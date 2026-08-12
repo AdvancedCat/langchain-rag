@@ -1,0 +1,36 @@
+{
+  "name": "docs-rag-agent",
+  "version": "1.0.0",
+  "description": "Deep Agents RAG documentation Q&A agent (indexes LangChain docs, offloads chunks, delegates analysis to subagents)",
+  "main": "agent.ts",
+  "scripts": {
+    "start": "tsx agent.ts",
+    "index": "tsx agent.ts --index-only",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "keywords": [
+    "langchain",
+    "deepagents",
+    "rag"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@langchain/anthropic": "^1.5.4",
+    "@langchain/classic": "^1.0.41",
+    "@langchain/core": "^1.2.5",
+    "@langchain/google-genai": "^2.2.0",
+    "@langchain/openai": "^1.5.6",
+    "@langchain/textsplitters": "^1.0.1",
+    "deepagents": "^1.12.2",
+    "dotenv": "^17.4.2",
+    "langchain": "^1.5.5",
+    "tsx": "^4.23.12",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "typescript": "^7.0.2"
+  }
+}

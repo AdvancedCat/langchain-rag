@@ -1,0 +1,14 @@
+{
+  "name": "langchain-lib",
+  "version": "1.0.0",
+  "description": "Monorepo for LangChain / Deep Agents experiments",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "rag": "pnpm --filter docs-rag-agent run start",
+    "rag:index": "pnpm --filter docs-rag-agent run index",
+    "typecheck": "pnpm -r run typecheck"
+  },
+  "license": "ISC",
+  "packageManager": "pnpm@10.7.0"
+}

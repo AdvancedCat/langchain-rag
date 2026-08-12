@@ -1,0 +1,15 @@
+packages:
+  - "packages/*"
+
+# Allow only these dependencies to run install/build scripts (pnpm 10 blocks
+# lifecycle scripts by default for supply-chain safety). tsx relies on esbuild.
+onlyBuiltDependencies:
+  - esbuild
+
+# deepagents declares langsmith@^0.7.1, but langchain@1.5 pulls langsmith 0.8.x
+# (same 0.x line, backward compatible and verified to run). Accept it to silence
+# the spurious peer-dependency warning.
+peerDependencyRules:
+  allowedVersions:
+    langsmith: "0.8.x"
+
