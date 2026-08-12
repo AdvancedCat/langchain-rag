@@ -7,6 +7,9 @@
   "scripts": {
     "rag": "pnpm --filter docs-rag-agent run start",
     "rag:index": "pnpm --filter docs-rag-agent run index",
+    "kafka:demo": "pnpm --filter kafka-example run demo",
+    "kafka:produce": "pnpm --filter kafka-example run produce",
+    "kafka:consume": "pnpm --filter kafka-example run consume",
     "typecheck": "pnpm -r run typecheck"
   },
   "license": "ISC",

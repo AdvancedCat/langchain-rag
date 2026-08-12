@@ -8,6 +8,25 @@ importers:
 
   .: {}
 
+  packages/kafka:
+    dependencies:
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
+      tsx:
+        specifier: ^4.23.12
+        version: 4.23.12
+    devDependencies:
+      '@types/node':
+        specifier: ^26.2.0
+        version: 26.2.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
   packages/rag:
     dependencies:
       '@langchain/anthropic':
@@ -545,6 +564,10 @@ packages:
     resolution: {integrity: sha512-p/nXbhSEcu3pZRdkW1OfJhpsVtW1gd4Wa1fnQc9YLiTfAjn0312eMKimbdIQzuZl9aa9xUGaRlP9T/CJE/ditQ==}
     engines: {node: '>=0.10.0'}
 
+  kafkajs@2.2.4:
+    resolution: {integrity: sha512-j/YeapB1vfPT2iOIUn/vxdyKEuhuY2PxMBvf5JWux6iSaukAccrMtXEY/Lb7OvavDhOWME589bpLrEdnVHjfjA==}
+    engines: {node: '>=14.0.0'}
+
   langchain@1.5.5:
     resolution: {integrity: sha512-KhedvQDRvaLIFMSvEy45U/pqR4G0dEfN7wPyHTBMgMIUXbcrVkaqRVlDSMPfMCwNuiRCfWFUHueYGtgSrwBcBA==}
     engines: {node: '>=20'}
@@ -1077,6 +1100,8 @@ snapshots:
       ts-algebra: 2.0.0
 
   jsonpointer@5.0.1: {}
+
+  kafkajs@2.2.4: {}
 
   langchain@1.5.5(@langchain/core@1.2.5(openai@6.49.0(zod@4.4.3)))(openai@6.49.0(zod@4.4.3)):
     dependencies:
