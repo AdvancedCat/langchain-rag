@@ -1,9 +1,11 @@
+import type { VectorStore } from '@langchain/core/vectorstores';
 import { Document } from '@langchain/core/documents';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import { MemoryVectorStore } from '@langchain/classic/vectorstores/memory';
 import { DOCS_BASE, DOC_PATHS, VECTOR_STORE_PATH } from '../config.js';
-import { createEmbeddings } from '../embeddings.js';
-import { saveVectorStore, loadVectorStore } from '../vectorStore.js';
+import {
+    loadVectorStore,
+    createVectorStoreFromDocuments,
+} from '../vectorStore.js';
 
 async function loadLangchainDocs(
     docPaths: string[] = DOC_PATHS,
@@ -30,7 +32,7 @@ async function loadLangchainDocs(
 
 export async function buildVectorStore(
     forceRebuild = false,
-): Promise<MemoryVectorStore> {
+): Promise<VectorStore> {
     if (!forceRebuild) {
         const existing = await loadVectorStore(VECTOR_STORE_PATH);
         if (existing) {
@@ -58,14 +60,7 @@ export async function buildVectorStore(
     console.log(`Split documentation into ${allSplits.length} chunks.`);
 
     console.log('Creating embeddings and indexing into the vector store...');
-    const embeddings = createEmbeddings();
-    const vectorStore = await MemoryVectorStore.fromDocuments(
-        allSplits,
-        embeddings,
-    );
-    console.log(`Indexed ${allSplits.length} chunks.`);
-
-    saveVectorStore(vectorStore, DOC_PATHS, VECTOR_STORE_PATH);
+    const vectorStore = await createVectorStoreFromDocuments(allSplits, DOC_PATHS);
 
     return vectorStore;
 }

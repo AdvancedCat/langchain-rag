@@ -1,4 +1,5 @@
 import { OpenAIEmbeddings } from '@langchain/openai';
+import type { EmbeddingsInterface } from '@langchain/core/embeddings';
 import type { EmbeddingConfig } from './config.js';
 
 export function getEmbeddingConfig(): EmbeddingConfig {
@@ -12,7 +13,7 @@ export function getEmbeddingConfig(): EmbeddingConfig {
     };
 }
 
-export function createEmbeddings(): OpenAIEmbeddings {
+export function createEmbeddings(): EmbeddingsInterface {
     const config = getEmbeddingConfig();
     if (!process.env.DASHSCOPE_API_KEY) {
         throw new Error(
