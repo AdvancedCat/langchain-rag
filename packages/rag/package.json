@@ -6,6 +6,9 @@
   "scripts": {
     "start": "tsx src/agent.ts",
     "index": "tsx src/agent.ts --index-only",
+    "eval": "tsx evals/run.ts",
+    "eval:rebuild": "tsx evals/run.ts --rebuild",
+    "eval:json": "tsx evals/run.ts --json",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "keywords": [

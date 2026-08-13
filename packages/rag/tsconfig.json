@@ -10,6 +10,6 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "evals/**/*.ts"],
   "exclude": ["node_modules"]
 }

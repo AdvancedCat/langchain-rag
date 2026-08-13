@@ -1,0 +1,386 @@
+{
+  "version": 1,
+  "description": "LangChain JS/deepagents RAG golden evaluation set. Chinese queries over English docs with Python docs as cross-language noise.",
+  "createdAt": "2026-08-13",
+  "queries": [
+    {
+      "id": "q001",
+      "query": "如何从子代理流式传输中间工具结果？",
+      "type": "api_usage",
+      "difficulty": "medium",
+      "expectedDocPaths": [
+        "oss/javascript/deepagents/streaming",
+        "oss/javascript/deepagents/frontend/subagent-streaming"
+      ],
+      "expectedKeywords": ["streamEvents", "subagent", "stream"]
+    },
+    {
+      "id": "q002",
+      "query": "deepagents 是什么？它和普通 LangChain Agent 有什么区别？",
+      "type": "comparison",
+      "difficulty": "easy",
+      "expectedDocPaths": [
+        "oss/javascript/deepagents/overview",
+        "oss/javascript/langchain/agents"
+      ],
+      "expectedKeywords": ["deepagents", "agent"]
+    },
+    {
+      "id": "q003",
+      "query": "RecursiveCharacterTextSplitter 的 chunk_size 和 chunk_overlap 参数怎么设置？",
+      "type": "api_usage",
+      "difficulty": "medium",
+      "expectedDocPaths": [
+        "oss/javascript/langchain/knowledge-base"
+      ],
+      "expectedKeywords": ["RecursiveCharacterTextSplitter", "chunkSize", "chunkOverlap"]
+    },
+    {
+      "id": "q004",
+      "query": "怎么在 LangChain 中使用 MCP 工具？",
+      "type": "api_usage",
+      "difficulty": "medium",
+      "expectedDocPaths": [
+        "oss/javascript/langchain/mcp",
+        "oss/javascript/deepagents/mcp"
+      ],
+      "expectedKeywords": ["MCP", "Model Context Protocol", "tool"]
+    },
+    {
+      "id": "q005",
+      "query": "StateBackend 是做什么用的？支持哪些后端？",
+      "type": "concept",
+      "difficulty": "medium",
+      "expectedDocPaths": [
+        "oss/javascript/deepagents/backends",
+        "oss/javascript/deepagents/retrieval"
+      ],
+      "expectedKeywords": ["StateBackend", "filesystem", "backend"]
+    },
+    {
+      "id": "q006",
+      "query": "LangGraph 的持久化和 checkpoint 机制是如何工作的？",
+      "type": "concept",
+      "difficulty": "hard",
+      "expectedDocPaths": [
+        "oss/javascript/langgraph/persistence",
+        "oss/javascript/langgraph/durable-execution"
+      ],
+      "expectedKeywords": ["checkpointer", "persistence", "thread"]
+    },
+    {
+      "id": "q007",
+      "query": "如何让 Agent 支持人工介入（human-in-the-loop）？",
+      "type": "api_usage",
+      "difficulty": "medium",
+      "expectedDocPaths": [
+        "oss/javascript/langchain/human-in-the-loop",
+        "oss/javascript/langgraph/human-in-the-loop"
+      ],
+      "expectedKeywords": ["interrupt", "human-in-the-loop", "approval"]
+    },
+    {
+      "id": "q008",
+      "query": "createDeepAgent 的 subagents 参数怎么配置多个子代理？",
+      "type": "api_usage",
+      "difficulty": "medium",
+      "expectedDocPaths": [
+        "oss/javascript/deepagents/subagents",
+        "oss/javascript/deepagents/overview"
+      ],
+      "expectedKeywords": ["subagents", "createDeepAgent", "SubAgent"]
+    },
+    {
+      "id": "q009",
+      "query": "LangChain 怎么做结构化输出？withStructuredOutput 怎么用？",
+      "type": "api_usage",
+      "difficulty": "medium",
+      "expectedDocPaths": [
+        "oss/javascript/langchain/structured-output"
+      ],
+      "expectedKeywords": ["withStructuredOutput", "structured", "zod"]
+    },
+    {
+      "id": "q010",
+      "query": "RAG 检索时向量相似度搜索和关键词搜索有什么区别？",
+      "type": "comparison",
+      "difficulty": "easy",
+      "expectedDocPaths": [
+        "oss/javascript/langchain/retrieval",
+        "oss/javascript/deepagents/retrieval"
+      ],
+      "expectedKeywords": ["vector", "BM25", "semantic", "keyword"]
+    },
+    {
+      "id": "q011",
+      "query": "deepagents 的 RAG 工作流是怎样的？",
+      "type": "concept",
+      "difficulty": "easy",
+      "expectedDocPaths": [
+        "oss/javascript/deepagents/rag",
+        "oss/javascript/deepagents/retrieval"
+      ],
+      "expectedKeywords": ["retrieve", "offload", "delegate", "RAG"]
+    },
+    {
+      "id": "q012",
+      "query": "LangGraph functional API 和 graph API 有什么区别？",
+      "type": "comparison",
+      "difficulty": "hard",
+      "expectedDocPaths": [
+        "oss/javascript/langgraph/functional-api",
+        "oss/javascript/langgraph/graph-api"
+      ],
+      "expectedKeywords": ["functional", "graph", "entrypoint", "node"]
+    },
+    {
+      "id": "q013",
+      "query": "怎么使用 astream_events 监听流式事件？",
+      "type": "api_usage",
+      "difficulty": "hard",
+      "expectedDocPaths": [
+        "oss/javascript/langchain/streaming",
+        "oss/javascript/langgraph/streaming"
+      ],
+      "expectedKeywords": ["astream_events", "stream", "event"]
+    },
+    {
+      "id": "q014",
+      "query": "deepagents 的 middleware 机制能做什么？",
+      "type": "concept",
+      "difficulty": "medium",
+      "expectedDocPaths": [
+        "oss/javascript/deepagents/middleware",
+        "oss/javascript/langchain/middleware"
+      ],
+      "expectedKeywords": ["middleware", "intercept", "hook"]
+    },
+    {
+      "id": "q015",
+      "query": "如何在 deepagents 中配置自定义工具？",
+      "type": "api_usage",
+      "difficulty": "easy",
+      "expectedDocPaths": [
+        "oss/javascript/deepagents/tools",
+        "oss/javascript/langchain/tools"
+      ],
+      "expectedKeywords": ["tool", "custom", "schema"]
+    },
+    {
+      "id": "q016",
+      "query": "LangGraph 的 memory 和 checkpointer 有什么不同？",
+      "type": "comparison",
+      "difficulty": "hard",
+      "expectedDocPaths": [
+        "oss/javascript/langgraph/memory",
+        "oss/javascript/langgraph/persistence"
+      ],
+      "expectedKeywords": ["memory", "checkpointer", "store", "thread"]
+    },
+    {
+      "id": "q017",
+      "query": "deepagents 前端集成怎么做？有哪些前端能力？",
+      "type": "concept",
+      "difficulty": "medium",
+      "expectedDocPaths": [
+        "oss/javascript/deepagents/frontend",
+        "oss/javascript/deepagents/frontend/overview",
+        "oss/javascript/deepagents/frontend/subagent-streaming"
+      ],
+      "expectedKeywords": ["frontend", "streaming", "UI"]
+    },
+    {
+      "id": "q018",
+      "query": "LangChain 的 tool calling 和 function calling 有什么区别？",
+      "type": "comparison",
+      "difficulty": "medium",
+      "expectedDocPaths": [
+        "oss/javascript/langchain/tools",
+        "oss/javascript/langchain/models"
+      ],
+      "expectedKeywords": ["tool calling", "function calling", "bindTools"]
+    },
+    {
+      "id": "q019",
+      "query": "durable execution 是什么？LangGraph 如何实现故障恢复？",
+      "type": "concept",
+      "difficulty": "hard",
+      "expectedDocPaths": [
+        "oss/javascript/langgraph/durable-execution",
+        "oss/javascript/langgraph/persistence"
+      ],
+      "expectedKeywords": ["durable", "checkpoint", "retry", "resume"]
+    },
+    {
+      "id": "q020",
+      "query": "deepagents quickstart 里的完整示例代码是怎样的？",
+      "type": "api_usage",
+      "difficulty": "easy",
+      "expectedDocPaths": [
+        "oss/javascript/deepagents/quickstart"
+      ],
+      "expectedKeywords": ["createDeepAgent", "quickstart", "example"]
+    },
+    {
+      "id": "q021",
+      "query": "如何观测和追踪 LangChain Agent 的执行过程？",
+      "type": "concept",
+      "difficulty": "medium",
+      "expectedDocPaths": [
+        "oss/javascript/langchain/observability"
+      ],
+      "expectedKeywords": ["tracing", "observability", "LangSmith", "callback"]
+    },
+    {
+      "id": "q022",
+      "query": "LangChain messages 有哪些类型？SystemMessage 和 HumanMessage 有什么区别？",
+      "type": "concept",
+      "difficulty": "easy",
+      "expectedDocPaths": [
+        "oss/javascript/langchain/messages"
+      ],
+      "expectedKeywords": ["SystemMessage", "HumanMessage", "AIMessage", "BaseMessage"]
+    },
+    {
+      "id": "q023",
+      "query": "怎么用 TypeScript 在 LangChain 中定义一个带 zod schema 的自定义 tool？",
+      "type": "api_usage",
+      "difficulty": "medium",
+      "expectedDocPaths": [
+        "oss/javascript/langchain/tools"
+      ],
+      "expectedKeywords": ["tool", "zod", "schema", "DynamicStructuredTool"]
+    },
+    {
+      "id": "q024",
+      "query": "LangChain JS 和 Python 版本的 API 有什么差异？",
+      "type": "comparison",
+      "difficulty": "hard",
+      "expectedDocPaths": [
+        "oss/javascript/langchain/overview",
+        "oss/python/langchain/overview"
+      ],
+      "expectedKeywords": ["JavaScript", "Python", "API"]
+    },
+    {
+      "id": "q025",
+      "query": "deepagents 的 write_todos 工具怎么用？",
+      "type": "api_usage",
+      "difficulty": "medium",
+      "expectedDocPaths": [
+        "oss/javascript/deepagents/tools",
+        "oss/javascript/deepagents/overview"
+      ],
+      "expectedKeywords": ["write_todos", "todo", "task"]
+    },
+    {
+      "id": "q026",
+      "query": "为什么我的 Agent 调用工具后结果没有出现在对话历史中？",
+      "type": "troubleshooting",
+      "difficulty": "hard",
+      "expectedDocPaths": [
+        "oss/javascript/langchain/middleware",
+        "oss/javascript/langchain/agents"
+      ],
+      "expectedKeywords": ["tool", "message", "history", "middleware"]
+    },
+    {
+      "id": "q027",
+      "query": "LangGraph 中 interrupt 函数抛出的 GraphInterruptError 怎么处理？",
+      "type": "troubleshooting",
+      "difficulty": "hard",
+      "expectedDocPaths": [
+        "oss/javascript/langgraph/human-in-the-loop",
+        "oss/javascript/langgraph/durable-execution"
+      ],
+      "expectedKeywords": ["interrupt", "GraphInterruptError", "Command"]
+    },
+    {
+      "id": "q028",
+      "query": "向量检索返回的 chunk 内容不相关，相似度分数也很低，怎么排查？",
+      "type": "troubleshooting",
+      "difficulty": "medium",
+      "expectedDocPaths": [
+        "oss/javascript/langchain/retrieval",
+        "oss/javascript/langchain/knowledge-base"
+      ],
+      "expectedKeywords": ["similarity", "embedding", "chunk", "threshold"]
+    },
+    {
+      "id": "q029",
+      "query": "deepagents 子代理执行超时或达到 recursion limit 怎么解决？",
+      "type": "troubleshooting",
+      "difficulty": "hard",
+      "expectedDocPaths": [
+        "oss/javascript/deepagents/subagents",
+        "oss/javascript/langgraph/graph-api"
+      ],
+      "expectedKeywords": ["recursion", "timeout", "subagent", "limit"]
+    },
+    {
+      "id": "q030",
+      "query": "Qdrant 向量库连接失败，collection size mismatch 错误怎么处理？",
+      "type": "troubleshooting",
+      "difficulty": "hard",
+      "expectedDocPaths": [
+        "oss/javascript/deepagents/backends",
+        "oss/javascript/langchain/retrieval"
+      ],
+      "expectedKeywords": ["Qdrant", "collection", "vector", "dimensions"]
+    },
+    {
+      "id": "q031",
+      "query": "streaming 模式下 on_chat_model_stream 和 on_tool_start 事件不触发怎么办？",
+      "type": "troubleshooting",
+      "difficulty": "hard",
+      "expectedDocPaths": [
+        "oss/javascript/langchain/streaming",
+        "oss/javascript/deepagents/streaming"
+      ],
+      "expectedKeywords": ["astream_events", "on_chat_model_stream", "on_tool_start", "callback"]
+    },
+    {
+      "id": "q032",
+      "query": "在 deepagents 中如何实现 RAG 的 retrieve-then-read 模式？",
+      "type": "concept",
+      "difficulty": "medium",
+      "expectedDocPaths": [
+        "oss/javascript/deepagents/rag",
+        "oss/javascript/deepagents/retrieval"
+      ],
+      "expectedKeywords": ["retrieve", "read", "search_documentation", "chunk-analyst"]
+    },
+    {
+      "id": "q033",
+      "query": "LangChain 支持哪些 embedding 模型？怎么配置 OpenAI embeddings？",
+      "type": "api_usage",
+      "difficulty": "easy",
+      "expectedDocPaths": [
+        "oss/javascript/langchain/models",
+        "oss/javascript/langchain/knowledge-base"
+      ],
+      "expectedKeywords": ["embedding", "OpenAIEmbeddings", "model", "dimension"]
+    },
+    {
+      "id": "q034",
+      "query": "deepagents 的 backend uploadFiles 和 read_file 是怎么配合的？",
+      "type": "api_usage",
+      "difficulty": "hard",
+      "expectedDocPaths": [
+        "oss/javascript/deepagents/backends",
+        "oss/javascript/deepagents/rag"
+      ],
+      "expectedKeywords": ["uploadFiles", "read_file", "StateBackend", "/retrieved/"]
+    },
+    {
+      "id": "q035",
+      "query": "LangGraph 的 StateGraph 中 addConditionalEdges 怎么使用？",
+      "type": "api_usage",
+      "difficulty": "hard",
+      "expectedDocPaths": [
+        "oss/javascript/langgraph/graph-api"
+      ],
+      "expectedKeywords": ["addConditionalEdges", "StateGraph", "conditional", "edge"]
+    }
+  ]
+}
