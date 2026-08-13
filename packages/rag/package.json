@@ -2,10 +2,10 @@
   "name": "docs-rag-agent",
   "version": "1.0.0",
   "description": "Deep Agents RAG documentation Q&A agent (indexes LangChain docs, offloads chunks, delegates analysis to subagents)",
-  "main": "agent.ts",
+  "main": "src/agent.ts",
   "scripts": {
-    "start": "tsx agent.ts",
-    "index": "tsx agent.ts --index-only",
+    "start": "tsx src/agent.ts",
+    "index": "tsx src/agent.ts --index-only",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "keywords": [
