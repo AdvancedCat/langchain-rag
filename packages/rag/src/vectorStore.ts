@@ -11,6 +11,15 @@ import { VECTOR_STORE_PATH } from './config.js';
 import { getEmbeddingConfig, createEmbeddings } from './embeddings.js';
 
 const DEFAULT_COLLECTION_NAME = 'langchain_docs';
+const UPSERT_BATCH_SIZE = 100;
+
+function chunkArray<T>(arr: T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) {
+        chunks.push(arr.slice(i, i + size));
+    }
+    return chunks;
+}
 
 function getVectorStoreType(): VectorStoreType {
     const type = process.env.VECTOR_STORE_TYPE?.toLowerCase();
@@ -234,11 +243,16 @@ export async function createVectorStoreFromDocuments(
             };
         }
 
-        const vectorStore = await QdrantVectorStore.fromDocuments(
-            documents,
-            embeddings,
-            dbConfig,
+        const vectorStore = new QdrantVectorStore(embeddings, dbConfig);
+
+        const batches = chunkArray(documents, UPSERT_BATCH_SIZE);
+        console.log(
+            `📦 Indexing ${documents.length} chunks in ${batches.length} batches (batchSize=${UPSERT_BATCH_SIZE})...`,
         );
+        for (let i = 0; i < batches.length; i++) {
+            await vectorStore.addDocuments(batches[i]);
+            console.log(`   Batch ${i + 1}/${batches.length} done (${batches[i].length} chunks)`);
+        }
 
         console.log(
             `✅ Indexed ${documents.length} chunks into Qdrant collection "${qdrantConfig.collectionName}"`,
@@ -247,7 +261,14 @@ export async function createVectorStoreFromDocuments(
     }
 
     console.log(`🔨 Building in-memory vector store...`);
-    const vectorStore = await MemoryVectorStore.fromDocuments(documents, embeddings);
+    const vectorStore = new MemoryVectorStore(embeddings);
+
+    const batches = chunkArray(documents, UPSERT_BATCH_SIZE);
+    for (let i = 0; i < batches.length; i++) {
+        await vectorStore.addDocuments(batches[i]);
+        console.log(`   Batch ${i + 1}/${batches.length} done (${batches[i].length} chunks)`);
+    }
+
     saveMemoryVectorStore(vectorStore, docPaths, VECTOR_STORE_PATH);
     return vectorStore;
 }

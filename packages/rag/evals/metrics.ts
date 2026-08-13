@@ -28,19 +28,25 @@ function dcgAtK(retrieved: RetrievedChunk[], expectedDocPaths: string[], k: numb
     return dcg;
 }
 
-function idcgAtK(numRelevant: number, k: number): number {
-    const idealHits = Math.min(numRelevant, k);
+function ndcgAtK(retrieved: RetrievedChunk[], expectedDocPaths: string[], k: number): number {
+    const topK = retrieved.slice(0, k);
+    let dcg = 0;
+    let numRelevantInTopK = 0;
+
+    for (let i = 0; i < topK.length; i++) {
+        if (isRelevantChunk(topK[i], expectedDocPaths)) {
+            dcg += 1 / Math.log2(i + 2);
+            numRelevantInTopK++;
+        }
+    }
+
+    if (numRelevantInTopK === 0) return 0;
+
     let idcg = 0;
-    for (let i = 0; i < idealHits; i++) {
+    for (let i = 0; i < numRelevantInTopK; i++) {
         idcg += 1 / Math.log2(i + 2);
     }
-    return idcg;
-}
 
-function ndcgAtK(retrieved: RetrievedChunk[], expectedDocPaths: string[], k: number): number {
-    const dcg = dcgAtK(retrieved, expectedDocPaths, k);
-    const idcg = idcgAtK(expectedDocPaths.length, k);
-    if (idcg === 0) return 0;
     return dcg / idcg;
 }
 
