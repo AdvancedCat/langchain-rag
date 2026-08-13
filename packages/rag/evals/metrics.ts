@@ -57,11 +57,30 @@ function keywordRecall(retrieved: RetrievedChunk[], expectedKeywords: string[]):
     return { hits, total: expectedKeywords.length };
 }
 
+function topScore(retrieved: RetrievedChunk[]): number {
+    if (retrieved.length === 0) return 0;
+    return retrieved[0].score;
+}
+
 export function evaluateQuery(
     query: GoldenQuery,
     retrieved: RetrievedChunk[],
     config: EvalConfig,
 ): QueryResult {
+    if (!query.answerable) {
+        return {
+            query,
+            retrieved,
+            hitAtK: Object.fromEntries(config.hitRateKs.map((k) => [k, false])) as Record<number, boolean>,
+            reciprocalRank: 0,
+            ndcgAtK: Object.fromEntries(config.ndcgKs.map((k) => [k, 0])) as Record<number, number>,
+            keywordHits: 0,
+            keywordTotal: 0,
+            abstentionCorrect: topScore(retrieved) < config.abstentionThreshold,
+            topScore: topScore(retrieved),
+        };
+    }
+
     const hitMap: Record<number, boolean> = {};
     const ndcgMap: Record<number, number> = {};
 
@@ -82,6 +101,8 @@ export function evaluateQuery(
         ndcgAtK: ndcgMap,
         keywordHits: hits,
         keywordTotal: total,
+        abstentionCorrect: false,
+        topScore: topScore(retrieved),
     };
 }
 

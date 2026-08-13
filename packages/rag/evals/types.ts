@@ -2,7 +2,8 @@ export type QueryType =
     | 'concept'
     | 'api_usage'
     | 'comparison'
-    | 'troubleshooting';
+    | 'troubleshooting'
+    | 'unanswerable';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
@@ -13,6 +14,7 @@ export interface GoldenQuery {
     difficulty: Difficulty;
     expectedDocPaths: string[];
     expectedKeywords: string[];
+    answerable: boolean;
 }
 
 export interface GoldenDataset {
@@ -37,14 +39,20 @@ export interface QueryResult {
     ndcgAtK: Record<number, number>;
     keywordHits: number;
     keywordTotal: number;
+    abstentionCorrect: boolean;
+    topScore: number;
 }
 
 export interface EvalReport {
     totalQueries: number;
+    answerableCount: number;
+    unanswerableCount: number;
     hitRateAtK: Record<number, number>;
     mrr: number;
     ndcgAtK: Record<number, number>;
     avgKeywordRecall: number;
+    abstentionRate: number;
+    unanswerableAvgTopScore: number;
     byType: Record<QueryType, TypeBreakdown>;
     byDifficulty: Record<Difficulty, TypeBreakdown>;
     perQuery: QueryResult[];
@@ -63,4 +71,5 @@ export interface EvalConfig {
     hitRateKs: number[];
     ndcgKs: number[];
     retrievalStrategy: string;
+    abstentionThreshold: number;
 }

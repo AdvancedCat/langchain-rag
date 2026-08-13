@@ -12,7 +12,12 @@
         "oss/javascript/deepagents/streaming",
         "oss/javascript/deepagents/frontend/subagent-streaming"
       ],
-      "expectedKeywords": ["streamEvents", "subagent", "stream"]
+      "expectedKeywords": [
+        "streamEvents",
+        "subagent",
+        "on_tool_start"
+      ],
+      "answerable": true
     },
     {
       "id": "q002",
@@ -23,17 +28,26 @@
         "oss/javascript/deepagents/overview",
         "oss/javascript/langchain/agents"
       ],
-      "expectedKeywords": ["deepagents", "agent"]
+      "expectedKeywords": [
+        "deepagents",
+        "createDeepAgent"
+      ],
+      "answerable": true
     },
     {
       "id": "q003",
       "query": "RecursiveCharacterTextSplitter 的 chunk_size 和 chunk_overlap 参数怎么设置？",
       "type": "api_usage",
-      "difficulty": "medium",
+      "difficulty": "easy",
       "expectedDocPaths": [
         "oss/javascript/langchain/knowledge-base"
       ],
-      "expectedKeywords": ["RecursiveCharacterTextSplitter", "chunkSize", "chunkOverlap"]
+      "expectedKeywords": [
+        "RecursiveCharacterTextSplitter",
+        "chunkSize",
+        "chunkOverlap"
+      ],
+      "answerable": true
     },
     {
       "id": "q004",
@@ -44,7 +58,12 @@
         "oss/javascript/langchain/mcp",
         "oss/javascript/deepagents/mcp"
       ],
-      "expectedKeywords": ["MCP", "Model Context Protocol", "tool"]
+      "expectedKeywords": [
+        "MCP",
+        "Model Context Protocol",
+        "MCPTool"
+      ],
+      "answerable": true
     },
     {
       "id": "q005",
@@ -55,7 +74,12 @@
         "oss/javascript/deepagents/backends",
         "oss/javascript/deepagents/retrieval"
       ],
-      "expectedKeywords": ["StateBackend", "filesystem", "backend"]
+      "expectedKeywords": [
+        "StateBackend",
+        "filesystem",
+        "backend"
+      ],
+      "answerable": true
     },
     {
       "id": "q006",
@@ -66,7 +90,12 @@
         "oss/javascript/langgraph/persistence",
         "oss/javascript/langgraph/durable-execution"
       ],
-      "expectedKeywords": ["checkpointer", "persistence", "thread"]
+      "expectedKeywords": [
+        "checkpointer",
+        "persistence",
+        "thread"
+      ],
+      "answerable": true
     },
     {
       "id": "q007",
@@ -77,7 +106,12 @@
         "oss/javascript/langchain/human-in-the-loop",
         "oss/javascript/langgraph/human-in-the-loop"
       ],
-      "expectedKeywords": ["interrupt", "human-in-the-loop", "approval"]
+      "expectedKeywords": [
+        "interrupt",
+        "human-in-the-loop",
+        "approval"
+      ],
+      "answerable": true
     },
     {
       "id": "q008",
@@ -88,7 +122,12 @@
         "oss/javascript/deepagents/subagents",
         "oss/javascript/deepagents/overview"
       ],
-      "expectedKeywords": ["subagents", "createDeepAgent", "SubAgent"]
+      "expectedKeywords": [
+        "subagents",
+        "createDeepAgent",
+        "SubAgent"
+      ],
+      "answerable": true
     },
     {
       "id": "q009",
@@ -98,7 +137,12 @@
       "expectedDocPaths": [
         "oss/javascript/langchain/structured-output"
       ],
-      "expectedKeywords": ["withStructuredOutput", "structured", "zod"]
+      "expectedKeywords": [
+        "withStructuredOutput",
+        "structured",
+        "zod"
+      ],
+      "answerable": true
     },
     {
       "id": "q010",
@@ -109,7 +153,13 @@
         "oss/javascript/langchain/retrieval",
         "oss/javascript/deepagents/retrieval"
       ],
-      "expectedKeywords": ["vector", "BM25", "semantic", "keyword"]
+      "expectedKeywords": [
+        "vector",
+        "BM25",
+        "semantic",
+        "keyword"
+      ],
+      "answerable": true
     },
     {
       "id": "q011",
@@ -120,7 +170,13 @@
         "oss/javascript/deepagents/rag",
         "oss/javascript/deepagents/retrieval"
       ],
-      "expectedKeywords": ["retrieve", "offload", "delegate", "RAG"]
+      "expectedKeywords": [
+        "retrieve",
+        "offload",
+        "delegate",
+        "RAG"
+      ],
+      "answerable": true
     },
     {
       "id": "q012",
@@ -131,7 +187,13 @@
         "oss/javascript/langgraph/functional-api",
         "oss/javascript/langgraph/graph-api"
       ],
-      "expectedKeywords": ["functional", "graph", "entrypoint", "node"]
+      "expectedKeywords": [
+        "functional",
+        "StateGraph",
+        "entrypoint",
+        "addNode"
+      ],
+      "answerable": true
     },
     {
       "id": "q013",
@@ -142,7 +204,12 @@
         "oss/javascript/langchain/streaming",
         "oss/javascript/langgraph/streaming"
       ],
-      "expectedKeywords": ["astream_events", "stream", "event"]
+      "expectedKeywords": [
+        "astream_events",
+        "on_chat_model_stream",
+        "event"
+      ],
+      "answerable": true
     },
     {
       "id": "q014",
@@ -153,18 +220,28 @@
         "oss/javascript/deepagents/middleware",
         "oss/javascript/langchain/middleware"
       ],
-      "expectedKeywords": ["middleware", "intercept", "hook"]
+      "expectedKeywords": [
+        "middleware",
+        "intercept",
+        "dynamicMiddleware"
+      ],
+      "answerable": true
     },
     {
       "id": "q015",
       "query": "如何在 deepagents 中配置自定义工具？",
       "type": "api_usage",
-      "difficulty": "easy",
+      "difficulty": "medium",
       "expectedDocPaths": [
         "oss/javascript/deepagents/tools",
         "oss/javascript/langchain/tools"
       ],
-      "expectedKeywords": ["tool", "custom", "schema"]
+      "expectedKeywords": [
+        "DynamicStructuredTool",
+        "custom",
+        "schema"
+      ],
+      "answerable": true
     },
     {
       "id": "q016",
@@ -175,7 +252,13 @@
         "oss/javascript/langgraph/memory",
         "oss/javascript/langgraph/persistence"
       ],
-      "expectedKeywords": ["memory", "checkpointer", "store", "thread"]
+      "expectedKeywords": [
+        "memory",
+        "checkpointer",
+        "store",
+        "thread"
+      ],
+      "answerable": true
     },
     {
       "id": "q017",
@@ -187,7 +270,12 @@
         "oss/javascript/deepagents/frontend/overview",
         "oss/javascript/deepagents/frontend/subagent-streaming"
       ],
-      "expectedKeywords": ["frontend", "streaming", "UI"]
+      "expectedKeywords": [
+        "frontend",
+        "streaming",
+        "useStream"
+      ],
+      "answerable": true
     },
     {
       "id": "q018",
@@ -198,7 +286,12 @@
         "oss/javascript/langchain/tools",
         "oss/javascript/langchain/models"
       ],
-      "expectedKeywords": ["tool calling", "function calling", "bindTools"]
+      "expectedKeywords": [
+        "tool calling",
+        "function calling",
+        "bindTools"
+      ],
+      "answerable": true
     },
     {
       "id": "q019",
@@ -209,17 +302,28 @@
         "oss/javascript/langgraph/durable-execution",
         "oss/javascript/langgraph/persistence"
       ],
-      "expectedKeywords": ["durable", "checkpoint", "retry", "resume"]
+      "expectedKeywords": [
+        "durable",
+        "checkpoint",
+        "retry",
+        "resume"
+      ],
+      "answerable": true
     },
     {
       "id": "q020",
       "query": "deepagents quickstart 里的完整示例代码是怎样的？",
       "type": "api_usage",
-      "difficulty": "easy",
+      "difficulty": "medium",
       "expectedDocPaths": [
         "oss/javascript/deepagents/quickstart"
       ],
-      "expectedKeywords": ["createDeepAgent", "quickstart", "example"]
+      "expectedKeywords": [
+        "createDeepAgent",
+        "quickstart",
+        "import"
+      ],
+      "answerable": true
     },
     {
       "id": "q021",
@@ -229,7 +333,13 @@
       "expectedDocPaths": [
         "oss/javascript/langchain/observability"
       ],
-      "expectedKeywords": ["tracing", "observability", "LangSmith", "callback"]
+      "expectedKeywords": [
+        "tracing",
+        "observability",
+        "LangSmith",
+        "callback"
+      ],
+      "answerable": true
     },
     {
       "id": "q022",
@@ -239,7 +349,13 @@
       "expectedDocPaths": [
         "oss/javascript/langchain/messages"
       ],
-      "expectedKeywords": ["SystemMessage", "HumanMessage", "AIMessage", "BaseMessage"]
+      "expectedKeywords": [
+        "SystemMessage",
+        "HumanMessage",
+        "AIMessage",
+        "BaseMessage"
+      ],
+      "answerable": true
     },
     {
       "id": "q023",
@@ -249,7 +365,13 @@
       "expectedDocPaths": [
         "oss/javascript/langchain/tools"
       ],
-      "expectedKeywords": ["tool", "zod", "schema", "DynamicStructuredTool"]
+      "expectedKeywords": [
+        "DynamicStructuredTool",
+        "zod",
+        "schema",
+        "@tool"
+      ],
+      "answerable": true
     },
     {
       "id": "q024",
@@ -260,7 +382,12 @@
         "oss/javascript/langchain/overview",
         "oss/python/langchain/overview"
       ],
-      "expectedKeywords": ["JavaScript", "Python", "API"]
+      "expectedKeywords": [
+        "JavaScript",
+        "Python",
+        "parity"
+      ],
+      "answerable": true
     },
     {
       "id": "q025",
@@ -271,7 +398,12 @@
         "oss/javascript/deepagents/tools",
         "oss/javascript/deepagents/overview"
       ],
-      "expectedKeywords": ["write_todos", "todo", "task"]
+      "expectedKeywords": [
+        "write_todos",
+        "task_list",
+        "plan"
+      ],
+      "answerable": true
     },
     {
       "id": "q026",
@@ -282,7 +414,13 @@
         "oss/javascript/langchain/middleware",
         "oss/javascript/langchain/agents"
       ],
-      "expectedKeywords": ["tool", "message", "history", "middleware"]
+      "expectedKeywords": [
+        "ToolMessage",
+        "message",
+        "history",
+        "middleware"
+      ],
+      "answerable": true
     },
     {
       "id": "q027",
@@ -293,7 +431,12 @@
         "oss/javascript/langgraph/human-in-the-loop",
         "oss/javascript/langgraph/durable-execution"
       ],
-      "expectedKeywords": ["interrupt", "GraphInterruptError", "Command"]
+      "expectedKeywords": [
+        "interrupt",
+        "GraphInterruptError",
+        "Command"
+      ],
+      "answerable": true
     },
     {
       "id": "q028",
@@ -304,7 +447,13 @@
         "oss/javascript/langchain/retrieval",
         "oss/javascript/langchain/knowledge-base"
       ],
-      "expectedKeywords": ["similarity", "embedding", "chunk", "threshold"]
+      "expectedKeywords": [
+        "similarity",
+        "embedding",
+        "chunk",
+        "threshold"
+      ],
+      "answerable": true
     },
     {
       "id": "q029",
@@ -315,7 +464,13 @@
         "oss/javascript/deepagents/subagents",
         "oss/javascript/langgraph/graph-api"
       ],
-      "expectedKeywords": ["recursion", "timeout", "subagent", "limit"]
+      "expectedKeywords": [
+        "recursion",
+        "timeout",
+        "subagent",
+        "limit"
+      ],
+      "answerable": true
     },
     {
       "id": "q030",
@@ -326,7 +481,13 @@
         "oss/javascript/deepagents/backends",
         "oss/javascript/langchain/retrieval"
       ],
-      "expectedKeywords": ["Qdrant", "collection", "vector", "dimensions"]
+      "expectedKeywords": [
+        "Qdrant",
+        "collection",
+        "vector",
+        "dimensions"
+      ],
+      "answerable": true
     },
     {
       "id": "q031",
@@ -337,7 +498,13 @@
         "oss/javascript/langchain/streaming",
         "oss/javascript/deepagents/streaming"
       ],
-      "expectedKeywords": ["astream_events", "on_chat_model_stream", "on_tool_start", "callback"]
+      "expectedKeywords": [
+        "astream_events",
+        "on_chat_model_stream",
+        "on_tool_start",
+        "callback"
+      ],
+      "answerable": true
     },
     {
       "id": "q032",
@@ -348,7 +515,13 @@
         "oss/javascript/deepagents/rag",
         "oss/javascript/deepagents/retrieval"
       ],
-      "expectedKeywords": ["retrieve", "read", "search_documentation", "chunk-analyst"]
+      "expectedKeywords": [
+        "retrieve",
+        "read_file",
+        "search_documentation",
+        "chunk-analyst"
+      ],
+      "answerable": true
     },
     {
       "id": "q033",
@@ -359,7 +532,13 @@
         "oss/javascript/langchain/models",
         "oss/javascript/langchain/knowledge-base"
       ],
-      "expectedKeywords": ["embedding", "OpenAIEmbeddings", "model", "dimension"]
+      "expectedKeywords": [
+        "embedding",
+        "OpenAIEmbeddings",
+        "embedQuery",
+        "dimension"
+      ],
+      "answerable": true
     },
     {
       "id": "q034",
@@ -370,7 +549,13 @@
         "oss/javascript/deepagents/backends",
         "oss/javascript/deepagents/rag"
       ],
-      "expectedKeywords": ["uploadFiles", "read_file", "StateBackend", "/retrieved/"]
+      "expectedKeywords": [
+        "uploadFiles",
+        "read_file",
+        "StateBackend",
+        "/retrieved/"
+      ],
+      "answerable": true
     },
     {
       "id": "q035",
@@ -380,7 +565,117 @@
       "expectedDocPaths": [
         "oss/javascript/langgraph/graph-api"
       ],
-      "expectedKeywords": ["addConditionalEdges", "StateGraph", "conditional", "edge"]
+      "expectedKeywords": [
+        "addConditionalEdges",
+        "StateGraph",
+        "conditional",
+        "edge"
+      ],
+      "answerable": true
+    },
+    {
+      "id": "q036",
+      "query": "LangChain JS 快速开始的第一步是什么？如何安装和初始化？",
+      "type": "api_usage",
+      "difficulty": "easy",
+      "expectedDocPaths": [
+        "oss/javascript/langchain/quickstart",
+        "oss/javascript/langchain/overview"
+      ],
+      "expectedKeywords": [
+        "install",
+        "npm",
+        "import",
+        "ChatOpenAI"
+      ],
+      "answerable": true
+    },
+    {
+      "id": "q037",
+      "query": "LangGraph 是什么？它适合解决什么类型的问题？",
+      "type": "concept",
+      "difficulty": "easy",
+      "expectedDocPaths": [
+        "oss/javascript/langgraph/overview"
+      ],
+      "expectedKeywords": [
+        "LangGraph",
+        "StateGraph",
+        "workflow",
+        "cyclic"
+      ],
+      "answerable": true
+    },
+    {
+      "id": "q038",
+      "query": "LangGraph JS 快速开始怎么构建第一个 graph？",
+      "type": "api_usage",
+      "difficulty": "easy",
+      "expectedDocPaths": [
+        "oss/javascript/langgraph/quickstart",
+        "oss/javascript/langgraph/graph-api"
+      ],
+      "expectedKeywords": [
+        "StateGraph",
+        "addNode",
+        "addEdge",
+        "compile"
+      ],
+      "answerable": true
+    },
+    {
+      "id": "q039",
+      "query": "如何在 LangChain 中集成 Pinecone 向量数据库？",
+      "type": "unanswerable",
+      "difficulty": "medium",
+      "expectedDocPaths": [],
+      "expectedKeywords": [],
+      "answerable": false
+    },
+    {
+      "id": "q040",
+      "query": "deepagents 如何配置 Redis 作为 StateBackend？",
+      "type": "unanswerable",
+      "difficulty": "medium",
+      "expectedDocPaths": [],
+      "expectedKeywords": [],
+      "answerable": false
+    },
+    {
+      "id": "q041",
+      "query": "LangGraph 怎么部署到 AWS Lambda 上？",
+      "type": "unanswerable",
+      "difficulty": "hard",
+      "expectedDocPaths": [],
+      "expectedKeywords": [],
+      "answerable": false
+    },
+    {
+      "id": "q042",
+      "query": "LangChain 怎么做 prompt 的 A/B 测试和流量分桶？",
+      "type": "unanswerable",
+      "difficulty": "medium",
+      "expectedDocPaths": [],
+      "expectedKeywords": [],
+      "answerable": false
+    },
+    {
+      "id": "q043",
+      "query": "怎么在 deepagents 中实现多租户状态隔离？",
+      "type": "unanswerable",
+      "difficulty": "hard",
+      "expectedDocPaths": [],
+      "expectedKeywords": [],
+      "answerable": false
+    },
+    {
+      "id": "q044",
+      "query": "LangChain 如何与 LlamaIndex 的数据加载器配合使用？",
+      "type": "unanswerable",
+      "difficulty": "medium",
+      "expectedDocPaths": [],
+      "expectedKeywords": [],
+      "answerable": false
     }
   ]
 }

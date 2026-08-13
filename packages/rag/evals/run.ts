@@ -125,6 +125,7 @@ function aggregateReport(
         api_usage: [],
         comparison: [],
         troubleshooting: [],
+        unanswerable: [],
     };
     const byDifficultyRec: Record<Difficulty, QueryResult[]> = {
         easy: [],
@@ -132,31 +133,52 @@ function aggregateReport(
         hard: [],
     };
 
+    const answerableResults: QueryResult[] = [];
+    const unanswerableResults: QueryResult[] = [];
+
     for (const r of results) {
         byType[r.query.type].push(r);
         byDifficultyRec[r.query.difficulty].push(r);
+        if (r.query.answerable) {
+            answerableResults.push(r);
+        } else {
+            unanswerableResults.push(r);
+        }
     }
 
-    const keywordResults = results.filter((r) => r.keywordTotal > 0);
+    const keywordResults = answerableResults.filter((r) => r.keywordTotal > 0);
     const avgKeywordRecall = keywordResults.length > 0
         ? mean(keywordResults.map((r) => r.keywordHits / r.keywordTotal))
         : 0;
 
+    const abstentionCorrect = unanswerableResults.filter((r) => r.abstentionCorrect).length;
+    const abstentionRate = unanswerableResults.length > 0
+        ? abstentionCorrect / unanswerableResults.length
+        : 0;
+    const unanswerableAvgTopScore = unanswerableResults.length > 0
+        ? mean(unanswerableResults.map((r) => r.topScore))
+        : 0;
+
     return {
         totalQueries: results.length,
+        answerableCount: answerableResults.length,
+        unanswerableCount: unanswerableResults.length,
         hitRateAtK: Object.fromEntries(
-            ks.map((k) => [k, mean(results.map((r) => (r.hitAtK[k] ? 1 : 0)))]),
+            ks.map((k) => [k, mean(answerableResults.map((r) => (r.hitAtK[k] ? 1 : 0)))]),
         ) as Record<number, number>,
-        mrr: mean(results.map((r) => r.reciprocalRank)),
+        mrr: mean(answerableResults.map((r) => r.reciprocalRank)),
         ndcgAtK: Object.fromEntries(
-            ks.map((k) => [k, mean(results.map((r) => r.ndcgAtK[k]))]),
+            ks.map((k) => [k, mean(answerableResults.map((r) => r.ndcgAtK[k]))]),
         ) as Record<number, number>,
         avgKeywordRecall,
+        abstentionRate,
+        unanswerableAvgTopScore,
         byType: {
             concept: computeBreakdown(byType.concept, ks),
             api_usage: computeBreakdown(byType.api_usage, ks),
             comparison: computeBreakdown(byType.comparison, ks),
             troubleshooting: computeBreakdown(byType.troubleshooting, ks),
+            unanswerable: computeBreakdown(byType.unanswerable, ks),
         },
         byDifficulty: {
             easy: computeBreakdown(byDifficultyRec.easy, ks),
@@ -176,10 +198,10 @@ function printReport(report: EvalReport): void {
     console.log('='.repeat(70));
     console.log(`  Strategy      : ${report.config.retrievalStrategy}`);
     console.log(`  Fetch K       : ${report.config.fetchK}`);
-    console.log(`  Total queries : ${report.totalQueries}`);
+    console.log(`  Total queries : ${report.totalQueries} (answerable: ${report.answerableCount}, unanswerable: ${report.unanswerableCount})`);
     console.log('-'.repeat(70));
 
-    console.log('\n  Overall Metrics:');
+    console.log('\n  Answerable Metrics (retrieval accuracy):');
     for (const k of report.config.hitRateKs) {
         console.log(`    Hit Rate@${k}  : ${formatPct(report.hitRateAtK[k])}`);
     }
@@ -188,6 +210,12 @@ function printReport(report: EvalReport): void {
         console.log(`    NDCG@${k}      : ${report.ndcgAtK[k].toFixed(4)}`);
     }
     console.log(`    Keyword Recall: ${formatPct(report.avgKeywordRecall)}`);
+
+    if (report.unanswerableCount > 0) {
+        console.log('\n  Unanswerable Metrics (abstention ability):');
+        console.log(`    Abstention Rate : ${formatPct(report.abstentionRate)} (topScore < ${report.config.abstentionThreshold})`);
+        console.log(`    Avg Top Score   : ${report.unanswerableAvgTopScore.toFixed(4)}`);
+    }
 
     console.log('\n  By Query Type:');
     console.log('    Type              Count  Hit@4   Hit@10  MRR     NDCG@10');
@@ -207,17 +235,35 @@ function printReport(report: EvalReport): void {
         );
     }
 
-    console.log('\n  Failed Queries (Hit@4 = 0):');
-    const failed = report.perQuery.filter((r) => !r.hitAtK[4]);
-    if (failed.length === 0) {
+    const answerableFailed = report.perQuery.filter(
+        (r) => r.query.answerable && !r.hitAtK[4],
+    );
+    console.log('\n  Answerable Failures (Hit@4 = 0):');
+    if (answerableFailed.length === 0) {
         console.log('    None 🎉');
     } else {
-        for (const r of failed) {
+        for (const r of answerableFailed) {
             const topPaths = r.retrieved.slice(0, 4).map((c) => c.docPath.split('/').pop()).join(', ');
             console.log(`    [${r.query.id}] (${r.query.type}/${r.query.difficulty})`);
             console.log(`      Q: ${r.query.query}`);
             console.log(`      Expected: ${r.query.expectedDocPaths.map((p) => p.split('/').pop()).join(', ')}`);
             console.log(`      Got: ${topPaths}`);
+        }
+    }
+
+    const falseConfidence = report.perQuery.filter(
+        (r) => !r.query.answerable && !r.abstentionCorrect,
+    );
+    if (report.unanswerableCount > 0) {
+        console.log('\n  Unanswerable False Confidence (topScore >= threshold):');
+        if (falseConfidence.length === 0) {
+            console.log('    None 🎉');
+        } else {
+            for (const r of falseConfidence) {
+                const topPath = r.retrieved[0]?.docPath.split('/').pop() ?? 'none';
+                console.log(`    [${r.query.id}] topScore=${r.topScore.toFixed(4)} -> ${topPath}`);
+                console.log(`      Q: ${r.query.query}`);
+            }
         }
     }
 
@@ -243,6 +289,7 @@ async function main(): Promise<void> {
         hitRateKs: [cli.topK, 10, cli.fetchK],
         ndcgKs: [cli.topK, 10, cli.fetchK],
         retrievalStrategy: 'baseline-dense',
+        abstentionThreshold: 0.78,
     };
 
     console.log('🔨 Building/loading vector store...');
