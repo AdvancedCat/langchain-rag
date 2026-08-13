@@ -1,6 +1,8 @@
 import "dotenv/config";
 
 import { randomUUID } from "node:crypto";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import { z } from "zod";
 
 import { Document } from "@langchain/core/documents";
@@ -17,6 +19,23 @@ import { getLLM } from "../libs/llm-provider.js";
 // ============================================================================
 
 const DOCS_BASE = "https://docs.langchain.com";
+const VECTOR_STORE_PATH = "./vectorstore/index.json";
+
+interface MemoryVector {
+  content: string;
+  embedding: number[];
+  metadata: Record<string, any>;
+  id?: string;
+}
+
+interface SerializedVectorStore {
+  version: number;
+  embeddingModel: string;
+  embeddingDimensions?: number;
+  docPaths: string[];
+  vectors: MemoryVector[];
+  createdAt: string;
+}
 
 // Curated LangChain OSS pages for this tutorial. Expand this list or filter
 // llms.txt URLs to index more of the site.
@@ -44,33 +63,112 @@ const EXAMPLE_QUERY =
 // Embedding factory: switch between OpenAI and Qianwen (DashScope) via env
 // ============================================================================
 
-function createEmbeddings() {
+function getEmbeddingConfig() {
   const dashscopeApiKey = process.env.DASHSCOPE_API_KEY;
   if (dashscopeApiKey) {
-    console.log(
-      "🧠 Using Qianwen embedding:",
-      process.env.QWEN_EMBEDDING_MODEL ?? "qwen3.7-text-embedding",
-    );
+    const model = process.env.QWEN_EMBEDDING_MODEL ?? "qwen3.7-text-embedding";
     const dimensions = process.env.QWEN_EMBEDDING_DIMENSIONS
       ? Number(process.env.QWEN_EMBEDDING_DIMENSIONS)
       : undefined;
+    return {
+      provider: "qianwen" as const,
+      model,
+      dimensions,
+    };
+  }
+  return {
+    provider: "openai" as const,
+    model: "text-embedding-3-small",
+    dimensions: undefined,
+  };
+}
+
+function createEmbeddings() {
+  const config = getEmbeddingConfig();
+  if (config.provider === "qianwen") {
+    console.log("🧠 Using Qianwen embedding:", config.model);
     return new OpenAIEmbeddings({
-      apiKey: dashscopeApiKey,
+      apiKey: process.env.DASHSCOPE_API_KEY,
       configuration: {
         baseURL:
           process.env.DASHSCOPE_BASE_URL ??
           "https://dashscope.aliyuncs.com/compatible-mode/v1",
       },
-      model:
-        process.env.QWEN_EMBEDDING_MODEL ?? "qwen3.7-text-embedding",
-      batchSize: 20, // Qianwen API limit: max 20 inputs per request
-      ...(dimensions ? { dimensions } : {}),
+      model: config.model,
+      batchSize: 20,
+      ...(config.dimensions ? { dimensions: config.dimensions } : {}),
     });
   }
 
-  // Fallback to OpenAI default
   console.log("🧠 Using OpenAI embedding: text-embedding-3-small");
   return new OpenAIEmbeddings({ model: "text-embedding-3-small" });
+}
+
+// ============================================================================
+// Persistence helpers for MemoryVectorStore
+// ============================================================================
+
+function saveVectorStore(
+  vectorStore: MemoryVectorStore,
+  docPaths: string[],
+  filePath: string,
+): void {
+  const config = getEmbeddingConfig();
+  const serialized: SerializedVectorStore = {
+    version: 1,
+    embeddingModel: config.model,
+    embeddingDimensions: config.dimensions,
+    docPaths,
+    vectors: (vectorStore as any).memoryVectors as MemoryVector[],
+    createdAt: new Date().toISOString(),
+  };
+
+  mkdirSync(dirname(filePath), { recursive: true });
+  writeFileSync(filePath, JSON.stringify(serialized, null, 2), "utf-8");
+
+  const sizeMB = (Buffer.byteLength(JSON.stringify(serialized)) / 1024 / 1024).toFixed(2);
+  console.log(`💾 Saved ${serialized.vectors.length} vectors to ${filePath} (${sizeMB} MB)`);
+}
+
+async function loadVectorStore(
+  filePath: string,
+): Promise<MemoryVectorStore | null> {
+  if (!existsSync(filePath)) {
+    return null;
+  }
+
+  try {
+    const raw = readFileSync(filePath, "utf-8");
+    const data = JSON.parse(raw) as SerializedVectorStore;
+    const config = getEmbeddingConfig();
+
+    if (data.embeddingModel !== config.model) {
+      console.warn(
+        `⚠️  Embedding model mismatch: saved="${data.embeddingModel}", current="${config.model}". Rebuilding...`,
+      );
+      return null;
+    }
+
+    if (data.embeddingDimensions !== config.dimensions) {
+      console.warn(
+        `⚠️  Embedding dimensions mismatch: saved=${data.embeddingDimensions}, current=${config.dimensions}. Rebuilding...`,
+      );
+      return null;
+    }
+
+    const embeddings = createEmbeddings();
+    const vectorStore = new MemoryVectorStore(embeddings);
+
+    (vectorStore as any).memoryVectors = data.vectors;
+
+    console.log(
+      `✅ Loaded ${data.vectors.length} vectors from ${filePath} (indexed at ${data.createdAt})`,
+    );
+    return vectorStore;
+  } catch (error) {
+    console.warn(`⚠️  Failed to load vector store:`, error instanceof Error ? error.message : error);
+    return null;
+  }
 }
 
 // ============================================================================
@@ -101,10 +199,19 @@ async function loadLangchainDocs(
 }
 
 // ============================================================================
-// Step 2: Build the vector store (load -> split -> embed -> store)
+// Step 2: Build the vector store (load -> split -> embed -> store -> persist)
+// Design: "load local first, rebuild as fallback" pattern per Experience #519197
 // ============================================================================
 
-async function buildVectorStore(): Promise<MemoryVectorStore> {
+async function buildVectorStore(forceRebuild = false): Promise<MemoryVectorStore> {
+  if (!forceRebuild) {
+    const existing = await loadVectorStore(VECTOR_STORE_PATH);
+    if (existing) {
+      return existing;
+    }
+  }
+
+  console.log("🔨 Building new vector store from documentation...");
   console.log("Loading LangChain documentation...");
   const docs = await loadLangchainDocs();
   console.log(`Loaded ${docs.length} documentation pages.`);
@@ -122,9 +229,10 @@ async function buildVectorStore(): Promise<MemoryVectorStore> {
 
   console.log("Creating embeddings and indexing into the vector store...");
   const embeddings = createEmbeddings();
-  const vectorStore = new MemoryVectorStore(embeddings);
-  await vectorStore.addDocuments(allSplits);
+  const vectorStore = await MemoryVectorStore.fromDocuments(allSplits, embeddings);
   console.log(`Indexed ${allSplits.length} chunks.`);
+
+  saveVectorStore(vectorStore, DOC_PATHS, VECTOR_STORE_PATH);
 
   return vectorStore;
 }
@@ -155,8 +263,8 @@ When delegating:
 - Limit concurrent delegations to {max_concurrent_analysts} to avoid rate limits.
 - After all analysts return, synthesize their findings with citations to the source URLs.`;
 
-async function createRagAgent() {
-  const vectorStore = await buildVectorStore();
+async function createRagAgent(forceRebuild = false) {
+  const vectorStore = await buildVectorStore(forceRebuild);
   const backend = new StateBackend();
 
   // Custom retrieval tool: run vector similarity search, then write each
@@ -168,7 +276,7 @@ async function createRagAgent() {
       const uploads: Array<[string, Uint8Array]> = [];
       const savedPaths: string[] = [];
 
-      retrievedDocs.forEach((doc, index) => {
+      retrievedDocs.forEach((doc: Document, index: number) => {
         const path = `/retrieved/${batchId}/chunk_${index + 1}.md`;
         const content =
           `# Source: ${doc.metadata?.source ?? "unknown"}\n\n${doc.pageContent}`;
@@ -234,7 +342,9 @@ async function createRagAgent() {
 // ============================================================================
 
 async function main() {
-  const isIndexOnly = process.argv.slice(2).includes("--index-only");
+  const args = process.argv.slice(2);
+  const isIndexOnly = args.includes("--index-only");
+  const forceRebuild = args.includes("--rebuild");
 
   console.log("=".repeat(80));
   console.log("Deep Agents RAG - Documentation Q&A Agent");
@@ -242,12 +352,12 @@ async function main() {
   console.log();
 
   if (isIndexOnly) {
-    await buildVectorStore();
+    await buildVectorStore(forceRebuild);
     console.log("Indexing complete.");
     return;
   }
 
-  const agent = await createRagAgent();
+  const agent = await createRagAgent(forceRebuild);
 
   console.log();
   console.log(`Query: ${EXAMPLE_QUERY}`);
