@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "description": "LangChain JS/deepagents RAG golden evaluation set. Chinese queries over English docs with Python docs as cross-language noise.",
   "createdAt": "2026-08-13",
   "queries": [
@@ -475,19 +475,11 @@
     {
       "id": "q030",
       "query": "Qdrant 向量库连接失败，collection size mismatch 错误怎么处理？",
-      "type": "troubleshooting",
+      "type": "unanswerable",
       "difficulty": "hard",
-      "expectedDocPaths": [
-        "oss/javascript/deepagents/backends",
-        "oss/javascript/langchain/retrieval"
-      ],
-      "expectedKeywords": [
-        "Qdrant",
-        "collection",
-        "vector",
-        "dimensions"
-      ],
-      "answerable": true
+      "expectedDocPaths": [],
+      "expectedKeywords": [],
+      "answerable": false
     },
     {
       "id": "q031",

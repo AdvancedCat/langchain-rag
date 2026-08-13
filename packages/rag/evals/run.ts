@@ -16,6 +16,7 @@ import type {
     Difficulty,
     TypeBreakdown,
     RetrievedChunk,
+    ScoreStats,
 } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -25,11 +26,12 @@ const DEFAULT_DATASET = resolve(__dirname, 'datasets/langchain-rag.json');
 interface CliArgs {
     rebuild: boolean;
     fetchK: number;
+    topK: number;
     datasetPath: string;
     typeFilter?: QueryType;
     difficultyFilter?: Difficulty;
     jsonOutput: boolean;
-    topK: number;
+    abstentionThreshold: number;
 }
 
 function parseArgs(): CliArgs {
@@ -37,9 +39,10 @@ function parseArgs(): CliArgs {
     const parsed: CliArgs = {
         rebuild: false,
         fetchK: 20,
+        topK: 4,
         datasetPath: DEFAULT_DATASET,
         jsonOutput: false,
-        topK: 4,
+        abstentionThreshold: 0.78,
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -61,6 +64,9 @@ function parseArgs(): CliArgs {
                 break;
             case '--difficulty':
                 parsed.difficultyFilter = args[++i] as Difficulty;
+                break;
+            case '--abstention-threshold':
+                parsed.abstentionThreshold = parseFloat(args[++i]);
                 break;
             case '--json':
                 parsed.jsonOutput = true;
@@ -96,6 +102,7 @@ function emptyBreakdown(ks: number[]): TypeBreakdown {
     return {
         count: 0,
         hitRateAtK: Object.fromEntries(ks.map((k) => [k, 0])) as Record<number, number>,
+        precisionAtK: Object.fromEntries(ks.map((k) => [k, 0])) as Record<number, number>,
         mrr: 0,
         ndcgAtK: Object.fromEntries(ks.map((k) => [k, 0])) as Record<number, number>,
     };
@@ -108,16 +115,34 @@ function computeBreakdown(results: QueryResult[], ks: number[]): TypeBreakdown {
 
     for (const k of ks) {
         b.hitRateAtK[k] = mean(results.map((r) => (r.hitAtK[k] ? 1 : 0)));
+        b.precisionAtK[k] = mean(results.map((r) => r.precisionAtK[k]));
         b.ndcgAtK[k] = mean(results.map((r) => r.ndcgAtK[k]));
     }
     b.mrr = mean(results.map((r) => r.reciprocalRank));
     return b;
 }
 
+function computeScoreStats(
+    results: QueryResult[],
+    threshold: number,
+): ScoreStats {
+    if (results.length === 0) {
+        return { min: 0, max: 0, mean: 0, median: 0, belowThreshold: 0 };
+    }
+    const scores = results.map((r) => r.topScore).sort((a, b) => a - b);
+    return {
+        min: scores[0],
+        max: scores[scores.length - 1],
+        mean: mean(scores),
+        median: scores[Math.floor(scores.length / 2)],
+        belowThreshold: scores.filter((s) => s < threshold).length,
+    };
+}
+
 function aggregateReport(
     results: QueryResult[],
     config: EvalConfig,
-): Omit<EvalReport, 'perQuery' | 'config'> {
+): Omit<EvalReport, 'perQuery' | 'config' | 'evaluatedAt'> {
     const ks = config.hitRateKs;
 
     const byType: Record<QueryType, QueryResult[]> = {
@@ -155,9 +180,6 @@ function aggregateReport(
     const abstentionRate = unanswerableResults.length > 0
         ? abstentionCorrect / unanswerableResults.length
         : 0;
-    const unanswerableAvgTopScore = unanswerableResults.length > 0
-        ? mean(unanswerableResults.map((r) => r.topScore))
-        : 0;
 
     return {
         totalQueries: results.length,
@@ -166,13 +188,17 @@ function aggregateReport(
         hitRateAtK: Object.fromEntries(
             ks.map((k) => [k, mean(answerableResults.map((r) => (r.hitAtK[k] ? 1 : 0)))]),
         ) as Record<number, number>,
+        precisionAtK: Object.fromEntries(
+            ks.map((k) => [k, mean(answerableResults.map((r) => r.precisionAtK[k]))]),
+        ) as Record<number, number>,
         mrr: mean(answerableResults.map((r) => r.reciprocalRank)),
         ndcgAtK: Object.fromEntries(
             ks.map((k) => [k, mean(answerableResults.map((r) => r.ndcgAtK[k]))]),
         ) as Record<number, number>,
         avgKeywordRecall,
         abstentionRate,
-        unanswerableAvgTopScore,
+        answerableScoreStats: computeScoreStats(answerableResults, config.abstentionThreshold),
+        unanswerableScoreStats: computeScoreStats(unanswerableResults, config.abstentionThreshold),
         byType: {
             concept: computeBreakdown(byType.concept, ks),
             api_usage: computeBreakdown(byType.api_usage, ks),
@@ -192,46 +218,63 @@ function formatPct(v: number): string {
     return `${(v * 100).toFixed(1)}%`;
 }
 
+function formatScore(v: number): string {
+    return v.toFixed(4);
+}
+
+function printScoreStats(label: string, stats: ScoreStats, threshold: number): void {
+    console.log(`  ${label}:`);
+    console.log(`    min=${formatScore(stats.min)}  max=${formatScore(stats.max)}  mean=${formatScore(stats.mean)}  median=${formatScore(stats.median)}`);
+    console.log(`    below threshold (${threshold}): ${stats.belowThreshold}`);
+}
+
 function printReport(report: EvalReport): void {
-    console.log('\n' + '='.repeat(70));
+    console.log('\n' + '='.repeat(72));
     console.log('  RAG Retrieval Evaluation Report');
-    console.log('='.repeat(70));
+    console.log('='.repeat(72));
+    console.log(`  Evaluated at  : ${report.evaluatedAt}`);
     console.log(`  Strategy      : ${report.config.retrievalStrategy}`);
-    console.log(`  Fetch K       : ${report.config.fetchK}`);
-    console.log(`  Total queries : ${report.totalQueries} (answerable: ${report.answerableCount}, unanswerable: ${report.unanswerableCount})`);
-    console.log('-'.repeat(70));
+    console.log(`  Fetch K       : ${report.config.fetchK}, Top K: ${report.config.topK}`);
+    console.log(`  Queries       : ${report.totalQueries} (answerable: ${report.answerableCount}, unanswerable: ${report.unanswerableCount})`);
+    console.log('-'.repeat(72));
 
     console.log('\n  Answerable Metrics (retrieval accuracy):');
     for (const k of report.config.hitRateKs) {
-        console.log(`    Hit Rate@${k}  : ${formatPct(report.hitRateAtK[k])}`);
+        console.log(`    Hit@${String(k).padEnd(2)}        : ${formatPct(report.hitRateAtK[k])}`);
     }
-    console.log(`    MRR           : ${report.mrr.toFixed(4)}`);
+    for (const k of report.config.hitRateKs) {
+        console.log(`    Precision@${String(k).padEnd(2)}  : ${formatPct(report.precisionAtK[k])}`);
+    }
+    console.log(`    MRR           : ${formatScore(report.mrr)}`);
     for (const k of report.config.ndcgKs) {
-        console.log(`    NDCG@${k}      : ${report.ndcgAtK[k].toFixed(4)}`);
+        console.log(`    NDCG@${String(k).padEnd(2)}      : ${formatScore(report.ndcgAtK[k])}`);
     }
-    console.log(`    Keyword Recall: ${formatPct(report.avgKeywordRecall)}`);
+    console.log(`    Keyword Recall: ${formatPct(report.avgKeywordRecall)} (top ${report.config.topK} only)`);
 
     if (report.unanswerableCount > 0) {
         console.log('\n  Unanswerable Metrics (abstention ability):');
         console.log(`    Abstention Rate : ${formatPct(report.abstentionRate)} (topScore < ${report.config.abstentionThreshold})`);
-        console.log(`    Avg Top Score   : ${report.unanswerableAvgTopScore.toFixed(4)}`);
     }
 
+    console.log('\n  Score Distribution:');
+    printScoreStats('Answerable  ', report.answerableScoreStats, report.config.abstentionThreshold);
+    printScoreStats('Unanswerable', report.unanswerableScoreStats, report.config.abstentionThreshold);
+
     console.log('\n  By Query Type:');
-    console.log('    Type              Count  Hit@4   Hit@10  MRR     NDCG@10');
+    console.log('    Type              Count  Hit@4   Prec@4  MRR     NDCG@10');
     console.log('    ' + '-'.repeat(62));
     for (const [type, b] of Object.entries(report.byType)) {
         console.log(
-            `    ${type.padEnd(18)}${String(b.count).padStart(5)}  ${formatPct(b.hitRateAtK[4] ?? 0).padStart(6)}  ${formatPct(b.hitRateAtK[10] ?? 0).padStart(6)}  ${b.mrr.toFixed(3).padStart(6)}  ${(b.ndcgAtK[10] ?? 0).toFixed(3).padStart(6)}`,
+            `    ${type.padEnd(18)}${String(b.count).padStart(5)}  ${formatPct(b.hitRateAtK[4] ?? 0).padStart(6)}  ${formatPct(b.precisionAtK[4] ?? 0).padStart(6)}  ${b.mrr.toFixed(3).padStart(6)}  ${(b.ndcgAtK[10] ?? 0).toFixed(3).padStart(6)}`,
         );
     }
 
     console.log('\n  By Difficulty:');
-    console.log('    Difficulty        Count  Hit@4   Hit@10  MRR     NDCG@10');
+    console.log('    Difficulty        Count  Hit@4   Prec@4  MRR     NDCG@10');
     console.log('    ' + '-'.repeat(62));
     for (const [diff, b] of Object.entries(report.byDifficulty)) {
         console.log(
-            `    ${diff.padEnd(18)}${String(b.count).padStart(5)}  ${formatPct(b.hitRateAtK[4] ?? 0).padStart(6)}  ${formatPct(b.hitRateAtK[10] ?? 0).padStart(6)}  ${b.mrr.toFixed(3).padStart(6)}  ${(b.ndcgAtK[10] ?? 0).toFixed(3).padStart(6)}`,
+            `    ${diff.padEnd(18)}${String(b.count).padStart(5)}  ${formatPct(b.hitRateAtK[4] ?? 0).padStart(6)}  ${formatPct(b.precisionAtK[4] ?? 0).padStart(6)}  ${b.mrr.toFixed(3).padStart(6)}  ${(b.ndcgAtK[10] ?? 0).toFixed(3).padStart(6)}`,
         );
     }
 
@@ -240,34 +283,45 @@ function printReport(report: EvalReport): void {
     );
     console.log('\n  Answerable Failures (Hit@4 = 0):');
     if (answerableFailed.length === 0) {
-        console.log('    None 🎉');
+        console.log('    None');
     } else {
         for (const r of answerableFailed) {
             const topPaths = r.retrieved.slice(0, 4).map((c) => c.docPath.split('/').pop()).join(', ');
-            console.log(`    [${r.query.id}] (${r.query.type}/${r.query.difficulty})`);
+            console.log(`    [${r.query.id}] (${r.query.type}/${r.query.difficulty}) score=${formatScore(r.topScore)}`);
             console.log(`      Q: ${r.query.query}`);
             console.log(`      Expected: ${r.query.expectedDocPaths.map((p) => p.split('/').pop()).join(', ')}`);
             console.log(`      Got: ${topPaths}`);
         }
     }
 
-    const falseConfidence = report.perQuery.filter(
-        (r) => !r.query.answerable && !r.abstentionCorrect,
-    );
     if (report.unanswerableCount > 0) {
+        const falseConfidence = report.perQuery.filter(
+            (r) => !r.query.answerable && !r.abstentionCorrect,
+        );
         console.log('\n  Unanswerable False Confidence (topScore >= threshold):');
         if (falseConfidence.length === 0) {
-            console.log('    None 🎉');
+            console.log('    None');
         } else {
             for (const r of falseConfidence) {
                 const topPath = r.retrieved[0]?.docPath.split('/').pop() ?? 'none';
-                console.log(`    [${r.query.id}] topScore=${r.topScore.toFixed(4)} -> ${topPath}`);
+                console.log(`    [${r.query.id}] topScore=${formatScore(r.topScore)} -> ${topPath}`);
                 console.log(`      Q: ${r.query.query}`);
+            }
+        }
+
+        const answerableBelowThreshold = report.perQuery.filter(
+            (r) => r.query.answerable && r.topScore < report.config.abstentionThreshold,
+        );
+        if (answerableBelowThreshold.length > 0) {
+            console.log('\n  Answerable Low-Score Risk (topScore < threshold, would be false-abstained):');
+            for (const r of answerableBelowThreshold) {
+                const hit = r.hitAtK[4] ? 'HIT' : 'MISS';
+                console.log(`    [${r.query.id}] score=${formatScore(r.topScore)} [${hit}] ${r.query.query.slice(0, 50)}`);
             }
         }
     }
 
-    console.log('\n' + '='.repeat(70) + '\n');
+    console.log('\n' + '='.repeat(72) + '\n');
 }
 
 async function main(): Promise<void> {
@@ -282,20 +336,21 @@ async function main(): Promise<void> {
         queries = queries.filter((q) => q.difficulty === cli.difficultyFilter);
     }
 
-    console.log(`📊 Loaded ${queries.length} queries from dataset (v${dataset.version})`);
+    console.log(`Loaded ${queries.length} queries from dataset v${dataset.version}`);
 
     const config: EvalConfig = {
         fetchK: cli.fetchK,
+        topK: cli.topK,
         hitRateKs: [cli.topK, 10, cli.fetchK],
         ndcgKs: [cli.topK, 10, cli.fetchK],
         retrievalStrategy: 'baseline-dense',
-        abstentionThreshold: 0.78,
+        abstentionThreshold: cli.abstentionThreshold,
     };
 
-    console.log('🔨 Building/loading vector store...');
+    console.log('Building/loading vector store...');
     const vectorStore = await buildVectorStore(cli.rebuild);
 
-    console.log(`🔍 Running retrieval (fetchK=${cli.fetchK}) for ${queries.length} queries...\n`);
+    console.log(`Running retrieval (fetchK=${cli.fetchK}) for ${queries.length} queries...\n`);
 
     const results: QueryResult[] = [];
     for (let i = 0; i < queries.length; i++) {
@@ -312,6 +367,7 @@ async function main(): Promise<void> {
         ...aggregate,
         perQuery: results,
         config,
+        evaluatedAt: new Date().toISOString(),
     };
 
     if (cli.jsonOutput) {

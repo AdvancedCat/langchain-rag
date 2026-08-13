@@ -35,6 +35,7 @@ export interface QueryResult {
     query: GoldenQuery;
     retrieved: RetrievedChunk[];
     hitAtK: Record<number, boolean>;
+    precisionAtK: Record<number, number>;
     reciprocalRank: number;
     ndcgAtK: Record<number, number>;
     keywordHits: number;
@@ -43,16 +44,27 @@ export interface QueryResult {
     topScore: number;
 }
 
+export interface ScoreStats {
+    min: number;
+    max: number;
+    mean: number;
+    median: number;
+    belowThreshold: number;
+}
+
 export interface EvalReport {
+    evaluatedAt: string;
     totalQueries: number;
     answerableCount: number;
     unanswerableCount: number;
     hitRateAtK: Record<number, number>;
+    precisionAtK: Record<number, number>;
     mrr: number;
     ndcgAtK: Record<number, number>;
     avgKeywordRecall: number;
     abstentionRate: number;
-    unanswerableAvgTopScore: number;
+    answerableScoreStats: ScoreStats;
+    unanswerableScoreStats: ScoreStats;
     byType: Record<QueryType, TypeBreakdown>;
     byDifficulty: Record<Difficulty, TypeBreakdown>;
     perQuery: QueryResult[];
@@ -62,12 +74,14 @@ export interface EvalReport {
 export interface TypeBreakdown {
     count: number;
     hitRateAtK: Record<number, number>;
+    precisionAtK: Record<number, number>;
     mrr: number;
     ndcgAtK: Record<number, number>;
 }
 
 export interface EvalConfig {
     fetchK: number;
+    topK: number;
     hitRateKs: number[];
     ndcgKs: number[];
     retrievalStrategy: string;
