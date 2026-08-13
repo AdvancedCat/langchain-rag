@@ -10,6 +10,7 @@ import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { MemoryVectorStore } from "@langchain/classic/vectorstores/memory";
 import { createDeepAgent, StateBackend, type SubAgent } from "deepagents";
+import { getLLM } from "../libs/llm-provider.js";
 
 // ============================================================================
 // Configuration
@@ -38,6 +39,39 @@ const DOC_PATHS = [
 
 const EXAMPLE_QUERY =
   "How do I stream intermediate tool results from a subagent?";
+
+// ============================================================================
+// Embedding factory: switch between OpenAI and Qianwen (DashScope) via env
+// ============================================================================
+
+function createEmbeddings() {
+  const dashscopeApiKey = process.env.DASHSCOPE_API_KEY;
+  if (dashscopeApiKey) {
+    console.log(
+      "🧠 Using Qianwen embedding:",
+      process.env.QWEN_EMBEDDING_MODEL ?? "qwen3.7-text-embedding",
+    );
+    const dimensions = process.env.QWEN_EMBEDDING_DIMENSIONS
+      ? Number(process.env.QWEN_EMBEDDING_DIMENSIONS)
+      : undefined;
+    return new OpenAIEmbeddings({
+      apiKey: dashscopeApiKey,
+      configuration: {
+        baseURL:
+          process.env.DASHSCOPE_BASE_URL ??
+          "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      },
+      model:
+        process.env.QWEN_EMBEDDING_MODEL ?? "qwen3.7-text-embedding",
+      batchSize: 20, // Qianwen API limit: max 20 inputs per request
+      ...(dimensions ? { dimensions } : {}),
+    });
+  }
+
+  // Fallback to OpenAI default
+  console.log("🧠 Using OpenAI embedding: text-embedding-3-small");
+  return new OpenAIEmbeddings({ model: "text-embedding-3-small" });
+}
 
 // ============================================================================
 // Step 1: Load documents
@@ -87,7 +121,7 @@ async function buildVectorStore(): Promise<MemoryVectorStore> {
   console.log(`Split documentation into ${allSplits.length} chunks.`);
 
   console.log("Creating embeddings and indexing into the vector store...");
-  const embeddings = new OpenAIEmbeddings({ model: "text-embedding-3-small" });
+  const embeddings = createEmbeddings();
   const vectorStore = new MemoryVectorStore(embeddings);
   await vectorStore.addDocuments(allSplits);
   console.log(`Indexed ${allSplits.length} chunks.`);
@@ -181,8 +215,11 @@ async function createRagAgent() {
       "source URL from the file header. If the chunk is not relevant, say so briefly.",
   };
 
+  const model = getLLM();
+  console.log(`🧠 Using LLM: deepseek:${model.model}`);
+
   const agent = createDeepAgent({
-    model: "openai:gpt-4o-mini",
+    model,
     tools: [searchDocumentation],
     subagents: [chunkAnalyst],
     systemPrompt,
