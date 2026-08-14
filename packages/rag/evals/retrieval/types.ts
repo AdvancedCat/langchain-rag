@@ -8,6 +8,8 @@ import type {
 
 export type { GoldenDataset, GoldenQuery, QueryType, Difficulty, RetrievedChunk };
 
+export type RetrievalStrategy = 'baseline-dense' | 'threshold-mmr';
+
 export interface QueryResult {
     query: GoldenQuery;
     retrieved: RetrievedChunk[];
@@ -61,6 +63,11 @@ export interface EvalConfig {
     topK: number;
     hitRateKs: number[];
     ndcgKs: number[];
-    retrievalStrategy: string;
+    retrievalStrategy: RetrievalStrategy;
+    scoreThreshold?: number;
+    mmr: {
+        enabled: boolean;
+        lambda: number;
+    };
     abstentionThreshold: number;
 }

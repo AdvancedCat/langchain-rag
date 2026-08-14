@@ -17,6 +17,7 @@ pnpm eval --rebuild                    # 强制重建向量索引
 pnpm eval --type troubleshooting       # 按类型过滤
 pnpm eval --difficulty hard            # 按难度过滤
 pnpm eval --abstention-threshold 0.75  # 自定义 abstention 阈值
+pnpm eval --strategy threshold-mmr --score-threshold 0.55 --mmr-lambda 0.7
 ```
 
 ## Baseline 列表
@@ -24,6 +25,20 @@ pnpm eval --abstention-threshold 0.75  # 自定义 abstention 阈值
 | 文件 | 日期 | Dataset | 策略 | Query | Hit@4 | Prec@4 | MRR | NDCG@10 | Abstain |
 |------|------|---------|------|-------|-------|--------|-----|---------|---------|
 | `retrieval/baseline-dense-20260813.json` | 2026-08-13 | v2 | baseline-dense | 44 (37+7) | 89.2% | 41.2% | 0.652 | 0.380 | 85.7% |
+| `retrieval/threshold-mmr-20260814.json` | 2026-08-14 | v2 | threshold-mmr 0.55/0.7 (rejected) | 44 (37+7) | 83.8% | 36.5% | 0.577 | 0.209 | 85.7% |
+
+## 2026-08-14 Phase 1 Calibration（未启用）
+
+`threshold-mmr-20260814.json` 是 Phase 1 参数网格的代表性候选结果，不是新的生产基线。0.50、0.55、0.60、0.65（固定 MMR lambda=0.7）均未满足 Hit@4、MRR、Precision@4 与 easy 不退化的成功标准，因此在线默认保持 `scoreThreshold` 未设置、`mmr.enabled=false`。
+
+| Threshold | Hit@4 | Prec@4 | MRR | NDCG@10 | Keyword Recall | easy Hit@4 |
+|-----------|-------|--------|-----|---------|----------------|------------|
+| 0.50 | 83.8% | 36.5% | 0.577 | 0.209 | 65.8% | 77.8% |
+| 0.55 | 83.8% | 36.5% | 0.577 | 0.209 | 65.8% | 77.8% |
+| 0.60 | 83.8% | 35.1% | 0.577 | 0.203 | 65.8% | 77.8% |
+| 0.65 | 67.6% | 30.4% | 0.486 | 0.177 | 59.5% | 66.7% |
+
+隔离对照 0.55 / lambda=1.0 恢复 Hit@4=89.2%、Precision@4=41.2%，说明主要退化来自 lambda=0.7 的多样性选择，而不是 0.55 阈值。MMR 同时将 top-4 平均唯一文档数从 2.82 提升到 3.02，并将 Keyword Recall 从 57.7% 提升到 65.8%；后续需补充专门的去冗余指标后再决定是否启用。
 
 ## 2026-08-13 Frozen Baseline (dense, dataset v2)
 

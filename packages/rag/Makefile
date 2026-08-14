@@ -19,6 +19,9 @@ LIMIT        ?=
 TYPE         ?=
 DIFFICULTY   ?=
 ABSTAIN      ?= 0.78
+STRATEGY     ?= baseline-dense
+SCORE_THRESHOLD ?=
+MMR_LAMBDA   ?= 0.7
 DATASET      ?=
 SAVE         ?=
 
@@ -38,6 +41,7 @@ help: ## Show this help message
 	@echo ""
 	@echo "Override variables on the command line, e.g.:"
 	@echo "  make eval K=30 TOP_K=8"
+	@echo "  make eval STRATEGY=threshold-mmr SCORE_THRESHOLD=0.55 MMR_LAMBDA=0.7"
 	@echo "  make eval-gen LIMIT=5 SAVE=my-baseline.json"
 	@echo ""
 
@@ -85,7 +89,10 @@ start: ## Start the RAG agent (interactive Q&A)
 # =============================================================================
 # Retrieval Evaluation
 # =============================================================================
-EVAL_FLAGS := --k $(K) --top-k $(TOP_K) --abstention-threshold $(ABSTAIN)
+EVAL_FLAGS := --k $(K) --top-k $(TOP_K) --abstention-threshold $(ABSTAIN) --strategy $(STRATEGY) --mmr-lambda $(MMR_LAMBDA)
+ifdef SCORE_THRESHOLD
+	EVAL_FLAGS += --score-threshold $(SCORE_THRESHOLD)
+endif
 ifdef TYPE
 	EVAL_FLAGS += --type $(TYPE)
 endif
@@ -97,7 +104,7 @@ ifdef DATASET
 endif
 
 .PHONY: eval
-eval: ## Run retrieval evaluation (text report). Vars: K TOP_K TYPE DIFFICULTY ABSTAIN DATASET
+eval: ## Run retrieval evaluation (text report). Vars: K TOP_K STRATEGY SCORE_THRESHOLD MMR_LAMBDA TYPE DIFFICULTY
 	$(PNPM) run eval -- $(EVAL_FLAGS)
 
 .PHONY: eval-json

@@ -437,14 +437,17 @@ interface QueryTransformer {
 
 ## 7. 分阶段实施计划
 
-### Phase 1：低成本高收益（1–2 天）
+### Phase 1：低成本高收益（已实施，候选策略未通过 gate）
 
 不引入新依赖，快速解决最痛的问题。
 
-1. **相似度阈值过滤**：`similaritySearch` 替换为带分数返回的 `similaritySearchVectorWithScore`，过滤低分结果。
-2. **MMR 去冗余**：替换为 `maxMarginalRelevanceSearch`，`lambda=0.7`。
-3. **topK / fetchK 可配置化**：把硬编码的 4 移入 config。
-4. **空结果处理**：检索为空时，tool 返回明确提示，让 Agent 知道需要改写 query 而非硬答。
+1. [x] **相似度阈值过滤**：共享 pipeline 使用带分数返回的 `similaritySearchVectorWithScore`，过滤低分结果。
+2. [x] **MMR 去冗余**：使用 `@langchain/core/utils/math` 的 `maximalMarginalRelevance`，保留原始 score。
+3. [x] **topK / fetchK 可配置化**：硬编码参数已移入 config 与 `RETRIEVAL_*` env。
+4. [x] **空结果处理**：tool 明确提示 Agent 改写 query 后重试。
+5. [ ] **默认启用 threshold + MMR**：2026-08-14 网格中无参数满足不退化约束，保持 `scoreThreshold` 未设置、`mmr.enabled=false`。
+
+标定摘要：0.50/0.55 + lambda=0.7 的 Hit@4/Precision@4/MRR 为 83.8%/36.5%/0.577，低于 frozen baseline 的 89.2%/41.2%/0.652；easy Hit@4 也由 88.9% 降到 77.8%。虽然 Keyword Recall 从 57.7% 升到 65.8%，且 top-4 平均唯一文档数由 2.82 升到 3.02，但不足以通过 gate。详见 [Phase 1 实施计划与结果](./phase1-threshold-mmr-plan.md#5-实施与标定结果2026-08-14)。
 
 ### Phase 2：混合检索 + Query 改写（3–5 天）
 

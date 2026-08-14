@@ -2,9 +2,9 @@ import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import 'dotenv/config';
-import type { Document } from '@langchain/core/documents';
 import type { VectorStore } from '@langchain/core/vectorstores';
 import { buildVectorStore } from '../../src/ingestion/index.js';
+import { retrieve } from '../../src/retrieval/pipeline.js';
 import { evaluateQuery, mean } from './metrics.js';
 import type {
     GoldenDataset,
@@ -17,6 +17,7 @@ import type {
     TypeBreakdown,
     RetrievedChunk,
     ScoreStats,
+    RetrievalStrategy,
 } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -32,6 +33,9 @@ interface CliArgs {
     difficultyFilter?: Difficulty;
     jsonOutput: boolean;
     abstentionThreshold: number;
+    strategy: RetrievalStrategy;
+    scoreThreshold?: number;
+    mmrLambda: number;
 }
 
 function parseArgs(): CliArgs {
@@ -43,6 +47,8 @@ function parseArgs(): CliArgs {
         datasetPath: DEFAULT_DATASET,
         jsonOutput: false,
         abstentionThreshold: 0.78,
+        strategy: 'baseline-dense',
+        mmrLambda: 0.7,
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -68,10 +74,50 @@ function parseArgs(): CliArgs {
             case '--abstention-threshold':
                 parsed.abstentionThreshold = parseFloat(args[++i]);
                 break;
+            case '--strategy':
+                parsed.strategy = args[++i] as RetrievalStrategy;
+                break;
+            case '--score-threshold':
+                parsed.scoreThreshold = parseFloat(args[++i]);
+                break;
+            case '--mmr-lambda':
+                parsed.mmrLambda = parseFloat(args[++i]);
+                break;
             case '--json':
                 parsed.jsonOutput = true;
                 break;
         }
+    }
+
+    if (!['baseline-dense', 'threshold-mmr'].includes(parsed.strategy)) {
+        throw new Error(
+            `--strategy must be baseline-dense or threshold-mmr, received: ${parsed.strategy}`,
+        );
+    }
+    if (!Number.isInteger(parsed.fetchK) || parsed.fetchK <= 0) {
+        throw new Error(`--k must be a positive integer, received: ${parsed.fetchK}`);
+    }
+    if (!Number.isInteger(parsed.topK) || parsed.topK <= 0) {
+        throw new Error(`--top-k must be a positive integer, received: ${parsed.topK}`);
+    }
+    if (parsed.fetchK < parsed.topK) {
+        throw new Error('--k must be greater than or equal to --top-k');
+    }
+    if (parsed.strategy === 'threshold-mmr' && parsed.scoreThreshold === undefined) {
+        throw new Error('--score-threshold is required for strategy threshold-mmr');
+    }
+    if (
+        parsed.scoreThreshold !== undefined &&
+        (!Number.isFinite(parsed.scoreThreshold) ||
+            parsed.scoreThreshold < -1 ||
+            parsed.scoreThreshold > 1)
+    ) {
+        throw new Error(
+            `--score-threshold must be between -1 and 1, received: ${parsed.scoreThreshold}`,
+        );
+    }
+    if (!Number.isFinite(parsed.mmrLambda) || parsed.mmrLambda < 0 || parsed.mmrLambda > 1) {
+        throw new Error(`--mmr-lambda must be between 0 and 1, received: ${parsed.mmrLambda}`);
     }
     return parsed;
 }
@@ -86,15 +132,35 @@ async function retrieveBaseline(
     query: string,
     fetchK: number,
 ): Promise<RetrievedChunk[]> {
-    const results = await (vectorStore as any).similaritySearchVectorWithScore(
+    const results = await vectorStore.similaritySearchVectorWithScore(
         await vectorStore.embeddings.embedQuery(query),
         fetchK,
     );
-    return results.map(([doc, score]: [Document, number], idx: number) => ({
+    return results.map(([doc, score], idx) => ({
         docPath: doc.metadata?.docPath ?? 'unknown',
         score,
         content: doc.pageContent,
         rank: idx + 1,
+    }));
+}
+
+async function retrieveThresholdMMR(
+    vectorStore: VectorStore,
+    query: string,
+    config: EvalConfig,
+): Promise<RetrievedChunk[]> {
+    const results = await retrieve(vectorStore, query, {
+        fetchK: config.fetchK,
+        topK: config.topK,
+        scoreThreshold: config.scoreThreshold,
+        mmr: config.mmr,
+    });
+
+    return results.map(({ document, score }, index) => ({
+        docPath: document.metadata?.docPath ?? 'unknown',
+        score,
+        content: document.pageContent,
+        rank: index + 1,
     }));
 }
 
@@ -235,6 +301,10 @@ function printReport(report: EvalReport): void {
     console.log(`  Evaluated at  : ${report.evaluatedAt}`);
     console.log(`  Strategy      : ${report.config.retrievalStrategy}`);
     console.log(`  Fetch K       : ${report.config.fetchK}, Top K: ${report.config.topK}`);
+    if (report.config.retrievalStrategy === 'threshold-mmr') {
+        console.log(`  Score threshold: ${report.config.scoreThreshold}`);
+        console.log(`  MMR lambda    : ${report.config.mmr.lambda}`);
+    }
     console.log(`  Queries       : ${report.totalQueries} (answerable: ${report.answerableCount}, unanswerable: ${report.unanswerableCount})`);
     console.log('-'.repeat(72));
 
@@ -326,6 +396,10 @@ function printReport(report: EvalReport): void {
 
 async function main(): Promise<void> {
     const cli = parseArgs();
+    if (cli.jsonOutput) {
+        console.log = (...args: unknown[]) => console.error(...args);
+    }
+    const progressOutput = cli.jsonOutput ? process.stderr : process.stdout;
     const dataset = loadDataset(cli.datasetPath);
 
     let queries = dataset.queries;
@@ -338,12 +412,18 @@ async function main(): Promise<void> {
 
     console.log(`Loaded ${queries.length} queries from dataset v${dataset.version}`);
 
+    const metricKs = [...new Set([cli.topK, 10, cli.fetchK])];
     const config: EvalConfig = {
         fetchK: cli.fetchK,
         topK: cli.topK,
-        hitRateKs: [cli.topK, 10, cli.fetchK],
-        ndcgKs: [cli.topK, 10, cli.fetchK],
-        retrievalStrategy: 'baseline-dense',
+        hitRateKs: metricKs,
+        ndcgKs: metricKs,
+        retrievalStrategy: cli.strategy,
+        scoreThreshold: cli.scoreThreshold,
+        mmr: {
+            enabled: cli.strategy === 'threshold-mmr',
+            lambda: cli.mmrLambda,
+        },
         abstentionThreshold: cli.abstentionThreshold,
     };
 
@@ -355,12 +435,14 @@ async function main(): Promise<void> {
     const results: QueryResult[] = [];
     for (let i = 0; i < queries.length; i++) {
         const q = queries[i];
-        process.stdout.write(`  [${i + 1}/${queries.length}] ${q.id}: ${q.query.slice(0, 50)}...\r`);
-        const retrieved = await retrieveBaseline(vectorStore, q.query, cli.fetchK);
+        progressOutput.write(`  [${i + 1}/${queries.length}] ${q.id}: ${q.query.slice(0, 50)}...\r`);
+        const retrieved = cli.strategy === 'threshold-mmr'
+            ? await retrieveThresholdMMR(vectorStore, q.query, config)
+            : await retrieveBaseline(vectorStore, q.query, cli.fetchK);
         const result = evaluateQuery(q, retrieved, config);
         results.push(result);
     }
-    process.stdout.write('\n');
+    progressOutput.write('\n');
 
     const aggregate = aggregateReport(results, config);
     const report: EvalReport = {
@@ -371,7 +453,7 @@ async function main(): Promise<void> {
     };
 
     if (cli.jsonOutput) {
-        console.log(JSON.stringify(report, null, 2));
+        process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     } else {
         printReport(report);
     }

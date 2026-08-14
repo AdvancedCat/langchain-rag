@@ -11,6 +11,88 @@ export interface EmbeddingConfig {
     dimensions?: number;
 }
 
+export interface RetrievalConfig {
+    topK: number;
+    fetchK: number;
+    scoreThreshold?: number;
+    mmr: {
+        enabled: boolean;
+        lambda: number;
+    };
+}
+
+const DEFAULT_RETRIEVAL_TOP_K = 4;
+const DEFAULT_RETRIEVAL_FETCH_K = 20;
+const DEFAULT_RETRIEVAL_MMR_LAMBDA = 0.7;
+
+function parseIntegerEnv(name: string, fallback: number): number {
+    const raw = process.env[name];
+    if (raw === undefined || raw === '') return fallback;
+
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value <= 0) {
+        throw new Error(`${name} must be a positive integer, received: ${raw}`);
+    }
+    return value;
+}
+
+function parseNumberEnv(
+    name: string,
+    fallback: number | undefined,
+): number | undefined {
+    const raw = process.env[name];
+    if (raw === undefined || raw === '') return fallback;
+
+    const value = Number(raw);
+    if (!Number.isFinite(value)) {
+        throw new Error(`${name} must be a finite number, received: ${raw}`);
+    }
+    return value;
+}
+
+function parseBooleanEnv(name: string, fallback: boolean): boolean {
+    const raw = process.env[name];
+    if (raw === undefined || raw === '') return fallback;
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+    throw new Error(`${name} must be "true" or "false", received: ${raw}`);
+}
+
+export function getRetrievalConfig(): RetrievalConfig {
+    const topK = parseIntegerEnv('RETRIEVAL_TOP_K', DEFAULT_RETRIEVAL_TOP_K);
+    const fetchK = parseIntegerEnv('RETRIEVAL_FETCH_K', DEFAULT_RETRIEVAL_FETCH_K);
+    const scoreThreshold = parseNumberEnv('RETRIEVAL_SCORE_THRESHOLD', undefined);
+    const mmrLambda =
+        parseNumberEnv('RETRIEVAL_MMR_LAMBDA', DEFAULT_RETRIEVAL_MMR_LAMBDA) ??
+        DEFAULT_RETRIEVAL_MMR_LAMBDA;
+
+    if (fetchK < topK) {
+        throw new Error(
+            `RETRIEVAL_FETCH_K (${fetchK}) must be greater than or equal to RETRIEVAL_TOP_K (${topK})`,
+        );
+    }
+    if (scoreThreshold !== undefined && (scoreThreshold < -1 || scoreThreshold > 1)) {
+        throw new Error(
+            `RETRIEVAL_SCORE_THRESHOLD must be between -1 and 1, received: ${scoreThreshold}`,
+        );
+    }
+    if (mmrLambda < 0 || mmrLambda > 1) {
+        throw new Error(
+            `RETRIEVAL_MMR_LAMBDA must be between 0 and 1, received: ${mmrLambda}`,
+        );
+    }
+
+    return {
+        topK,
+        fetchK,
+        scoreThreshold,
+        mmr: {
+            enabled: parseBooleanEnv('RETRIEVAL_MMR_ENABLED', false),
+            lambda: mmrLambda,
+        },
+    };
+}
+
 const LANGCHAIN_JS_DOCS = [
     'oss/javascript/langchain/agents',
     'oss/javascript/langchain/tools',

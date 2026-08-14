@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { Document } from '@langchain/core/documents';
 import { tool } from '@langchain/core/tools';
 import { createDeepAgent, StateBackend, type SubAgent } from 'deepagents';
 import { getLLM } from '../../../libs/llm-provider.js';
 import { buildVectorStore } from '../ingestion/index.js';
+import { getRetrievalConfig } from '../config.js';
+import { retrieve } from './pipeline.js';
 
 const RAG_WORKFLOW_INSTRUCTIONS = `# Documentation Q&A workflow
 
@@ -29,19 +30,27 @@ When delegating:
 - After all analysts return, synthesize their findings with citations to the source URLs.`;
 
 export async function createRagAgent(forceRebuild = false) {
+    const retrievalConfig = getRetrievalConfig();
     const vectorStore = await buildVectorStore(forceRebuild);
     const backend = new StateBackend();
 
     const searchDocumentation = tool(
         async ({ query }) => {
-            const retrievedDocs = await vectorStore.similaritySearch(query, 4);
+            const retrievedChunks = await retrieve(vectorStore, query, retrievalConfig);
+            if (retrievedChunks.length === 0) {
+                return 'No documentation chunks passed the retrieval filters. Reformulate the query and call search_documentation again.';
+            }
+
             const batchId = randomUUID().slice(0, 8);
             const uploads: Array<[string, Uint8Array]> = [];
             const savedPaths: string[] = [];
 
-            retrievedDocs.forEach((doc: Document, index: number) => {
+            retrievedChunks.forEach(({ document, score }, index) => {
                 const path = `/retrieved/${batchId}/chunk_${index + 1}.md`;
-                const content = `# Source: ${doc.metadata?.source ?? 'unknown'}\n\n${doc.pageContent}`;
+                const content =
+                    `# Source: ${document.metadata?.source ?? 'unknown'}\n` +
+                    `# Similarity score: ${score.toFixed(4)}\n\n` +
+                    document.pageContent;
                 uploads.push([path, new TextEncoder().encode(content)]);
                 savedPaths.push(path);
             });

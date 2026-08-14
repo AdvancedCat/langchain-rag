@@ -3,7 +3,7 @@
 > **Phase 标记**：`Phase 1（阈值 + MMR）`
 > **所属**：`packages/rag` 检索策略升级
 > **上游文档**：[retrieval-strategy-upgrade.md](./retrieval-strategy-upgrade.md) §7 Phase 1、[evaluation-plan.md](./evaluation-plan.md) §6
-> **状态**：方案已定（决策已收敛），待实施（未改代码）
+> **状态**：已实施并完成评测；候选策略未通过成功标准，默认保持关闭（2026-08-14）
 > **性质**：低成本高收益，不引入新依赖
 
 ---
@@ -87,11 +87,11 @@ const retrievedDocs = await vectorStore.similaritySearch(query, 4);
 
 ```bash
 # 复现 baseline（确认环境一致）
-pnpm run eval:rebuild -- --json > eval-results/baseline-repro.json
+pnpm --silent run eval:rebuild -- --json > eval-results/baseline-repro.json
 
 # 阈值网格扫描（复用索引，无需 rebuild）
 for t in 0.50 0.55 0.60 0.65; do
-  pnpm run eval:json -- --strategy threshold-mmr --score-threshold $t --mmr-lambda 0.7 > eval-results/phase1-$t.json
+  pnpm --silent run eval:json -- --strategy threshold-mmr --score-threshold $t --mmr-lambda 0.7 > eval-results/phase1-$t.json
 done
 
 # 选定阈值后跑最终策略
@@ -133,3 +133,31 @@ pnpm run eval -- --strategy threshold-mmr --score-threshold <选定值> --mmr-la
 | 1 | 阈值默认值 | 先跑 `{0.50, 0.55, 0.60, 0.65}` 网格，由 Hit@4/Precision@4 数据选定，不预设 0.55 |
 | 2 | topK/fetchK 可配置化 + 空结果处理 | **纳入** Phase 1（design doc 第 3、4 条） |
 | 3 | baseline 记录 | 记录 Phase 1 新 baseline（`threshold-mmr-YYYYMMDD.json`），**不覆盖** 原始 `baseline-dense-20260813.json`，只在 README 表新增行 |
+
+---
+
+## 5. 实施与标定结果（2026-08-14）
+
+### 5.1 Gate 结果
+
+- 配置层、共享 pipeline、线上接入、eval strategy 均已实现并通过 TypeScript 类型检查。
+- 在线默认保持 `scoreThreshold=undefined`、`mmr.enabled=false`；只有显式配置才改变检索结果。
+- baseline rebuild 仍为 58 页 / 2681 chunks，Hit@4、Precision@4、Keyword Recall、abstention 与 frozen 一致。受 embedding/近邻次序漂移影响，本次同索引 baseline 的 MRR 为 0.622（frozen 为 0.652），NDCG@10 为 0.378（frozen 为 0.380）。
+
+### 5.2 阈值网格（MMR lambda=0.7）
+
+| scoreThreshold | Hit@4 | Prec@4 | MRR | NDCG@10 | Keyword Recall | easy Hit@4 | 空结果 |
+|----------------|-------|--------|-----|---------|----------------|------------|--------|
+| 0.50 | 83.8% | 36.5% | 0.577 | 0.209 | 65.8% | 77.8% | 0 |
+| 0.55 | 83.8% | 36.5% | 0.577 | 0.209 | 65.8% | 77.8% | 0 |
+| 0.60 | 83.8% | 35.1% | 0.577 | 0.203 | 65.8% | 77.8% | 1 |
+| 0.65 | 67.6% | 30.4% | 0.486 | 0.177 | 59.5% | 66.7% | 3 |
+
+结论：四组均未满足 Hit@4、MRR、Precision@4 和 easy 不退化的约束，因此**不选定默认阈值，也不默认启用 MMR**。`threshold-mmr-20260814.json` 保存 0.55 / 0.7 的代表性 rejected candidate，供后续策略对比，不代表生产 baseline。
+
+### 5.3 Bad case 与指标解释
+
+- 0.55 / 0.7 相比同索引 dense baseline 恢复 `q001`、`q031`，但新增丢失 `q006`、`q009`、`q011`、`q024`，失败 query 从 4 条增加到 6 条。
+- MMR 把 top-4 平均唯一 `docPath` 数从 2.82 提升到 3.02，Keyword Recall 提升 8.1pp，说明多样性确有收益；但当前 Precision@4 将同一 expected doc 的多个 chunk 都计为 relevant，去冗余会直接减少该指标的相关 chunk 数，两者存在口径冲突。
+- 0.55 / lambda=1.0 隔离对照恢复到 Hit@4=89.2%、Precision@4=41.2%、easy Hit@4=88.9%，确认主要退化来自 lambda=0.7 的多样性选择，不是 0.55 阈值过滤。
+- 后续若继续调 MMR，应先补充“重复 chunk 占比 / unique source coverage / generation context quality”等去冗余指标，再扫描 lambda；跨语言和模块误召回仍交给 metadata、BM25 或 rerank。
