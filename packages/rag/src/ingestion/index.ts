@@ -1,8 +1,9 @@
 import type { VectorStore } from '@langchain/core/vectorstores';
 import { Document } from '@langchain/core/documents';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import { DOCS_BASE, DOC_PATHS, VECTOR_STORE_PATH } from '../config.js';
+import { DOCS_BASE, DOC_PATHS } from '../config.js';
 import {
+    ensureQdrantRunning,
     loadVectorStore,
     createVectorStoreFromDocuments,
 } from '../vectorStore.js';
@@ -47,8 +48,10 @@ async function loadLangchainDocs(
 export async function buildVectorStore(
     forceRebuild = false,
 ): Promise<VectorStore> {
+    await ensureQdrantRunning();
+
     if (!forceRebuild) {
-        const existing = await loadVectorStore(VECTOR_STORE_PATH);
+        const existing = await loadVectorStore();
         if (existing) {
             return existing;
         }
@@ -87,7 +90,7 @@ export async function buildVectorStore(
     console.log(`Split documentation into ${allSplits.length} chunks.`);
 
     console.log('Creating embeddings and indexing into the vector store...');
-    const vectorStore = await createVectorStoreFromDocuments(allSplits, DOC_PATHS);
+    const vectorStore = await createVectorStoreFromDocuments(allSplits);
 
     return vectorStore;
 }

@@ -1,28 +1,9 @@
 export const DOCS_BASE = 'https://docs.langchain.com';
-export const VECTOR_STORE_PATH = './vectorstore/index.json';
-
-export type VectorStoreType = 'memory' | 'qdrant';
 
 export interface QdrantConfig {
     url: string;
     apiKey?: string;
     collectionName: string;
-}
-
-export interface MemoryVector {
-    content: string;
-    embedding: number[];
-    metadata: Record<string, any>;
-    id?: string;
-}
-
-export interface SerializedVectorStore {
-    version: number;
-    embeddingModel: string;
-    embeddingDimensions?: number;
-    docPaths: string[];
-    vectors: MemoryVector[];
-    createdAt: string;
 }
 
 export interface EmbeddingConfig {
