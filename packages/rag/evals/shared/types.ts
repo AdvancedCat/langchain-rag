@@ -26,6 +26,7 @@ export interface GoldenDataset {
 
 export interface RetrievedChunk {
     docPath: string;
+    chunkIndex?: number;
     score: number;
     content: string;
     rank: number;

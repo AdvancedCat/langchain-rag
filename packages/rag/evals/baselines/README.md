@@ -17,7 +17,7 @@ pnpm eval --rebuild                    # 强制重建向量索引
 pnpm eval --type troubleshooting       # 按类型过滤
 pnpm eval --difficulty hard            # 按难度过滤
 pnpm eval --abstention-threshold 0.75  # 自定义 abstention 阈值
-pnpm eval --strategy threshold-mmr --score-threshold 0.55 --mmr-lambda 0.7
+pnpm eval --strategy threshold-mmr --score-threshold 0.55 --mmr-lambda 0.9
 ```
 
 ## Baseline 列表
@@ -26,6 +26,7 @@ pnpm eval --strategy threshold-mmr --score-threshold 0.55 --mmr-lambda 0.7
 |------|------|---------|------|-------|-------|--------|-----|---------|---------|
 | `retrieval/baseline-dense-20260813.json` | 2026-08-13 | v2 | baseline-dense | 44 (37+7) | 89.2% | 41.2% | 0.652 | 0.380 | 85.7% |
 | `retrieval/threshold-mmr-20260814.json` | 2026-08-14 | v2 | threshold-mmr 0.55/0.7 (rejected) | 44 (37+7) | 83.8% | 36.5% | 0.577 | 0.209 | 85.7% |
+| `retrieval/threshold-mmr-lambda090-20260814.json` | 2026-08-14 | v2 | threshold-mmr 0.55/0.9 (experimental) | 44 (37+7) | 89.2% | 39.9% | 0.628 | 0.230 | 85.7% |
 
 ## 2026-08-14 Phase 1 Calibration（未启用）
 
@@ -39,6 +40,10 @@ pnpm eval --strategy threshold-mmr --score-threshold 0.55 --mmr-lambda 0.7
 | 0.65 | 67.6% | 30.4% | 0.486 | 0.177 | 59.5% | 66.7% |
 
 隔离对照 0.55 / lambda=1.0 恢复 Hit@4=89.2%、Precision@4=41.2%，说明主要退化来自 lambda=0.7 的多样性选择，而不是 0.55 阈值。MMR 同时将 top-4 平均唯一文档数从 2.82 提升到 3.02，并将 Keyword Recall 从 57.7% 提升到 65.8%；后续需补充专门的去冗余指标后再决定是否启用。
+
+补充 Duplicate Chunk Ratio、Unique Source Coverage 与 Generation Context Quality proxy 后，lambda 重扫描推荐 0.90 作为显式开启 MMR 时的实验参数：相对同索引 dense，Hit@4/easy 保持不变，重复率 10.8%→9.5%，unique source coverage 73.0%→75.7%，context quality 36.8%→38.1%。由于 Precision@4 仍从 41.2% 降到 39.9%，生产开关继续保持关闭。
+
+> Context Quality 的均值提升来自 5/37 条 answerable query，另有 4 条下降、28 条不变；该 proxy 只用于低成本参数扫描，不能替代 generation eval。
 
 ## 2026-08-13 Frozen Baseline (dense, dataset v2)
 

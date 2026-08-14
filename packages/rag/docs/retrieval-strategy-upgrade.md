@@ -445,9 +445,11 @@ interface QueryTransformer {
 2. [x] **MMR 去冗余**：使用 `@langchain/core/utils/math` 的 `maximalMarginalRelevance`，保留原始 score。
 3. [x] **topK / fetchK 可配置化**：硬编码参数已移入 config 与 `RETRIEVAL_*` env。
 4. [x] **空结果处理**：tool 明确提示 Agent 改写 query 后重试。
-5. [ ] **默认启用 threshold + MMR**：2026-08-14 网格中无参数满足不退化约束，保持 `scoreThreshold` 未设置、`mmr.enabled=false`。
+5. [ ] **默认启用 threshold + MMR**：2026-08-14 网格中无参数满足全部生产 gate，保持 `scoreThreshold` 未设置、`mmr.enabled=false`；显式开启 MMR 时的校准 lambda 已由 0.7 调整为 0.9。
 
 标定摘要：0.50/0.55 + lambda=0.7 的 Hit@4/Precision@4/MRR 为 83.8%/36.5%/0.577，低于 frozen baseline 的 89.2%/41.2%/0.652；easy Hit@4 也由 88.9% 降到 77.8%。虽然 Keyword Recall 从 57.7% 升到 65.8%，且 top-4 平均唯一文档数由 2.82 升到 3.02，但不足以通过 gate。详见 [Phase 1 实施计划与结果](./phase1-threshold-mmr-plan.md#5-实施与标定结果2026-08-14)。
+
+补充去冗余指标后，lambda=0.9 相比同索引 dense 保持 Hit@4/easy 不变，Duplicate Chunk Ratio 由 10.8% 降至 9.5%，Unique Source Coverage 由 73.0% 升至 75.7%，Generation Context Quality proxy 由 36.8% 升至 38.1%；但 Precision@4 仍下降到 39.9%，因此只更新关闭状态下的校准参数，不启用生产策略。
 
 ### Phase 2：混合检索 + Query 改写（3–5 天）
 

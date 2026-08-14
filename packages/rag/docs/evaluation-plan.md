@@ -142,7 +142,40 @@ Keyword Recall = (top-k 拼接文本中命中的 expectedKeywords 数) / expecte
 - **作用**：不依赖文档路径标注的辅助指标，对 api_usage 类特别有效（检查代码标识符是否出现）
 - **注意**：这是粗粒度指标，关键词出现不等于内容完整正确，仅作为补充信号
 
-### 3.5 指标互补关系
+### 3.5 Duplicate Chunk Ratio@K
+
+```
+Duplicate Chunk Ratio@K = top-k 中重复 chunk 数 / 实际返回 chunk 数
+```
+
+- **重复定义**：当前 chunk 与更早结果属于同一 `docPath`，且 `chunkIndex` 相同或相邻（差值 ≤ 1）。当前切分 overlap=200，这类相邻 chunk 最容易重复上下文。
+- **取值范围**：[0, 1]，越低越好。
+- **汇总范围**：仅 answerable query；unanswerable 继续用 abstention 衡量。
+
+### 3.6 Unique Source Coverage@K
+
+```
+Unique Source Coverage@K = top-k 中唯一 docPath 数 / K
+```
+
+- **取值范围**：[0, 1]，越高代表有限 context slot 覆盖了更多独立来源。
+- **缺结果惩罚**：分母固定为 K，阈值过滤导致不足 K 条时不会得到虚高 coverage。
+- **边界**：来源更多不等于更相关，必须与 Hit@K、Precision@K 一起判断。
+
+### 3.7 Generation Context Quality@K（无 LLM 代理指标）
+
+```
+Source Precision = expectedDocPath chunk 数 / 实际返回 chunk 数
+Coverage Quality = harmonic_mean(Source Precision, Keyword Recall@K)
+Generation Context Quality@K = Coverage Quality × (1 - Duplicate Chunk Ratio@K)
+```
+
+- **衡量维度**：同时要求来源正确、关键信息覆盖、上下文不过度重复。
+- **取值范围**：[0, 1]，越高越好。
+- **重要边界**：这是无需生成模型即可批量扫描的 retrieval proxy，不代表真实答案 Faithfulness/Relevance；最终候选仍需进入 generation eval。
+- **汇总范围**：仅 answerable query。
+
+### 3.8 指标互补关系
 
 | 指标 | 关心的问题 | 盲区 |
 |------|-----------|------|
@@ -150,8 +183,11 @@ Keyword Recall = (top-k 拼接文本中命中的 expectedKeywords 数) / expecte
 | MRR | 第一个对的排第几？ | 不关心第二篇及以后 |
 | NDCG@k | 整体排序好不好？ | 对单篇命中的 query 与 MRR 重复 |
 | Keyword Recall | 内容里有没有关键信息？ | 不关心文档来源是否正确 |
+| Duplicate Chunk Ratio@k | context 是否被相邻重复 chunk 占用？ | 不判断剩余内容是否相关 |
+| Unique Source Coverage@k | context slot 覆盖了多少独立来源？ | 来源多可能只是噪声更多 |
+| Generation Context Quality@k | 正确来源、关键词覆盖、低重复是否兼得？ | 是代理指标，不测真实生成答案 |
 
-四个指标组合使用，才能完整刻画检索质量。
+以上指标组合使用，才能区分“召回准确”“排序正确”和“生成上下文高效”三个目标。
 
 ---
 
@@ -168,6 +204,9 @@ Overall Metrics:
   MRR          : 0.682
   NDCG@10      : 0.715
   Keyword Recall: 75.2%
+  Duplicate Chunk Ratio@4: 9.5%
+  Unique Source Coverage@4: 75.7%
+  Generation Context Quality@4: 38.1%
 ```
 
 ### 4.2 按 Query Type 分组

@@ -52,7 +52,7 @@ const retrievedDocs = await vectorStore.similaritySearch(query, 4);
 ### 2.1 设计决策
 
 - **D1 — 阈值只做噪声过滤，不做拒答**：`scoreThreshold` 不预设单一值，用 `{0.50, 0.55, 0.60, 0.65}` 网格实测，由 Hit@4/Precision@4 数据选定默认值；不沿用 0.78（已记录会误杀 19/37 answerable）。空结果由「过滤后为空」触发，而非绝对分数。
-- **D2 — MMR 用 `@langchain/core/utils/math` 的 `maximalMarginalRelevance`**：不用 `vectorStore.maxMarginalRelevanceSearch`（不返回分数、无法与阈值组合）。前者返回选中索引，可在 `similaritySearchVectorWithScore` 候选上做、保留 score。`lambda=0.7`。
+- **D2 — MMR 用 `@langchain/core/utils/math` 的 `maximalMarginalRelevance`**：不用 `vectorStore.maxMarginalRelevanceSearch`（不返回分数、无法与阈值组合）。前者返回选中索引，可在 `similaritySearchVectorWithScore` 候选上做、保留 score。初始 `lambda=0.7`；去冗余指标补齐后重新标定为 `0.9`（MMR 仍默认关闭）。
 - **D3 — 管线顺序**：`embedQuery → similaritySearchVectorWithScore(fetchK=20) → 阈值过滤 → MMR 选 topK=4 → 返回带 score`。
 - **D4 — 配置化**：新增 `RetrievalConfig`（`topK=4, fetchK=20, scoreThreshold?, mmr.enabled=false, mmr.lambda=0.7`）+ `RETRIEVAL_*` env 映射 + `.env.example`。
 - **D5 — 评测可切换**：eval 加 `--strategy baseline-dense|threshold-mmr`、`--score-threshold`、`--mmr-lambda`；`EvalConfig.retrievalStrategy` 由当前硬编码 `'baseline-dense'` 改为 CLI 驱动。**baseline 文件保持冻结**，新结果写新文件。
@@ -161,3 +161,27 @@ pnpm run eval -- --strategy threshold-mmr --score-threshold <选定值> --mmr-la
 - MMR 把 top-4 平均唯一 `docPath` 数从 2.82 提升到 3.02，Keyword Recall 提升 8.1pp，说明多样性确有收益；但当前 Precision@4 将同一 expected doc 的多个 chunk 都计为 relevant，去冗余会直接减少该指标的相关 chunk 数，两者存在口径冲突。
 - 0.55 / lambda=1.0 隔离对照恢复到 Hit@4=89.2%、Precision@4=41.2%、easy Hit@4=88.9%，确认主要退化来自 lambda=0.7 的多样性选择，不是 0.55 阈值过滤。
 - 后续若继续调 MMR，应先补充“重复 chunk 占比 / unique source coverage / generation context quality”等去冗余指标，再扫描 lambda；跨语言和模块误召回仍交给 metadata、BM25 或 rerank。
+
+### 5.4 去冗余指标与 lambda 重标定
+
+新增三个仅在 answerable query 汇总的指标：
+
+- `Duplicate Chunk Ratio@K`：同一 `docPath` 下，与更早结果 `chunkIndex` 相同或相邻的 chunk 占实际返回结果比例，越低越好。
+- `Unique Source Coverage@K`：唯一 `docPath` 数 / K，越高越好。
+- `Generation Context Quality@K`：来源正确率与 Keyword Recall 的调和平均，再乘以非重复比例；这是无 LLM 的生成上下文代理指标，不等价于真实答案质量。
+
+固定 `scoreThreshold=0.55`，扫描 `lambda={0.70,0.75,0.80,0.85,0.90,0.95,1.00}`，并在 0.90 附近细扫 0.88/0.92：
+
+| lambda | Hit@4 | Prec@4 | MRR | Keyword | Duplicate | Unique Source | Context Quality | easy Hit@4 |
+|--------|-------|--------|-----|---------|-----------|---------------|-----------------|------------|
+| dense | 89.2% | 41.2% | 0.622 | 57.7% | 10.8% | 73.0% | 36.8% | 88.9% |
+| 0.70 | 83.8% | 36.5% | 0.577 | 65.8% | 6.8% | 77.7% | 36.5% | 77.8% |
+| 0.75 | 86.5% | 35.8% | 0.597 | 64.6% | 7.4% | 77.0% | 35.7% | 88.9% |
+| 0.80 | 83.8% | 39.2% | 0.604 | 60.1% | 9.5% | 74.3% | 37.2% | 88.9% |
+| 0.85 | 86.5% | 37.2% | 0.622 | 59.2% | 10.8% | 73.6% | 35.7% | 88.9% |
+| **0.90** | **89.2%** | 39.9% | **0.628–0.633** | **58.3%** | **9.5%** | **75.7%** | **38.1%** | **88.9%** |
+| 0.92 | 89.2% | 40.5% | 0.631 | 58.1% | 10.1% | 75.0% | 37.8% | 88.9% |
+| 0.95 | 89.2% | 41.2% | 0.619 | 55.9% | 11.5% | 73.6% | 36.3% | 88.9% |
+| 1.00 | 89.2% | 41.2% | 0.615 | 57.7% | 10.8% | 73.0% | 36.8% | 88.9% |
+
+结论：`lambda=0.90` 在保持 Hit@4、easy 和失败 query 集合不变的前提下，取得最低重复率、最高 unique source coverage 与最高 generation context quality；两次运行的新指标完全一致。Context Quality 在 5/37 条 answerable query 上升、4 条下降、28 条不变，平均值不是全面改善。它被设为“显式开启 MMR 时”的校准默认值，但 MMR 继续默认关闭，因为 Precision@4 仍下降 1.3pp，MRR 未达到 frozen 0.652 的原始生产 gate，且还没有真实 generation eval 结论。

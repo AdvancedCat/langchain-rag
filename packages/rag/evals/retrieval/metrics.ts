@@ -68,6 +68,58 @@ function keywordRecall(
     return { hits, total: expectedKeywords.length };
 }
 
+function duplicateChunkRatioAtK(retrieved: RetrievedChunk[], k: number): number {
+    const topK = retrieved.slice(0, k);
+    if (topK.length === 0) return 0;
+
+    let duplicateCount = 0;
+    for (let i = 0; i < topK.length; i++) {
+        const current = topK[i];
+        if (current.chunkIndex === undefined) continue;
+        const currentIndex = current.chunkIndex;
+
+        const duplicatesEarlierChunk = topK.slice(0, i).some(
+            (previous) =>
+                previous.docPath === current.docPath &&
+                previous.chunkIndex !== undefined &&
+                Math.abs(previous.chunkIndex - currentIndex) <= 1,
+        );
+        if (duplicatesEarlierChunk) duplicateCount++;
+    }
+
+    return duplicateCount / topK.length;
+}
+
+function uniqueSourceCoverageAtK(retrieved: RetrievedChunk[], k: number): number {
+    if (k <= 0) return 0;
+    const uniqueSources = new Set(retrieved.slice(0, k).map((chunk) => chunk.docPath));
+    return uniqueSources.size / k;
+}
+
+function harmonicMean(a: number, b: number): number {
+    if (a <= 0 || b <= 0) return 0;
+    return (2 * a * b) / (a + b);
+}
+
+function generationContextQualityAtK(
+    retrieved: RetrievedChunk[],
+    query: GoldenQuery,
+    k: number,
+): number {
+    if (!query.answerable) return 0;
+    const topK = retrieved.slice(0, k);
+    if (topK.length === 0) return 0;
+
+    const sourcePrecision =
+        topK.filter((chunk) => isRelevantChunk(chunk, query.expectedDocPaths)).length /
+        topK.length;
+    const keyword = keywordRecall(retrieved, query.expectedKeywords, k);
+    const keywordRecallAtK = keyword.total > 0 ? keyword.hits / keyword.total : 0;
+    const nonDuplicateRatio = 1 - duplicateChunkRatioAtK(retrieved, k);
+
+    return harmonicMean(sourcePrecision, keywordRecallAtK) * nonDuplicateRatio;
+}
+
 function topScore(retrieved: RetrievedChunk[]): number {
     if (retrieved.length === 0) return 0;
     return retrieved[0].score;
@@ -79,6 +131,15 @@ export function evaluateQuery(
     config: EvalConfig,
 ): QueryResult {
     const primaryK = config.hitRateKs[0];
+    const duplicateChunkRatioMap = Object.fromEntries(
+        config.hitRateKs.map((k) => [k, duplicateChunkRatioAtK(retrieved, k)]),
+    ) as Record<number, number>;
+    const uniqueSourceCoverageMap = Object.fromEntries(
+        config.hitRateKs.map((k) => [k, uniqueSourceCoverageAtK(retrieved, k)]),
+    ) as Record<number, number>;
+    const generationContextQualityMap = Object.fromEntries(
+        config.hitRateKs.map((k) => [k, generationContextQualityAtK(retrieved, query, k)]),
+    ) as Record<number, number>;
 
     if (!query.answerable) {
         return {
@@ -90,6 +151,9 @@ export function evaluateQuery(
             ndcgAtK: Object.fromEntries(config.ndcgKs.map((k) => [k, 0])) as Record<number, number>,
             keywordHits: 0,
             keywordTotal: 0,
+            duplicateChunkRatioAtK: duplicateChunkRatioMap,
+            uniqueSourceCoverageAtK: uniqueSourceCoverageMap,
+            generationContextQualityAtK: generationContextQualityMap,
             abstentionCorrect: topScore(retrieved) < config.abstentionThreshold,
             topScore: topScore(retrieved),
         };
@@ -118,6 +182,9 @@ export function evaluateQuery(
         ndcgAtK: ndcgMap,
         keywordHits: hits,
         keywordTotal: total,
+        duplicateChunkRatioAtK: duplicateChunkRatioMap,
+        uniqueSourceCoverageAtK: uniqueSourceCoverageMap,
+        generationContextQualityAtK: generationContextQualityMap,
         abstentionCorrect: false,
         topScore: topScore(retrieved),
     };

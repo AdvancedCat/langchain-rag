@@ -138,6 +138,10 @@ async function retrieveBaseline(
     );
     return results.map(([doc, score], idx) => ({
         docPath: doc.metadata?.docPath ?? 'unknown',
+        chunkIndex:
+            typeof doc.metadata?.chunkIndex === 'number'
+                ? doc.metadata.chunkIndex
+                : undefined,
         score,
         content: doc.pageContent,
         rank: idx + 1,
@@ -158,6 +162,10 @@ async function retrieveThresholdMMR(
 
     return results.map(({ document, score }, index) => ({
         docPath: document.metadata?.docPath ?? 'unknown',
+        chunkIndex:
+            typeof document.metadata?.chunkIndex === 'number'
+                ? document.metadata.chunkIndex
+                : undefined,
         score,
         content: document.pageContent,
         rank: index + 1,
@@ -171,6 +179,15 @@ function emptyBreakdown(ks: number[]): TypeBreakdown {
         precisionAtK: Object.fromEntries(ks.map((k) => [k, 0])) as Record<number, number>,
         mrr: 0,
         ndcgAtK: Object.fromEntries(ks.map((k) => [k, 0])) as Record<number, number>,
+        duplicateChunkRatioAtK: Object.fromEntries(
+            ks.map((k) => [k, 0]),
+        ) as Record<number, number>,
+        uniqueSourceCoverageAtK: Object.fromEntries(
+            ks.map((k) => [k, 0]),
+        ) as Record<number, number>,
+        generationContextQualityAtK: Object.fromEntries(
+            ks.map((k) => [k, 0]),
+        ) as Record<number, number>,
     };
 }
 
@@ -183,6 +200,17 @@ function computeBreakdown(results: QueryResult[], ks: number[]): TypeBreakdown {
         b.hitRateAtK[k] = mean(results.map((r) => (r.hitAtK[k] ? 1 : 0)));
         b.precisionAtK[k] = mean(results.map((r) => r.precisionAtK[k]));
         b.ndcgAtK[k] = mean(results.map((r) => r.ndcgAtK[k]));
+
+        const answerableResults = results.filter((r) => r.query.answerable);
+        b.duplicateChunkRatioAtK[k] = mean(
+            answerableResults.map((r) => r.duplicateChunkRatioAtK[k]),
+        );
+        b.uniqueSourceCoverageAtK[k] = mean(
+            answerableResults.map((r) => r.uniqueSourceCoverageAtK[k]),
+        );
+        b.generationContextQualityAtK[k] = mean(
+            answerableResults.map((r) => r.generationContextQualityAtK[k]),
+        );
     }
     b.mrr = mean(results.map((r) => r.reciprocalRank));
     return b;
@@ -262,6 +290,24 @@ function aggregateReport(
             ks.map((k) => [k, mean(answerableResults.map((r) => r.ndcgAtK[k]))]),
         ) as Record<number, number>,
         avgKeywordRecall,
+        avgDuplicateChunkRatioAtK: Object.fromEntries(
+            ks.map((k) => [
+                k,
+                mean(answerableResults.map((r) => r.duplicateChunkRatioAtK[k])),
+            ]),
+        ) as Record<number, number>,
+        avgUniqueSourceCoverageAtK: Object.fromEntries(
+            ks.map((k) => [
+                k,
+                mean(answerableResults.map((r) => r.uniqueSourceCoverageAtK[k])),
+            ]),
+        ) as Record<number, number>,
+        avgGenerationContextQualityAtK: Object.fromEntries(
+            ks.map((k) => [
+                k,
+                mean(answerableResults.map((r) => r.generationContextQualityAtK[k])),
+            ]),
+        ) as Record<number, number>,
         abstentionRate,
         answerableScoreStats: computeScoreStats(answerableResults, config.abstentionThreshold),
         unanswerableScoreStats: computeScoreStats(unanswerableResults, config.abstentionThreshold),
@@ -320,6 +366,12 @@ function printReport(report: EvalReport): void {
         console.log(`    NDCG@${String(k).padEnd(2)}      : ${formatScore(report.ndcgAtK[k])}`);
     }
     console.log(`    Keyword Recall: ${formatPct(report.avgKeywordRecall)} (top ${report.config.topK} only)`);
+
+    const primaryK = report.config.topK;
+    console.log('\n  Context Diversity & Generation Proxy (answerable):');
+    console.log(`    Duplicate Chunk Ratio@${primaryK}: ${formatPct(report.avgDuplicateChunkRatioAtK[primaryK])}`);
+    console.log(`    Unique Source Coverage@${primaryK}: ${formatPct(report.avgUniqueSourceCoverageAtK[primaryK])}`);
+    console.log(`    Generation Context Quality@${primaryK}: ${formatPct(report.avgGenerationContextQualityAtK[primaryK])}`);
 
     if (report.unanswerableCount > 0) {
         console.log('\n  Unanswerable Metrics (abstention ability):');

@@ -23,7 +23,7 @@ export interface RetrievalConfig {
 
 const DEFAULT_RETRIEVAL_TOP_K = 4;
 const DEFAULT_RETRIEVAL_FETCH_K = 20;
-const DEFAULT_RETRIEVAL_MMR_LAMBDA = 0.7;
+const DEFAULT_RETRIEVAL_MMR_LAMBDA = 0.9;
 
 function parseIntegerEnv(name: string, fallback: number): number {
     const raw = process.env[name];

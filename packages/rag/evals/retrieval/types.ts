@@ -19,6 +19,9 @@ export interface QueryResult {
     ndcgAtK: Record<number, number>;
     keywordHits: number;
     keywordTotal: number;
+    duplicateChunkRatioAtK: Record<number, number>;
+    uniqueSourceCoverageAtK: Record<number, number>;
+    generationContextQualityAtK: Record<number, number>;
     abstentionCorrect: boolean;
     topScore: number;
 }
@@ -41,6 +44,9 @@ export interface EvalReport {
     mrr: number;
     ndcgAtK: Record<number, number>;
     avgKeywordRecall: number;
+    avgDuplicateChunkRatioAtK: Record<number, number>;
+    avgUniqueSourceCoverageAtK: Record<number, number>;
+    avgGenerationContextQualityAtK: Record<number, number>;
     abstentionRate: number;
     answerableScoreStats: ScoreStats;
     unanswerableScoreStats: ScoreStats;
@@ -56,6 +62,9 @@ export interface TypeBreakdown {
     precisionAtK: Record<number, number>;
     mrr: number;
     ndcgAtK: Record<number, number>;
+    duplicateChunkRatioAtK: Record<number, number>;
+    uniqueSourceCoverageAtK: Record<number, number>;
+    generationContextQualityAtK: Record<number, number>;
 }
 
 export interface EvalConfig {
