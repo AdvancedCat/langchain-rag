@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import 'dotenv/config';
 import type { Document } from '@langchain/core/documents';
 import type { VectorStore } from '@langchain/core/vectorstores';
-import { buildVectorStore } from '../src/ingestion/index.js';
+import { buildVectorStore } from '../../src/ingestion/index.js';
 import { evaluateQuery, mean } from './metrics.js';
 import type {
     GoldenDataset,
@@ -21,7 +21,7 @@ import type {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const DEFAULT_DATASET = resolve(__dirname, 'datasets/langchain-rag.json');
+const DEFAULT_DATASET = resolve(__dirname, '../datasets/langchain-rag.json');
 
 interface CliArgs {
     rebuild: boolean;

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import type { RetrievedChunk } from '../types.js';
+import type { RetrievedChunk } from '../shared/types.js';
 import type { FaithfulnessResult, ClaimVerdict } from './types.js';
 import { callLLMJson } from './llm-json.js';
 

@@ -91,7 +91,7 @@ interface GoldenQuery {
 
 ## 3. 评估指标
 
-指标实现在 [`evals/metrics.ts`](../evals/metrics.ts)。
+指标实现在 [`evals/retrieval/metrics.ts`](../evals/retrieval/metrics.ts)。
 
 ### 3.1 Hit Rate@k
 
@@ -157,7 +157,7 @@ Keyword Recall = (top-k 拼接文本中命中的 expectedKeywords 数) / expecte
 
 ## 4. 报告结构
 
-报告由 [`evals/run.ts`](../evals/run.ts) 生成，包含以下维度。
+报告由 [`evals/retrieval/run.ts`](../evals/retrieval/run.ts) 生成，包含以下维度。
 
 ### 4.1 Overall 指标
 
@@ -315,7 +315,9 @@ pnpm run eval:json > eval-results/phase1.json
 
 | 文件 | 职责 |
 |------|------|
-| [`evals/types.ts`](../evals/types.ts) | 类型定义 |
-| [`evals/metrics.ts`](../evals/metrics.ts) | 指标计算（Hit Rate/MRR/NDCG/Keyword Recall） |
-| [`evals/run.ts`](../evals/run.ts) | 主运行器：加载索引 → 逐条检索 → 聚合报告 |
-| [`evals/datasets/langchain-rag.json`](../evals/datasets/langchain-rag.json) | 35 条 golden queries |
+| [`evals/shared/types.ts`](../evals/shared/types.ts) | 跨层级共享类型定义（GoldenQuery、RetrievedChunk 等） |
+| [`evals/retrieval/types.ts`](../evals/retrieval/types.ts) | 检索评测专属类型（EvalReport、EvalConfig 等） |
+| [`evals/retrieval/metrics.ts`](../evals/retrieval/metrics.ts) | 指标计算（Hit Rate/MRR/NDCG/Keyword Recall） |
+| [`evals/retrieval/run.ts`](../evals/retrieval/run.ts) | 检索评测主运行器：加载索引 → 逐条检索 → 聚合报告 |
+| [`evals/generation/run.ts`](../evals/generation/run.ts) | 生成评测主运行器：retrieve → generate → faithfulness/relevance |
+| [`evals/datasets/langchain-rag.json`](../evals/datasets/langchain-rag.json) | Golden queries 数据集 |

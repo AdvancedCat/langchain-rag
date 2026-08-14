@@ -9,14 +9,14 @@ import { createEmbeddings } from '../../src/embeddings.js';
 import { generateAnswer, getEvalLLM } from './generator.js';
 import { evaluateFaithfulness, isAbstention } from './faithfulness.js';
 import { evaluateRelevance } from './relevance.js';
-import { mean } from '../metrics.js';
+import { mean } from '../retrieval/metrics.js';
 import type {
     GoldenDataset,
     GoldenQuery,
     QueryType,
     Difficulty,
     RetrievedChunk,
-} from '../types.js';
+} from '../shared/types.js';
 import type {
     GenEvalConfig,
     GenQueryResult,
@@ -27,7 +27,7 @@ import type {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const DEFAULT_DATASET = resolve(__dirname, '../datasets/langchain-rag.json');
-const BASELINES_DIR = resolve(__dirname, '../baselines');
+const BASELINES_DIR = resolve(__dirname, '../baselines/generation');
 
 interface CliArgs {
     rebuild: boolean;

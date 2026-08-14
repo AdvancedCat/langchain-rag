@@ -1,6 +1,11 @@
 # RAG Evaluation Baselines
 
-本目录保存 RAG 检索评测的基准结果。**Baseline 一经冻结不再修改**，后续检索策略优化（混合检索、rerank、metadata 过滤等）均与此对比。
+本目录保存 RAG 评测的基准结果，按评测层级分为：
+
+- `retrieval/` — 检索评测 baseline（Hit Rate、MRR、NDCG、Precision 等）
+- `generation/` — 生成评测 baseline（Faithfulness、Relevance、Abstention 等）
+
+**Baseline 一经冻结不再修改**，后续检索策略优化（混合检索、rerank、metadata 过滤等）均与此对比。
 
 ## 运行方式
 
@@ -18,7 +23,7 @@ pnpm eval --abstention-threshold 0.75  # 自定义 abstention 阈值
 
 | 文件 | 日期 | Dataset | 策略 | Query | Hit@4 | Prec@4 | MRR | NDCG@10 | Abstain |
 |------|------|---------|------|-------|-------|--------|-----|---------|---------|
-| `baseline-dense-20260813.json` | 2026-08-13 | v2 | baseline-dense | 44 (37+7) | 89.2% | 41.2% | 0.652 | 0.380 | 85.7% |
+| `retrieval/baseline-dense-20260813.json` | 2026-08-13 | v2 | baseline-dense | 44 (37+7) | 89.2% | 41.2% | 0.652 | 0.380 | 85.7% |
 
 ## 2026-08-13 Frozen Baseline (dense, dataset v2)
 

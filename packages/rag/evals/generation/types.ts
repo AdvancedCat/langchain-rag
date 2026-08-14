@@ -1,4 +1,4 @@
-import type { GoldenQuery, RetrievedChunk, QueryType, Difficulty } from '../types.js';
+import type { GoldenQuery, RetrievedChunk, QueryType, Difficulty } from '../shared/types.js';
 
 export interface GenEvalConfig {
     topK: number;

@@ -1,6 +1,6 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { ChatOpenAI } from '@langchain/openai';
-import type { RetrievedChunk } from '../types.js';
+import type { RetrievedChunk } from '../shared/types.js';
 
 function getEvalLLM(): BaseChatModel {
     const apiKey = process.env.DEEPSEEK_API_KEY;
