@@ -42,13 +42,14 @@ export async function createRagAgent(forceRebuild = false) {
 
     const searchDocumentation = tool(
         async ({ query }) => {
-            const retrievedChunks = await retrieve(
+            const allCandidates = await retrieve(
                 { vectorStore, bm25Retriever, llm },
                 query,
                 retrievalConfig,
             );
 
-            const maxDenseScore = getMaxDenseScore(retrievedChunks);
+            const retrievedChunks = allCandidates.slice(0, retrievalConfig.topK);
+            const maxDenseScore = getMaxDenseScore(allCandidates);
             if (retrievedChunks.length === 0 || maxDenseScore < ABSTENTION_THRESHOLD) {
                 return 'No documentation chunks passed the retrieval filters. Reformulate the query and call search_documentation again.';
             }

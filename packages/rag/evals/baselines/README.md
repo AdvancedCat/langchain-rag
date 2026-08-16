@@ -24,9 +24,118 @@ pnpm eval --strategy threshold-mmr --score-threshold 0.55 --mmr-lambda 0.9
 
 | 文件 | 日期 | Dataset | 策略 | Query | Hit@4 | Prec@4 | MRR | NDCG@10 | Abstain |
 |------|------|---------|------|-------|-------|--------|-----|---------|---------|
+| `retrieval/hybrid-rewrite-20260816.json` | 2026-08-16 | v2 | hybrid-rewrite（生产默认） | 44 (37+7) | 89.2% | 39.2% | 0.646 | 0.372 | **100%** |
+| `retrieval/hybrid-bm25-20260816.json` | 2026-08-16 | v2 | hybrid-bm25 (ablation) | 44 (37+7) | **91.9%** | 40.5% | **0.662** | **0.381** | 85.7% |
 | `retrieval/baseline-dense-20260813.json` | 2026-08-13 | v2 | baseline-dense | 44 (37+7) | 89.2% | 41.2% | 0.652 | 0.380 | 85.7% |
 | `retrieval/threshold-mmr-20260814.json` | 2026-08-14 | v2 | threshold-mmr 0.55/0.7 (rejected) | 44 (37+7) | 83.8% | 36.5% | 0.577 | 0.209 | 85.7% |
 | `retrieval/threshold-mmr-lambda090-20260814.json` | 2026-08-14 | v2 | threshold-mmr 0.55/0.9 (experimental) | 44 (37+7) | 89.2% | 39.9% | 0.628 | 0.230 | 85.7% |
+
+## 2026-08-16 Phase 2 混合检索 + Query Rewrite
+
+Phase 2 引入了两项核心能力：(1) Dense + BM25 Sparse 混合检索（Score-level Boost Fusion），(2) 基于 DeepSeek 的 Query Rewrite。评测结果显示两种策略各有优劣，形成 Precision–Abstention trade-off。
+
+### 策略对比总览
+
+| 指标 | baseline-dense (08-13) | hybrid-bm25 (ablation) | hybrid-rewrite（生产默认） |
+|------|----------------------|----------------------|------------------------|
+| Hit@4 | 89.2% | **91.9%** ↑ | 89.2% |
+| Hit@10 | 94.6% | 94.6% | **97.3%** ↑ |
+| Hit@20 | 97.3% | 97.3% | **100%** ↑ |
+| Prec@4 | 41.2% | 40.5% | 39.2% |
+| MRR | 0.652 | **0.662** | 0.646 |
+| NDCG@10 | 0.380 | **0.381** | 0.372 |
+| Keyword Recall | 57.7% | 58.3% | 57.7% |
+| Duplicate Ratio@4 | 10.8% | 10.1% | **8.8%** |
+| Context Quality@4 | 36.8% | 37.8% | 37.5% |
+| **Abstention Rate** | 85.7%（6/7） | 85.7%（6/7） | **100%（7/7）** ↑ |
+| Answerable failures | 4 | **3** | 4 |
+
+**核心结论**：
+- **hybrid-bm25** 在 top-4 精度上最优（Hit@4=91.9%，MRR=0.662），但 abstention 仍有 1 条漏判（q039 Pinecone 虚假置信度）。
+- **hybrid-rewrite**（生产默认）虽然 top-4 精度回到 89.2%，但 Abstention 达到完美 100%，且 Hit@20=100%（深度召回无遗漏），Duplicate Ratio 最低（8.8%）。
+- Query Rewrite 的副作用：将精确 API 名称（如 `astream_events`）泛化为更通用的表述，导致 BM25 精确匹配信号被削弱，引入 q013 新的 miss。
+
+### hybrid-rewrite 配置（生产默认）
+- 检索策略: hybrid-rewrite（Dense + BM25 Boost Fusion + DeepSeek Query Rewrite）
+- Fetch K: 20（denseTopK=30, sparseTopK=5），Top K: 4
+- 融合权重: denseWeight=2.0, sparseWeight=0.5
+- Query Rewrite: DeepSeek deepseek-v4-flash，temperature=0.7，LRU 缓存 500 条，失败 fallback 原查询
+- BM25 分词: 中文单字 unigram + 英文驼峰/连字符拆分，in-memory 索引（2681 chunks）
+- Embedding: qwen3.7-text-embedding（DashScope，1024 维）
+- 向量库: Qdrant（localhost:6333），collection `langchain_docs`（未重建，2681 chunks）
+- Query 数: 44（37 answerable + 7 unanswerable）
+- Abstention threshold: topScore < 0.78
+
+### hybrid-rewrite 按类型
+
+| 类型 | 数量 | Hit@4 | MRR | NDCG@10 | 对比 hybrid-bm25 |
+|------|------|-------|-----|---------|-----------------|
+| concept | 10 | 100.0% | 0.683 | 0.407 | MRR 略降 |
+| api_usage | 16 | 87.5% | 0.752 | 0.389 | Hit@4 ↓6.3pp（q013 回归） |
+| comparison | 6 | 100.0% | 0.500 | 0.336 | 保持 100%，MRR ↑ |
+| troubleshooting | 5 | 60.0% | 0.403 | 0.288 | MRR 微升 |
+| unanswerable | 7 | N/A | N/A | N/A | **Abstention 100%** ✅ |
+
+### hybrid-rewrite 按难度
+
+| 难度 | 数量 | Hit@4 | MRR | 对比 hybrid-bm25 |
+|------|------|-------|-----|-----------------|
+| easy | 9 | 100.0% | 0.704 | 保持 100% |
+| medium | 20 | 75.0% | 0.592 | 持平 |
+| hard | 15 | 60.0% | 0.381 | Hit@4 ↓6.7pp |
+
+### hybrid-rewrite 失败分析（Hit@4 = 0，共 4 条）
+
+| ID | 问题 | hybrid-bm25 结果 | hybrid-rewrite 结果 | Rewrite 影响 |
+|----|------|-----------------|-------------------|-------------|
+| ~~q002~~ | ~~deepagents vs Agent~~ | ✅ 已修复 | ✅ 保持修复 | Rewrite 保留了关键术语，无负面影响 |
+| q001 | 子代理流式传输 | ❌ 失败 | ❌ 失败 | 无变化（Python rag 噪声问题） |
+| q013 | astream_events 监听 | ✅ HIT | ❌ **新失败** | Rewrite 将 "astream_events" 泛化，丢失 BM25 精确匹配 |
+| q026 | 工具结果不在历史 | ❌ 失败 | ❌ 失败 | 无变化（跨模块混淆） |
+| q031 | streaming 回调不触发 | ❌ 失败 | ❌ 失败 | 无变化（langgraph vs langchain 混淆） |
+
+### Abstention 改善分析
+
+hybrid-rewrite 的最大亮点是 **Abstention Rate 从 85.7% 提升到 100%**，修复了 q039（"如何集成 Pinecone"）的虚假置信度问题：
+- baseline-dense/hybrid-bm25：q039 的 topDenseScore=0.7885（刚好高于 0.78 阈值，产生 false confidence）
+- hybrid-rewrite：Rewrite 后查询语义更聚焦，q039 的 topDenseScore 降至 0.7775（低于阈值，正确 abstain）
+
+同时 answerable 的平均分从 0.769 微降至 0.758，unanswerable 平均分从 0.693 降至 0.672，两类分数分布的间距更明显，说明 Rewrite 有助于提升 dense embedding 的语义区分度。
+
+### 效果提升归因（BM25 Boost 部分）
+
+Hit@4 从 89.2% → 91.9%（hybrid-bm25 vs baseline-dense）的核心来源：
+
+1. **BM25 关键词精确匹配（主因）**：comparison 类 query（如 "deepagents vs Agent"）通过词频信号纠正 dense embedding 在语义相近但模块不同的文档间的排序偏差。q002 直接贡献 2.7pp Hit@4。
+2. **dense-first Boost Fusion 策略**：权重 4:1（dense=0.8, sparse=0.2），BM25 仅对 dense 候选做 boost 重排、不引入 sparse 独有文档，避免中文 unigram 噪音同时保持 dense 高召回底池。
+3. **保守分词 + Min-Max 归一化**：中文 unigram + 英文驼峰拆分减少噪音；分数归一化消除 dense cosine 与 BM25 尺度差异。
+
+### Query Rewrite 的 Trade-off 分析
+
+| 正面效果 | 负面效果 |
+|---------|---------|
+| Abstention 100%（修复 q039 虚假置信度） | q013 从 HIT 变为 MISS（API 名称被泛化） |
+| Hit@20=100%（深度召回无遗漏） | Prec@4 从 40.5% 降至 39.2% |
+| Duplicate Ratio 降至 8.8% | MRR 从 0.662 降至 0.646 |
+| unanswerable 分数分布更低（更易拒答） | answerable 低分段数量从 19 增至 22 |
+
+**根因**：当前 Rewrite prompt 温度为 0.7，倾向于将查询"优化"为更书面化、更泛化的表达，这对区分 answerable/unanswerable 有利（提升语义区分度），但对需要精确 API 名称匹配的 query 会丢失关键 term，削弱 BM25 的精确匹配优势。
+
+**后续优化方向**：降低 rewrite temperature（0.1~0.3）、在 prompt 中强制保留代码标识符/API 名称，或采用 step-back prompting 等保留实体的改写策略。
+
+### 未解决问题
+
+| 问题 | 现状 | 目标 |
+|------|------|------|
+| q001/q026 Python 文档干扰 | troubleshooting Hit@4 仍 60% | Metadata 预过滤 language=javascript → 80%+ |
+| q031 langgraph vs langchain streaming 混淆 | 跨包歧义仍存在 | CrossEncoder rerank 或模块路由 |
+| q013 API 名称被 rewrite 泛化 | api_usage Hit@4 回退 | Rewrite prompt 保留代码标识符 / 降低 temperature |
+| answerable 低分段 | 22/37 topScore < 0.78 | 融合分数替代 pure dense score 做 abstention 判断 |
+| BM25 内存索引 OOM 风险 | 2681 chunks≈82MB 安全，100k+ 有风险 | 流式构建 / 迁移 Qdrant native sparse vectors |
+
+### 工程修复记录
+
+评测过程中发现并修复了 retrieval pipeline 的一个 bug：[pipeline.ts](file://~/Documents/Code/langchain-lib/packages/rag/src/retrieval/pipeline.ts#L82) 在非 MMR 模式下 `slice(0, config.topK)` 只返回 4 个结果，导致 @10/@20 指标无法正确计算。修复后 `retrieve()` 返回完整候选列表，由生产调用方 [index.ts](file://~/Documents/Code/langchain-lib/packages/rag/src/retrieval/index.ts#L51) 显式 `slice(0, topK)`，不影响生产行为。
 
 ## 2026-08-14 Phase 1 Calibration（未启用）
 

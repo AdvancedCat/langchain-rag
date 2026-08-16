@@ -79,7 +79,7 @@ export async function retrieve(
         return selectedIndexes.map((index) => finalCandidates[index]);
     }
 
-    return finalCandidates.slice(0, config.topK);
+    return finalCandidates;
 }
 
 function deduplicateMerge(resultLists: ScoredChunk[][]): ScoredChunk[] {
