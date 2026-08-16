@@ -32,6 +32,12 @@ export interface RetrievalConfig {
         multiQuery: boolean;
         multiQueryCount: number;
     };
+    rerank: {
+        enabled: boolean;
+        model: string;
+        topN: number;
+        rerankUrl: string;
+    };
 }
 
 const DEFAULT_RETRIEVAL_TOP_K = 4;
@@ -43,6 +49,8 @@ const DEFAULT_DENSE_TOP_K = 30;
 const DEFAULT_DENSE_WEIGHT = 2;
 const DEFAULT_SPARSE_WEIGHT = 0.5;
 const DEFAULT_MULTI_QUERY_COUNT = 3;
+const DEFAULT_RERANK_MODEL = 'qwen3-rerank';
+const DEFAULT_RERANK_URL = 'https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank';
 
 function parseIntegerEnv(name: string, fallback: number): number {
     const raw = process.env[name];
@@ -95,6 +103,10 @@ export function getRetrievalConfig(): RetrievalConfig {
     const queryRewriteEnabled = parseBooleanEnv('RETRIEVAL_QUERY_REWRITE', true);
     const multiQueryEnabled = parseBooleanEnv('RETRIEVAL_MULTI_QUERY', false);
     const mmrEnabled = parseBooleanEnv('RETRIEVAL_MMR_ENABLED', false);
+    const rerankEnabled = parseBooleanEnv('RETRIEVAL_RERANK_ENABLED', false);
+    const rerankModel = process.env.RETRIEVAL_RERANK_MODEL ?? DEFAULT_RERANK_MODEL;
+    const rerankTopN = parseIntegerEnv('RETRIEVAL_RERANK_TOP_N', DEFAULT_RETRIEVAL_TOP_K);
+    const rerankUrl = process.env.DASHSCOPE_RERANK_URL ?? DEFAULT_RERANK_URL;
 
     if (fetchK < topK) {
         throw new Error(
@@ -123,6 +135,17 @@ export function getRetrievalConfig(): RetrievalConfig {
     if (denseWeight <= 0 || sparseWeight <= 0) {
         throw new Error('RETRIEVAL_DENSE_WEIGHT and RETRIEVAL_SPARSE_WEIGHT must be positive');
     }
+    if (rerankEnabled && mmrEnabled) {
+        throw new Error('RETRIEVAL_RERANK_ENABLED and RETRIEVAL_MMR_ENABLED cannot both be true');
+    }
+    if (rerankEnabled && rerankTopN > fetchK) {
+        throw new Error(
+            `RETRIEVAL_RERANK_TOP_N (${rerankTopN}) must be less than or equal to RETRIEVAL_FETCH_K (${fetchK})`,
+        );
+    }
+    if (rerankTopN <= 0) {
+        throw new Error('RETRIEVAL_RERANK_TOP_N must be positive');
+    }
 
     return {
         topK,
@@ -144,6 +167,12 @@ export function getRetrievalConfig(): RetrievalConfig {
             rewrite: queryRewriteEnabled,
             multiQuery: multiQueryEnabled,
             multiQueryCount,
+        },
+        rerank: {
+            enabled: rerankEnabled,
+            model: rerankModel,
+            topN: rerankTopN,
+            rerankUrl,
         },
     };
 }

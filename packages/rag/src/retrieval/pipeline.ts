@@ -8,11 +8,13 @@ import { retrieveDense } from './retrievers/dense.js';
 import { deduplicate } from './retrievers/hybrid.js';
 import { rewriteQuery } from './transformers/rewrite.js';
 import { generateMultiQueries } from './transformers/multiQuery.js';
+import type { Reranker } from './rerankers/index.js';
 
 export interface RetrieveDeps {
     vectorStore: VectorStore;
     bm25Retriever: BM25Retriever;
     llm: BaseChatModel;
+    reranker?: Reranker;
 }
 
 export async function retrieve(
@@ -20,7 +22,7 @@ export async function retrieve(
     query: string,
     config: RetrievalConfig,
 ): Promise<ScoredChunk[]> {
-    const { vectorStore, bm25Retriever, llm } = deps;
+    const { vectorStore, bm25Retriever, llm, reranker } = deps;
 
     const queries = await transformQueries(query, llm, config);
 
@@ -52,21 +54,54 @@ export async function retrieve(
 
     const isHybrid = bm25Available;
 
-    if (config.scoreThreshold !== undefined && !isHybrid) {
-        finalCandidates = finalCandidates.filter((c) => c.score >= config.scoreThreshold!);
+    let rerankedCandidates: ScoredChunk[];
+
+    if (config.rerank.enabled && reranker && finalCandidates.length > 0) {
+        const fetchCandidates = finalCandidates.slice(0, config.fetchK);
+        const documents = fetchCandidates.map((c) => c.document.pageContent);
+        const primaryQuery = queries[0];
+        const rerankCount = Math.min(documents.length, config.fetchK);
+
+        try {
+            const rerankResults = await reranker.rank(primaryQuery, documents, rerankCount);
+            const reranked = rerankResults.map((r) => {
+                const original = fetchCandidates[r.index];
+                return {
+                    ...original,
+                    score: r.relevanceScore,
+                    rerankScore: r.relevanceScore,
+                };
+            });
+            const rerankedIndexes = new Set(rerankResults.map((r) => r.index));
+            const unReranked = fetchCandidates
+                .filter((_, i) => !rerankedIndexes.has(i))
+                .map((c) => ({ ...c, rerankScore: 0 }));
+            rerankedCandidates = [...reranked, ...unReranked];
+        } catch (error) {
+            console.warn(
+                `[Rerank] API failed, falling back to fusion order: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            rerankedCandidates = finalCandidates;
+        }
+    } else {
+        rerankedCandidates = finalCandidates;
     }
 
-    if (finalCandidates.length === 0) {
+    if (config.scoreThreshold !== undefined && !isHybrid && !config.rerank.enabled) {
+        rerankedCandidates = rerankedCandidates.filter((c) => c.score >= config.scoreThreshold!);
+    }
+
+    if (rerankedCandidates.length === 0) {
         return [];
     }
 
     if (config.mmr.enabled) {
         const queryEmbedding = await vectorStore.embeddings.embedQuery(queries[0]);
         const candidateEmbeddings = await vectorStore.embeddings.embedDocuments(
-            finalCandidates.map(({ document }) => document.pageContent),
+            rerankedCandidates.map(({ document }) => document.pageContent),
         );
 
-        const relevanceScores = finalCandidates.map((c) => c.denseScore ?? c.score);
+        const relevanceScores = rerankedCandidates.map((c) => c.denseScore ?? c.score);
 
         const selectedIndexes = maximalMarginalRelevanceCustom(
             queryEmbedding,
@@ -76,10 +111,10 @@ export async function retrieve(
             config.topK,
         );
 
-        return selectedIndexes.map((index) => finalCandidates[index]);
+        return selectedIndexes.map((index) => rerankedCandidates[index]);
     }
 
-    return finalCandidates;
+    return rerankedCandidates;
 }
 
 function deduplicateMerge(resultLists: ScoredChunk[][]): ScoredChunk[] {

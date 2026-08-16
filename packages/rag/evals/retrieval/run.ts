@@ -7,6 +7,7 @@ import { retrieve } from '../../src/retrieval/pipeline.js';
 import type { RetrieveDeps } from '../../src/retrieval/pipeline.js';
 import { getGlobalBM25Retriever } from '../../src/retrieval/retrievers/bm25.js';
 import { getMaxDenseScore } from '../../src/retrieval/types.js';
+import { createDashScopeReranker, type Reranker } from '../../src/retrieval/rerankers/index.js';
 import { getLLM } from '../../../libs/llm-provider.js';
 import type { RetrievalConfig } from '../../src/config.js';
 import { evaluateQuery, mean } from './metrics.js';
@@ -99,6 +100,7 @@ function parseArgs(): CliArgs {
         'hybrid-bm25',
         'hybrid-rewrite',
         'hybrid-multiquery',
+        'hybrid-rerank',
     ];
     if (!validStrategies.includes(parsed.strategy)) {
         throw new Error(
@@ -155,6 +157,12 @@ function buildRetrievalConfig(cli: CliArgs): RetrievalConfig {
             multiQuery: false,
             multiQueryCount: 3,
         },
+        rerank: {
+            enabled: false,
+            model: 'qwen3-rerank',
+            topN: cli.topK,
+            rerankUrl: 'https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank',
+        },
     };
 
     switch (cli.strategy) {
@@ -174,6 +182,12 @@ function buildRetrievalConfig(cli: CliArgs): RetrievalConfig {
             base.hybrid.enabled = true;
             base.queryTransform.rewrite = true;
             base.queryTransform.multiQuery = true;
+            break;
+        case 'hybrid-rerank':
+            base.hybrid.enabled = true;
+            base.queryTransform.rewrite = true;
+            base.rerank.enabled = true;
+            base.rerank.topN = cli.topK;
             break;
     }
 
@@ -538,7 +552,22 @@ async function main(): Promise<void> {
     const vectorStore = await buildVectorStore(cli.rebuild);
     const bm25Retriever = getGlobalBM25Retriever();
     const llm = getLLM();
-    const deps: RetrieveDeps = { vectorStore, bm25Retriever, llm };
+
+    let reranker: Reranker | undefined;
+    if (retrievalConfig.rerank.enabled) {
+        const apiKey = process.env.DASHSCOPE_API_KEY;
+        if (!apiKey) {
+            throw new Error('DASHSCOPE_API_KEY is required for hybrid-rerank strategy');
+        }
+        reranker = createDashScopeReranker({
+            apiKey,
+            model: retrievalConfig.rerank.model,
+            rerankUrl: retrievalConfig.rerank.rerankUrl,
+        });
+        console.log(`🔄 Reranker enabled for eval: ${retrievalConfig.rerank.model}`);
+    }
+
+    const deps: RetrieveDeps = { vectorStore, bm25Retriever, llm, reranker };
 
     console.log(`Running retrieval (strategy=${cli.strategy}, fetchK=${cli.fetchK}) for ${queries.length} queries...\n`);
 

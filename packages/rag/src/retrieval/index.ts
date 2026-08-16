@@ -8,6 +8,7 @@ import { getRetrievalConfig } from '../config.js';
 import { retrieve } from './pipeline.js';
 import { getGlobalBM25Retriever } from './retrievers/bm25.js';
 import { getMaxDenseScore } from './types.js';
+import { createDashScopeReranker, type Reranker } from './rerankers/index.js';
 
 const ABSTENTION_THRESHOLD = 0.78;
 
@@ -40,10 +41,24 @@ export async function createRagAgent(forceRebuild = false) {
     const backend = new StateBackend();
     const llm = getLLM();
 
+    let reranker: Reranker | undefined;
+    if (retrievalConfig.rerank.enabled) {
+        const apiKey = process.env.DASHSCOPE_API_KEY;
+        if (!apiKey) {
+            throw new Error('DASHSCOPE_API_KEY is required when rerank is enabled');
+        }
+        reranker = createDashScopeReranker({
+            apiKey,
+            model: retrievalConfig.rerank.model,
+            rerankUrl: retrievalConfig.rerank.rerankUrl,
+        });
+        console.log(`🔄 Reranker enabled: ${retrievalConfig.rerank.model}, topN=${retrievalConfig.rerank.topN}`);
+    }
+
     const searchDocumentation = tool(
         async ({ query }) => {
             const allCandidates = await retrieve(
-                { vectorStore, bm25Retriever, llm },
+                { vectorStore, bm25Retriever, llm, reranker },
                 query,
                 retrievalConfig,
             );

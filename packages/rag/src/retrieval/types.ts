@@ -7,6 +7,7 @@ export interface ScoredChunk {
     score: number;
     retrievalSource: RetrievalSourceType;
     denseScore?: number;
+    rerankScore?: number;
 }
 
 export function getChunkId(chunk: Pick<ScoredChunk, 'document'>): string {

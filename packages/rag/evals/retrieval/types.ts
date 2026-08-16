@@ -13,7 +13,8 @@ export type RetrievalStrategy =
     | 'threshold-mmr'
     | 'hybrid-bm25'
     | 'hybrid-rewrite'
-    | 'hybrid-multiquery';
+    | 'hybrid-multiquery'
+    | 'hybrid-rerank';
 
 export interface QueryResult {
     query: GoldenQuery;
