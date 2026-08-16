@@ -12,6 +12,6 @@
     "kafka:consume": "pnpm --filter kafka-example run consume",
     "typecheck": "pnpm -r run typecheck"
   },
-  "license": "ISC",
+  "license": "MIT",
   "packageManager": "pnpm@10.7.0"
 }

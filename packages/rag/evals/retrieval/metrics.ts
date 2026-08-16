@@ -120,7 +120,8 @@ function generationContextQualityAtK(
     return harmonicMean(sourcePrecision, keywordRecallAtK) * nonDuplicateRatio;
 }
 
-function topScore(retrieved: RetrievedChunk[]): number {
+function topScore(retrieved: RetrievedChunk[], override?: number): number {
+    if (override !== undefined) return override;
     if (retrieved.length === 0) return 0;
     return retrieved[0].score;
 }
@@ -131,6 +132,7 @@ export function evaluateQuery(
     config: EvalConfig,
 ): QueryResult {
     const primaryK = config.hitRateKs[0];
+    const queryTopScore = topScore(retrieved, config.topScoreOverride);
     const duplicateChunkRatioMap = Object.fromEntries(
         config.hitRateKs.map((k) => [k, duplicateChunkRatioAtK(retrieved, k)]),
     ) as Record<number, number>;
@@ -154,8 +156,8 @@ export function evaluateQuery(
             duplicateChunkRatioAtK: duplicateChunkRatioMap,
             uniqueSourceCoverageAtK: uniqueSourceCoverageMap,
             generationContextQualityAtK: generationContextQualityMap,
-            abstentionCorrect: topScore(retrieved) < config.abstentionThreshold,
-            topScore: topScore(retrieved),
+            abstentionCorrect: queryTopScore < config.abstentionThreshold,
+            topScore: queryTopScore,
         };
     }
 
@@ -186,7 +188,7 @@ export function evaluateQuery(
         uniqueSourceCoverageAtK: uniqueSourceCoverageMap,
         generationContextQualityAtK: generationContextQualityMap,
         abstentionCorrect: false,
-        topScore: topScore(retrieved),
+        topScore: queryTopScore,
     };
 }
 

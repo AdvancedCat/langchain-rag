@@ -6,7 +6,9 @@ import {
     ensureQdrantRunning,
     loadVectorStore,
     createVectorStoreFromDocuments,
+    fetchAllDocumentsFromQdrant,
 } from '../vectorStore.js';
+import { getGlobalBM25Retriever, resetGlobalBM25Retriever } from '../retrieval/retrievers/bm25.js';
 
 interface LoadedDoc {
     doc: Document;
@@ -45,6 +47,13 @@ async function loadLangchainDocs(
     return results;
 }
 
+async function buildBM25IndexFromDocuments(documents: Document[]): Promise<void> {
+    resetGlobalBM25Retriever();
+    const bm25 = getGlobalBM25Retriever();
+    bm25.build(documents);
+    console.log(`📝 Built BM25 index (${bm25.size()} documents)`);
+}
+
 export async function buildVectorStore(
     forceRebuild = false,
 ): Promise<VectorStore> {
@@ -53,6 +62,9 @@ export async function buildVectorStore(
     if (!forceRebuild) {
         const existing = await loadVectorStore();
         if (existing) {
+            console.log('📝 Loading all documents from Qdrant for BM25 index...');
+            const allDocs = await fetchAllDocumentsFromQdrant();
+            await buildBM25IndexFromDocuments(allDocs as Document[]);
             return existing;
         }
     }
@@ -88,6 +100,8 @@ export async function buildVectorStore(
     }
 
     console.log(`Split documentation into ${allSplits.length} chunks.`);
+
+    await buildBM25IndexFromDocuments(allSplits);
 
     console.log('Creating embeddings and indexing into the vector store...');
     const vectorStore = await createVectorStoreFromDocuments(allSplits);

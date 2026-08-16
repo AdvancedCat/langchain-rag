@@ -1,5 +1,5 @@
 import type { VectorStore } from '@langchain/core/vectorstores';
-import type { Document } from '@langchain/core/documents';
+import type { Document, DocumentInterface } from '@langchain/core/documents';
 import { QdrantVectorStore } from '@langchain/qdrant';
 import type { QdrantLibArgs } from '@langchain/qdrant';
 import { QdrantClient } from '@qdrant/js-client-rest';
@@ -176,4 +176,69 @@ export async function createVectorStoreFromDocuments(
         `✅ Indexed ${documents.length} chunks into Qdrant collection "${qdrantConfig.collectionName}"`,
     );
     return vectorStore;
+}
+
+export function getSharedQdrantClient(): QdrantClient {
+    const { client } = getQdrantClient();
+    return client;
+}
+
+/**
+ * 从 Qdrant scroll 遍历全部 documents，用于构建内存中的 BM25 索引。
+ *
+ * TRADE-OFF（权衡）：当前实现将所有 document 的 pageContent 一次性累积到数组中，
+ * 再整体传给 BM25Retriever.build()。优点是实现简单、小 corpus 下速度快
+ * （当前约 2.7k chunks ≈ 45MB 稳态内存 / 82MB 构建峰值）；缺点是内存不随
+ * corpus 线性扩展，规模上来后需要重新评估。
+ *
+ * 各规模下的内存估算（JS Map 条目开销是主要来源）：
+ *   - 10k chunks  → ~170MB 稳态 / ~300MB 峰值  （安全）
+ *   - 50k chunks  → ~800MB 稳态 / ~1.5GB 峰值  （Node 默认堆约 1.4GB，需警惕）
+ *   - 100k chunks → ~1.6GB 稳态 / ~3GB 峰值    （有 OOM 风险）
+ *
+ * 主要内存消耗来自每个文档的 termFreq Map 条目（每个约 50 字节），
+ * 而非 pageContent 字符串本身（后者与 dense 检索路径共享引用，不是额外开销）。
+ *
+ * 何时优化：corpus 超过 ~10k chunks，或进程 RSS 超过 500MB 时再行动。
+ * 优化路径（按改造代价从低到高）：
+ *   1. 流式增量构建：scroll 一批构建一批，去掉中间 Document[] 全量数组，
+ *      增量更新 termFreq / docFreq，避免双份驻留。
+ *   2. 紧凑数据结构：用扁平数组 + 共享词表替换 Map<string, number>，
+ *      降低 V8 对 Map 条目的 per-entry 开销。
+ *   3. 迁移到 Qdrant 原生 sparse vectors（fastembed BM25）：倒排索引由
+ *      Qdrant（Rust 进程）管理，JS 侧零内存开销，且支持增量更新，无需
+ *      启动时全量 reload。
+ */
+export async function fetchAllDocumentsFromQdrant(): Promise<DocumentInterface[]> {
+    const { client, config } = getQdrantClient();
+    const documents: DocumentInterface[] = [];
+    let offset: string | null = null;
+    const limit = 200;
+
+    do {
+        const response = await client.scroll(config.collectionName, {
+            limit,
+            offset: offset ?? undefined,
+            with_payload: true,
+            with_vector: false,
+        });
+
+        const points = (response as { points?: Array<{ payload?: Record<string, unknown> | null }> }).points;
+        if (!points) break;
+
+        for (const point of points) {
+            const payload = point.payload ?? {};
+            const pageContent = typeof payload.content === 'string'
+                ? payload.content
+                : (typeof payload.pageContent === 'string' ? payload.pageContent : '');
+            const metadata = (payload.metadata ?? {}) as Record<string, unknown>;
+            if (pageContent) {
+                documents.push({ pageContent, metadata });
+            }
+        }
+
+        offset = ((response as { next_page_offset?: string | null }).next_page_offset ?? null) as string | null;
+    } while (offset !== null);
+
+    return documents;
 }

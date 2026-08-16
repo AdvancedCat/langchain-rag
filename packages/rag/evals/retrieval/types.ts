@@ -8,7 +8,12 @@ import type {
 
 export type { GoldenDataset, GoldenQuery, QueryType, Difficulty, RetrievedChunk };
 
-export type RetrievalStrategy = 'baseline-dense' | 'threshold-mmr';
+export type RetrievalStrategy =
+    | 'baseline-dense'
+    | 'threshold-mmr'
+    | 'hybrid-bm25'
+    | 'hybrid-rewrite'
+    | 'hybrid-multiquery';
 
 export interface QueryResult {
     query: GoldenQuery;
@@ -79,4 +84,5 @@ export interface EvalConfig {
         lambda: number;
     };
     abstentionThreshold: number;
+    topScoreOverride?: number;
 }

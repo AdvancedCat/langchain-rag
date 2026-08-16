@@ -6,6 +6,10 @@ import { getLLM } from '../../../libs/llm-provider.js';
 import { buildVectorStore } from '../ingestion/index.js';
 import { getRetrievalConfig } from '../config.js';
 import { retrieve } from './pipeline.js';
+import { getGlobalBM25Retriever } from './retrievers/bm25.js';
+import { getMaxDenseScore } from './types.js';
+
+const ABSTENTION_THRESHOLD = 0.78;
 
 const RAG_WORKFLOW_INSTRUCTIONS = `# Documentation Q&A workflow
 
@@ -32,12 +36,20 @@ When delegating:
 export async function createRagAgent(forceRebuild = false) {
     const retrievalConfig = getRetrievalConfig();
     const vectorStore = await buildVectorStore(forceRebuild);
+    const bm25Retriever = getGlobalBM25Retriever();
     const backend = new StateBackend();
+    const llm = getLLM();
 
     const searchDocumentation = tool(
         async ({ query }) => {
-            const retrievedChunks = await retrieve(vectorStore, query, retrievalConfig);
-            if (retrievedChunks.length === 0) {
+            const retrievedChunks = await retrieve(
+                { vectorStore, bm25Retriever, llm },
+                query,
+                retrievalConfig,
+            );
+
+            const maxDenseScore = getMaxDenseScore(retrievedChunks);
+            if (retrievedChunks.length === 0 || maxDenseScore < ABSTENTION_THRESHOLD) {
                 return 'No documentation chunks passed the retrieval filters. Reformulate the query and call search_documentation again.';
             }
 
@@ -47,9 +59,10 @@ export async function createRagAgent(forceRebuild = false) {
 
             retrievedChunks.forEach(({ document, score }, index) => {
                 const path = `/retrieved/${batchId}/chunk_${index + 1}.md`;
+                const displayScore = score.toFixed(4);
                 const content =
                     `# Source: ${document.metadata?.source ?? 'unknown'}\n` +
-                    `# Similarity score: ${score.toFixed(4)}\n\n` +
+                    `# Retrieval score: ${displayScore}\n\n` +
                     document.pageContent;
                 uploads.push([path, new TextEncoder().encode(content)]);
                 savedPaths.push(path);
@@ -92,11 +105,11 @@ export async function createRagAgent(forceRebuild = false) {
             'source URL from the file header. If the chunk is not relevant, say so briefly.',
     };
 
-    const model = getLLM();
-    console.log(`🧠 Using LLM: deepseek:${model.model}`);
+    const modelName = process.env.LLM_MODEL ?? 'deepseek-v4-flash';
+    console.log(`🧠 Using LLM: deepseek:${modelName}`);
 
     const agent = createDeepAgent({
-        model,
+        model: llm,
         tools: [searchDocumentation],
         subagents: [chunkAnalyst],
         systemPrompt,

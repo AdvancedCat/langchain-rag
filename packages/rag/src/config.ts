@@ -19,11 +19,30 @@ export interface RetrievalConfig {
         enabled: boolean;
         lambda: number;
     };
+    hybrid: {
+        enabled: boolean;
+        rrfConstant: number;
+        sparseTopK: number;
+        denseTopK: number;
+        denseWeight: number;
+        sparseWeight: number;
+    };
+    queryTransform: {
+        rewrite: boolean;
+        multiQuery: boolean;
+        multiQueryCount: number;
+    };
 }
 
 const DEFAULT_RETRIEVAL_TOP_K = 4;
 const DEFAULT_RETRIEVAL_FETCH_K = 20;
 const DEFAULT_RETRIEVAL_MMR_LAMBDA = 0.9;
+const DEFAULT_RRF_CONSTANT = 60;
+const DEFAULT_SPARSE_TOP_K = 5;
+const DEFAULT_DENSE_TOP_K = 30;
+const DEFAULT_DENSE_WEIGHT = 2;
+const DEFAULT_SPARSE_WEIGHT = 0.5;
+const DEFAULT_MULTI_QUERY_COUNT = 3;
 
 function parseIntegerEnv(name: string, fallback: number): number {
     const raw = process.env[name];
@@ -65,6 +84,17 @@ export function getRetrievalConfig(): RetrievalConfig {
     const mmrLambda =
         parseNumberEnv('RETRIEVAL_MMR_LAMBDA', DEFAULT_RETRIEVAL_MMR_LAMBDA) ??
         DEFAULT_RETRIEVAL_MMR_LAMBDA;
+    const rrfConstant = parseNumberEnv('RETRIEVAL_RRF_CONSTANT', DEFAULT_RRF_CONSTANT) ?? DEFAULT_RRF_CONSTANT;
+    const sparseTopK = parseIntegerEnv('RETRIEVAL_SPARSE_TOP_K', DEFAULT_SPARSE_TOP_K);
+    const denseTopK = parseIntegerEnv('RETRIEVAL_DENSE_TOP_K', DEFAULT_DENSE_TOP_K);
+    const denseWeight = parseNumberEnv('RETRIEVAL_DENSE_WEIGHT', DEFAULT_DENSE_WEIGHT) ?? DEFAULT_DENSE_WEIGHT;
+    const sparseWeight = parseNumberEnv('RETRIEVAL_SPARSE_WEIGHT', DEFAULT_SPARSE_WEIGHT) ?? DEFAULT_SPARSE_WEIGHT;
+    const multiQueryCount = parseIntegerEnv('RETRIEVAL_MULTI_QUERY_COUNT', DEFAULT_MULTI_QUERY_COUNT);
+
+    const hybridEnabled = parseBooleanEnv('RETRIEVAL_HYBRID_ENABLED', true);
+    const queryRewriteEnabled = parseBooleanEnv('RETRIEVAL_QUERY_REWRITE', true);
+    const multiQueryEnabled = parseBooleanEnv('RETRIEVAL_MULTI_QUERY', false);
+    const mmrEnabled = parseBooleanEnv('RETRIEVAL_MMR_ENABLED', false);
 
     if (fetchK < topK) {
         throw new Error(
@@ -81,14 +111,39 @@ export function getRetrievalConfig(): RetrievalConfig {
             `RETRIEVAL_MMR_LAMBDA must be between 0 and 1, received: ${mmrLambda}`,
         );
     }
+    if (rrfConstant <= 0) {
+        throw new Error(`RETRIEVAL_RRF_CONSTANT must be positive, received: ${rrfConstant}`);
+    }
+    if (sparseTopK <= 0 || denseTopK <= 0) {
+        throw new Error('RETRIEVAL_SPARSE_TOP_K and RETRIEVAL_DENSE_TOP_K must be positive');
+    }
+    if (multiQueryCount < 1 || multiQueryCount > 10) {
+        throw new Error('RETRIEVAL_MULTI_QUERY_COUNT must be between 1 and 10');
+    }
+    if (denseWeight <= 0 || sparseWeight <= 0) {
+        throw new Error('RETRIEVAL_DENSE_WEIGHT and RETRIEVAL_SPARSE_WEIGHT must be positive');
+    }
 
     return {
         topK,
         fetchK,
         scoreThreshold,
         mmr: {
-            enabled: parseBooleanEnv('RETRIEVAL_MMR_ENABLED', false),
+            enabled: mmrEnabled,
             lambda: mmrLambda,
+        },
+        hybrid: {
+            enabled: hybridEnabled,
+            rrfConstant,
+            sparseTopK,
+            denseTopK,
+            denseWeight,
+            sparseWeight,
+        },
+        queryTransform: {
+            rewrite: queryRewriteEnabled,
+            multiQuery: multiQueryEnabled,
+            multiQueryCount,
         },
     };
 }
