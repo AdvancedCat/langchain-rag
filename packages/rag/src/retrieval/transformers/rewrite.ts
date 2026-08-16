@@ -29,7 +29,9 @@ export async function rewriteQuery(
     const prompt = REWRITE_PROMPT.replace('{query}', query);
 
     try {
-        const response = await llm.invoke([new HumanMessage(prompt)]);
+        const response = await llm.invoke([new HumanMessage(prompt)], {
+            temperature: 0.1,
+        } as Parameters<typeof llm.invoke>[1]);
 
         const text = response.content.toString().trim();
 

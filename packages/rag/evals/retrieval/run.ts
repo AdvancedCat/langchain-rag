@@ -98,6 +98,7 @@ function parseArgs(): CliArgs {
         'baseline-dense',
         'threshold-mmr',
         'hybrid-bm25',
+        'hybrid-bm25-rerank',
         'hybrid-rewrite',
         'hybrid-multiquery',
         'hybrid-rerank',
@@ -173,6 +174,11 @@ function buildRetrievalConfig(cli: CliArgs): RetrievalConfig {
             break;
         case 'hybrid-bm25':
             base.hybrid.enabled = true;
+            break;
+        case 'hybrid-bm25-rerank':
+            base.hybrid.enabled = true;
+            base.rerank.enabled = true;
+            base.rerank.topN = cli.topK;
             break;
         case 'hybrid-rewrite':
             base.hybrid.enabled = true;

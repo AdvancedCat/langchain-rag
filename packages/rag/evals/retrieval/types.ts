@@ -12,6 +12,7 @@ export type RetrievalStrategy =
     | 'baseline-dense'
     | 'threshold-mmr'
     | 'hybrid-bm25'
+    | 'hybrid-bm25-rerank'
     | 'hybrid-rewrite'
     | 'hybrid-multiquery'
     | 'hybrid-rerank';

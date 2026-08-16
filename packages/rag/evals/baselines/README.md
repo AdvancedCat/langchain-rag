@@ -24,110 +24,100 @@ pnpm eval --strategy threshold-mmr --score-threshold 0.55 --mmr-lambda 0.9
 
 | 文件 | 日期 | Dataset | 策略 | Query | Hit@4 | Prec@4 | MRR | NDCG@10 | Abstain |
 |------|------|---------|------|-------|-------|--------|-----|---------|---------|
-| `retrieval/hybrid-rerank-20260816.json` | 2026-08-16 | v2 | hybrid-rerank (experimental) | 44 (37+7) | 83.8% | 39.9% | **0.715** | 0.383 | **100%** |
+| `retrieval/hybrid-rerank-20260816.json` | 2026-08-16 | v2 | hybrid-rerank (experimental, 关) | 44 (37+7) | 89.2% | 39.9% | 0.683 | 0.390 | **100%** |
 | `retrieval/hybrid-rewrite-20260816.json` | 2026-08-16 | v2 | hybrid-rewrite（生产默认） | 44 (37+7) | **91.9%** | 41.2% | 0.684 | **0.393** | **100%** |
 | `retrieval/hybrid-bm25-20260816.json` | 2026-08-16 | v2 | hybrid-bm25 (ablation) | 44 (37+7) | 91.9% | 40.5% | 0.662 | 0.381 | 85.7% |
 | `retrieval/baseline-dense-20260813.json` | 2026-08-13 | v2 | baseline-dense | 44 (37+7) | 89.2% | 41.2% | 0.652 | 0.380 | 85.7% |
 | `retrieval/threshold-mmr-20260814.json` | 2026-08-14 | v2 | threshold-mmr 0.55/0.7 (rejected) | 44 (37+7) | 83.8% | 36.5% | 0.577 | 0.209 | 85.7% |
 | `retrieval/threshold-mmr-lambda090-20260814.json` | 2026-08-14 | v2 | threshold-mmr 0.55/0.9 (experimental) | 44 (37+7) | 89.2% | 39.9% | 0.628 | 0.230 | 85.7% |
 
-## 2026-08-16 Phase 3 Cross-encoder Rerank 精排
+## 2026-08-16 Phase 3 Cross-encoder Rerank 精排（实验性，默认关闭）
 
-Phase 3 在 Phase 2 混合检索（Dense + BM25 Boost + Query Rewrite）的基础上，引入 DashScope `qwen3-rerank` Cross-encoder 模型对 top-fetchK 候选进行精排。两阶段检索架构：Bi-encoder 负责高效粗筛（~3000 → 20），Cross-encoder 负责精细排序（20 → 4）。
+Phase 3 在 Phase 2 混合检索（Dense + BM25 Boost + Query Rewrite）的基础上，引入 DashScope `qwen3-rerank` Cross-encoder 模型对 top-fetchK 候选进行精排。两阶段检索架构：Bi-encoder 负责高效粗筛（~3000 → 20），Cross-encoder 负责精细排序。
 
-**重要提示**：由于 Query Rewrite 每次调用 LLM 独立采样（temperature=0.7），初始粗筛候选池存在随机性，Hit@4 指标波动约 ±5pp。MRR 和 NDCG 衡量排序质量，在同一候选池内比较更可靠。
+**最终判定：⚠️ 模型效果未达预期，功能框架已就绪但默认关闭。** 代码保留为 experimental，待更换更高质量 reranker 模型（如 bge-reranker-v2 或中文微调模型）或积累更多训练数据后再评估启用。
 
-### 策略对比总览
+### 核心发现：为什么 qwen3-rerank 没有带来净增益
+
+经过多轮消融实验（含 deterministic 对比——关闭 Query Rewrite，确保候选池 100% 一致），发现以下问题：
+
+1. **Rerank Drift（排序漂移）**：初版实现用 rerank 分数**完全替换** bi-encoder 分数，导致 cross-encoder 将"宽泛语义匹配"的 overview/intro 类 chunk 排到精确 API 文档前面，Hit@4 从 91.9% 骤降至 83.8%。
+2. **RRF 融合无法根治**：改用 Rank-level 加权 RRF 融合（weighted RRF, k=60）后，发现不存在 sweet spot——任何能改变排序的权重都会引入新的失败（q013/q020/q023/q029），权重小到不犯错时（bi-encoder:reranker = 20:1），reranker 也无法带来任何增益。
+3. **模型偏差**：qwen3-rerank 在中文技术文档场景下系统性偏好"概念介绍"类 chunk 而非"具体 API 用法"类 chunk，这与我们的 ground truth 标注偏好（精确答案优先）存在系统性偏差。
+4. **Rewrite 方差**：将 rewrite temperature 从 0.7 降至 0.1 后大幅减少了方差，但 DeepSeek API 通过 invoke 参数覆盖 temperature 仍不能保证完全确定性输出（两次独立运行结果仍有微小差异），因此 deterministic 消融（hybrid-bm25 无 rewrite）的结论更可信。
+
+### 策略对比总览（最终配置，加权 RRF 20:1）
 
 | 指标 | hybrid-rewrite（生产默认，冻结） | hybrid-rerank（experimental） | 变化 |
 |------|-------------------------------|------------------------------|------|
-| Hit@4 | **91.9%** | 83.8% | ↓8.1pp（rewrite 方差） |
-| Hit@10 | 100% | 91.9% | ↓8.1pp（同上） |
+| Hit@4 | **91.9%** | 89.2% | ↓2.7pp |
+| Hit@10 | **97.3%** | 97.3% | 持平 |
 | Hit@20 | 100% | **100%** | 持平 ✅ |
-| Prec@4 | 41.2% | 39.9% | ↓1.3pp |
-| **MRR** | 0.684 | **0.715** | **↑4.5%** ✅ |
-| NDCG@4 | 0.436 | 0.436 | 持平 |
-| NDCG@10 | **0.393** | 0.383 | ↓2.5% |
-| Keyword Recall | 58.6% | **61.9%** | **↑3.3pp** ✅ |
-| Duplicate Ratio@4 | 8.8% | **6.1%** | ↓2.7pp ✅ |
-| Unique Source Coverage@4 | 74.3% | **77.0%** | ↑2.7pp |
-| Context Quality@4 | 38.2% | 36.0% | ↓2.2pp |
+| Prec@4 | **41.2%** | 39.9% | ↓1.3pp |
+| MRR | **0.684** | 0.683 | ≈持平 |
+| NDCG@4 | 0.449 | 0.445 | ≈持平 |
+| NDCG@10 | **0.393** | 0.390 | ≈持平 |
+| Keyword Recall | 57.7% | 57.7% | 持平 |
+| Duplicate Ratio@4 | 8.1% | 8.1% | 持平 |
 | **Abstention Rate** | **100%（7/7）** | **100%（7/7）** | 持平 ✅ |
-| Answerable failures | 3 | 6 | +3（rewrite 波动） |
+| Answerable failures | 3 | 4 | +1（q013） |
 
-**核心结论**：
-- **MRR 显著提升（+4.5%）**：Cross-encoder 有效改善了 top-4 内部排序，最相关文档排名更靠前。
-- **Keyword Recall 提升（+3.3pp）**：reranker 更好地识别了关键词匹配，Duplicate Ratio 同时下降。
-- **Guardrail 全部保住**：easy Hit@4=100%、Abstention=100%、Hit@20=100%，未引入安全退化。
-- **Hit@4 波动说明**：两次评估使用独立的 Query Rewrite 结果，初始召回池不同；MRR/NDCG 的排序改善是确定的，但 Hit@4 的绝对值需要多轮平均或固定 rewrite 结果来消除方差。
-- **判定：⚠️ 部分成功，不默认启用**。MRR 提升明确但 Hit@4 受 rewrite 方差干扰，需进一步验证。
+### Deterministic 消融验证（hybrid-bm25 无 rewrite，候选池 100% 相同）
 
-### hybrid-rerank 配置
-- 检索策略: hybrid-rerank（Dense + BM25 Boost + Query Rewrite + qwen3-rerank）
-- Rerank 模型: DashScope qwen3-rerank，原生 HTTP API，10s 超时
-- Fetch K: 20（粗筛后送入 reranker），Rerank topN: 20（全量重排），最终 Top K: 4
-- 融合权重: denseWeight=2.0, sparseWeight=0.5（与 Phase 2 一致）
-- Score 语义：`score` 字段替换为 rerank relevance_score；`denseScore` 保持原值用于 abstention 判断；新增 `rerankScore` 字段
-- Fallback：API 失败时自动降级到 BM25 boost 融合排序，不阻断检索
+这是最严谨的 A/B 对比——关闭 Query Rewrite，两次检索的 dense+BM25 候选池完全一致：
+
+| RRF 权重 (bi-encoder : reranker) | Hit@4 | MRR | 新失败 query | 结论 |
+|----------------------------------|-------|-----|-------------|------|
+| 无 rerank（baseline） | **91.9%** | **0.664** | — | 基准 |
+| 1:1（等权 RRF k=60） | 83.8% | 0.623 | q013/q020/q023/q029 (+4) | ❌ 严重退化 |
+| 2:0.3（7:1） | 89.2% | 0.660 | q013 (+1) | ❌ 仍引入退化 |
+| 3:0.15（20:1，安全值） | **91.9%** | **0.664** | 无 | ✅ 不退化但也无增益 |
+| 3:0.2（15:1） | 89.2% | 0.659 | q013 (+1) | ❌ 引入退化 |
+
+**结论**：20:1 权重是"安全线"，reranker 权重再大一点就破坏现有排序，再小一点等于没开。
+
+### hybrid-rerank 最终配置
+
+- 检索策略: hybrid-rerank（Dense + BM25 Boost + Query Rewrite + qwen3-rerank + Weighted RRF）
+- Rerank 模型: DashScope qwen3-rerank，原生 HTTP API，10s 超时，失败自动 fallback
+- **融合策略: Weighted RRF**（k=60, bi-encoder weight=3.0, reranker weight=0.15，约 20:1）
+  - 初版使用 rerank 分数完全替换 bi-encoder 分数，导致 Hit@4 暴跌 8pp（Rerank Drift）
+  - 改为 RRF 后仍需保守权重才能不引入回归
+- Fetch K: 20（粗筛后送入 reranker），Rerank 返回全量 20 条重排，最终 Top K: 4
+- Score 语义：`score` 为 RRF 融合分；`denseScore` 保持原始 cosine 用于 abstention 判断；新增 `rerankScore` 字段
+- Query Rewrite temperature: 从全局默认 0.7 降至 **0.1**（通过 invoke 参数覆盖），减少 API 名称泛化
 - 向量库: Qdrant `langchain_docs`（2681 chunks，**未重建**，复用 Phase 2 索引）
+- **开关状态: 默认关闭**（`RETRIEVAL_RERANK_ENABLED=false`）
 - Query 数: 44（37 answerable + 7 unanswerable）
 - Abstention threshold: topScore (dense cosine) < 0.78
 
-### hybrid-rerank 按类型
+### 工程产出（可复用）
 
-| 类型 | 数量 | Hit@4 | MRR | NDCG@10 | 对比 hybrid-rewrite（冻结） |
-|------|------|-------|-----|---------|---------------------------|
-| concept | 10 | 90.0% | **0.800** | 0.488 | MRR ↑10.3%（0.725→0.800） |
-| api_usage | 16 | 87.5% | **0.738** | 0.357 | MRR ↓7.4%（rewrite 引入 q013/q020 新失败） |
-| comparison | 6 | 66.7% | 0.550 | 0.360 | MRR ↑10%（0.500→0.550）但 Hit@4 ↓33pp（q018/q024 失败） |
-| troubleshooting | 5 | **80.0%** | **0.668** | 0.283 | **Hit@4 ↑20pp（60→80%），MRR ↑66%** ✅ 主战场达标 |
-| unanswerable | 7 | N/A | N/A | N/A | Abstention 100% ✅ |
+虽然 qwen3-rerank 模型在当前场景下未带来净增益，但以下工程框架已完成并可复用：
 
-### hybrid-rerank 按难度
+1. **[rerankers/index.ts](file://~/Documents/Code/langchain-lib/packages/rag/src/retrieval/rerankers/index.ts)**：通用 `Reranker` 接口 + DashScope HTTP 客户端实现（超时、错误处理、fallback），接入新 reranker 只需实现 `rank()` 方法。
+2. **[pipeline.ts](file://~/Documents/Code/langchain-lib/packages/rag/src/retrieval/pipeline.ts#L59-L108)**：Weighted RRF 融合层，可通过 `BI_ENCODER_WEIGHT`/`RERANK_WEIGHT` 常量调节权重比。
+3. **[config.ts](file://~/Documents/Code/langchain-lib/packages/rag/src/config.ts)**：完整的 rerank 配置段（enabled/model/topN/rerankUrl）+ MMR 互斥校验 + 环境变量解析。
+4. **[types.ts](file://~/Documents/Code/langchain-lib/packages/rag/src/retrieval/types.ts)**：`ScoredChunk.rerankScore` 字段用于观测调试。
+5. **[transformers/rewrite.ts](file://~/Documents/Code/langchain-lib/packages/rag/src/retrieval/transformers/rewrite.ts#L31-L34)**：Query Rewrite temperature 从 0.7 降至 0.1，改善 API 名称保留。
+6. **Bug 修复**：初版 rerank 只返回 `topN=4` 条导致 Hit@10/@20 指标失真（已修复，返回全量重排列表）。
 
-| 难度 | 数量 | Hit@4 | MRR | 对比 hybrid-rewrite（冻结） |
-|------|------|-------|-----|---------------------------|
-| easy | 9 | **100%** | **0.741** | Hit@4 保持 100% ✅，MRR ↑5.2% |
-| medium | 20 | 70.0% | 0.630 | Hit@4 ↓5pp，MRR ↑6.4%（0.592→0.630） |
-| hard | 15 | 53.3% | **0.478** | MRR ↑25.5%（0.381→0.478）✅ |
+### 失败分析（4 条，最终配置）
 
-### hybrid-rerank 失败分析（Hit@4 = 0，共 6 条）
+| ID | 问题 | 类型/难度 | hybrid-rewrite | hybrid-rerank | 分析 |
+|----|------|----------|---------------|--------------|------|
+| q001 | 子代理流式传输 | api_usage/medium | ❌ MISS | ❌ MISS | Python rag 文档噪声，需 metadata 语言过滤 |
+| q013 | astream_events 监听 | api_usage/hard | ✅ HIT | ❌ **新失败** | reranker 将 models chunk 排到 streaming 前面，权重 20:1 仍无法完全抑制 |
+| q026 | 工具结果不在历史 | troubleshooting/hard | ❌ MISS | ❌ MISS | 跨模块混淆，需 metadata 模块路由 |
+| q031 | streaming 回调不触发 | troubleshooting/hard | ❌ MISS | ❌ MISS | langgraph vs langchain streaming 混淆 |
 
-| ID | 问题 | 类型/难度 | hybrid-rewrite 结果 | hybrid-rerank 结果 | 分析 |
-|----|------|----------|-------------------|-------------------|------|
-| q013 | astream_events 监听 | api_usage/hard | ❌ MISS（rewrite 泛化） | ❌ MISS | 持续失败，rewrite 丢失 API 名称 |
-| q018 | tool calling vs function calling | comparison/medium | ✅ HIT | ❌ **新失败** | rewrite 改写导致召回池变化 |
-| q019 | durable execution 故障恢复 | concept/hard | ✅ HIT | ❌ **新失败** | rerank 将 overview chunk 排前 |
-| q020 | deepagents quickstart 示例 | api_usage/medium | ✅ HIT | ❌ **新失败** | rewrite 引入方差 |
-| q024 | JS vs Python API 差异 | comparison/hard | ❌ MISS（跨语言混淆） | ❌ MISS | 跨包/跨语言问题 rerank 未能解决 |
-| q031 | streaming 回调不触发 | troubleshooting/hard | ❌ MISS | ❌ MISS | 仍在候选池内但未进 top-4 |
+### 后续方向
 
-**正面修复**：q001（子代理流式）、q014（middleware）、q026（工具结果历史）、q029（子代理超时）在本次运行中被修复（进入 top-4），但 q018/q019/q020/q024 因 rewrite 随机性成为新失败，净 Hit@4 下降。
-
-### 工程修复记录
-
-评测过程中发现并修复了 retrieval pipeline 的一个 bug：初版 rerank 实现只返回 `topN=4` 条结果，导致 Hit@10/Hit@20 指标异常（都等于 Hit@4=83.8%）。修复后 rerank 对全部 fetchK=20 条候选打分重排，返回完整排序列表，由上层 slice(0, K)。修复见 [pipeline.ts](file://~/Documents/Code/langchain-lib/packages/rag/src/retrieval/pipeline.ts#L59-L88)。
-
-### 诚实评估与后续方向
-
-**成功项**：
-- MRR 从 0.684 提升到 0.715，排序质量明确改善
-- troubleshooting Hit@4 从 60%→80%，达成 Phase 3 目标
-- hard MRR 从 0.381→0.478，难例排序显著改善
-- Keyword Recall 提升 3.3pp，Duplicate Ratio 下降
-- 所有 Guardrail（easy、abstention、Hit@20）全部保住
-
-**未达标项**：
-- Hit@4 未达 ≥95% 目标，反而因 rewrite 随机性下降到 83.8%
-- 3 条新失败 query（q018/q019/q020）源于初始召回池变化，非 rerank 排序错误
-- q001/q024 的 Python/跨包噪声问题仍存在，需要 metadata 过滤解决
-
-**后续优化方向**：
-1. **固定 rewrite 结果**：将 rewrite 结果缓存或固定 seed，确保 A/B 对比在同一候选池上进行，消除 LLM 采样方差
-2. **Metadata `language` 过滤**：对 JS 文档查询预过滤 `language=javascript`，解决 q001/q024 跨语言噪声
-3. **Rerank 后保留融合分兜底**：当 rerank 分数置信度低时（如 top1-top2 分差 < 0.05），回退到融合排序
-4. **降低 rewrite temperature**：从 0.7 降到 0.1~0.3，减少 API 名称被泛化的概率
-5. **考虑 Rerank LRU 缓存**：对高频 query 缓存 rerank 结果，降低延迟和成本
+1. **更换 reranker 模型**：尝试 bge-reranker-v2-m3（多语言）或专门针对中文技术文档微调的 reranker，这是解决模型偏差的根本路径。
+2. **Metadata `language` 过滤**：对 JS 文档查询预过滤 `language=javascript`，优先解决 q001 这类跨语言噪声（不依赖 reranker）。
+3. **Metadata `module` 路由**：识别 query 所属模块（langchain/langgraph/deepagents），在向量检索前加 metadata filter，解决 q026/q031 跨包混淆。
+4. **Rewrite temperature 独立配置**：当前通过 invoke 参数覆盖 temperature，若 LangChain 版本升级导致参数传递失效，应创建独立的低 temperature LLM 实例用于 rewrite。
+5. **Rewrite 磁盘缓存**：在 eval 场景下将 rewrite 结果写入磁盘缓存，确保 A/B 对比在完全相同的候选池上进行。
 
 ## 2026-08-16 Phase 2 混合检索 + Query Rewrite
 

@@ -61,22 +61,42 @@ export async function retrieve(
         const documents = fetchCandidates.map((c) => c.document.pageContent);
         const primaryQuery = queries[0];
         const rerankCount = Math.min(documents.length, config.fetchK);
+        const RRF_K = 60;
+        const BI_ENCODER_WEIGHT = 3.0;
+        const RERANK_WEIGHT = 0.15;
 
         try {
             const rerankResults = await reranker.rank(primaryQuery, documents, rerankCount);
-            const reranked = rerankResults.map((r) => {
-                const original = fetchCandidates[r.index];
+            const biEncoderRank = new Map<string, number>();
+            fetchCandidates.forEach((c, i) => {
+                biEncoderRank.set(getChunkId(c), i + 1);
+            });
+
+            const rerankRank = new Map<string, number>();
+            rerankResults.forEach((r, i) => {
+                const id = getChunkId(fetchCandidates[r.index]);
+                rerankRank.set(id, i + 1);
+            });
+
+            const scored = fetchCandidates.map((chunk) => {
+                const id = getChunkId(chunk);
+                const rank1 = biEncoderRank.get(id) ?? fetchCandidates.length + 1;
+                const rank2 = rerankRank.get(id) ?? fetchCandidates.length + 1;
+                const rrfScore =
+                    (BI_ENCODER_WEIGHT / (RRF_K + rank1)) +
+                    (RERANK_WEIGHT / (RRF_K + rank2));
+                const rerankEntry = rerankResults.find((r) => getChunkId(fetchCandidates[r.index]) === id);
                 return {
-                    ...original,
-                    score: r.relevanceScore,
-                    rerankScore: r.relevanceScore,
+                    ...chunk,
+                    score: rrfScore,
+                    rerankScore: rerankEntry?.relevanceScore ?? 0,
                 };
             });
-            const rerankedIndexes = new Set(rerankResults.map((r) => r.index));
-            const unReranked = fetchCandidates
-                .filter((_, i) => !rerankedIndexes.has(i))
-                .map((c) => ({ ...c, rerankScore: 0 }));
-            rerankedCandidates = [...reranked, ...unReranked];
+
+            scored.sort((a, b) => b.score - a.score);
+
+            const tail = finalCandidates.slice(config.fetchK);
+            rerankedCandidates = [...scored, ...tail];
         } catch (error) {
             console.warn(
                 `[Rerank] API failed, falling back to fusion order: ${error instanceof Error ? error.message : String(error)}`,
