@@ -1,17 +1,37 @@
 {
   "name": "langchain-lib",
   "version": "1.0.0",
-  "description": "Monorepo for LangChain / Deep Agents experiments",
+  "description": "Production-grade RAG agent built on LangChain Deep Agents: hybrid retrieval (Dense + BM25), query rewrite, cross-encoder rerank, and a built-in offline evaluation toolkit.",
   "private": true,
   "type": "module",
   "scripts": {
     "rag": "pnpm --filter docs-rag-agent run start",
     "rag:index": "pnpm --filter docs-rag-agent run index",
-    "kafka:demo": "pnpm --filter kafka-example run demo",
-    "kafka:produce": "pnpm --filter kafka-example run produce",
-    "kafka:consume": "pnpm --filter kafka-example run consume",
     "typecheck": "pnpm -r run typecheck"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/advancedcat/langchain-lib.git"
+  },
+  "keywords": [
+    "langchain",
+    "deepagents",
+    "langgraph",
+    "rag",
+    "hybrid-search",
+    "bm25",
+    "vector-search",
+    "qdrant",
+    "retrieval-augmented-generation",
+    "llm",
+    "ai-agent",
+    "evaluation"
+  ],
+  "author": "advancedcat",
   "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/advancedcat/langchain-lib/issues"
+  },
+  "homepage": "https://github.com/advancedcat/langchain-lib#readme",
   "packageManager": "pnpm@10.7.0"
 }

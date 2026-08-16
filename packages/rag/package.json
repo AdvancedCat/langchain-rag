@@ -18,8 +18,8 @@
     "deepagents",
     "rag"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "advancedcat",
+  "license": "MIT",
   "type": "module",
   "dependencies": {
     "@langchain/classic": "^1.0.41",

@@ -5,6 +5,8 @@
   "type": "module",
   "description": "Shared LLM provider factory and cross-package utilities",
   "main": "llm-provider.ts",
+  "author": "advancedcat",
+  "license": "MIT",
   "dependencies": {
     "@langchain/core": "^1.2.5",
     "@langchain/openai": "^1.5.6",

@@ -8,25 +8,6 @@ importers:
 
   .: {}
 
-  packages/kafka:
-    dependencies:
-      dotenv:
-        specifier: ^17.4.2
-        version: 17.4.2
-      kafkajs:
-        specifier: ^2.2.4
-        version: 2.2.4
-      tsx:
-        specifier: ^4.23.12
-        version: 4.23.12
-    devDependencies:
-      '@types/node':
-        specifier: ^26.2.0
-        version: 26.2.0
-      typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
-
   packages/libs:
     dependencies:
       '@langchain/core':
@@ -552,10 +533,6 @@ packages:
   jsonpointer@5.0.1:
     resolution: {integrity: sha512-p/nXbhSEcu3pZRdkW1OfJhpsVtW1gd4Wa1fnQc9YLiTfAjn0312eMKimbdIQzuZl9aa9xUGaRlP9T/CJE/ditQ==}
     engines: {node: '>=0.10.0'}
-
-  kafkajs@2.2.4:
-    resolution: {integrity: sha512-j/YeapB1vfPT2iOIUn/vxdyKEuhuY2PxMBvf5JWux6iSaukAccrMtXEY/Lb7OvavDhOWME589bpLrEdnVHjfjA==}
-    engines: {node: '>=14.0.0'}
 
   langchain@1.5.5:
     resolution: {integrity: sha512-KhedvQDRvaLIFMSvEy45U/pqR4G0dEfN7wPyHTBMgMIUXbcrVkaqRVlDSMPfMCwNuiRCfWFUHueYGtgSrwBcBA==}
@@ -1083,8 +1060,6 @@ snapshots:
       argparse: 2.0.1
 
   jsonpointer@5.0.1: {}
-
-  kafkajs@2.2.4: {}
 
   langchain@1.5.5(@langchain/core@1.2.5(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(ws@8.21.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(ws@8.21.3):
     dependencies:
