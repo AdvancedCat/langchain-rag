@@ -137,7 +137,7 @@ export async function retrieve(
     return rerankedCandidates;
 }
 
-function deduplicateMerge(resultLists: ScoredChunk[][]): ScoredChunk[] {
+export function deduplicateMerge(resultLists: ScoredChunk[][]): ScoredChunk[] {
     const map = new Map<string, { chunk: ScoredChunk; bestScore: number }>();
     for (const results of resultLists) {
         for (const chunk of results) {
@@ -159,7 +159,7 @@ function deduplicateMerge(resultLists: ScoredChunk[][]): ScoredChunk[] {
     return merged;
 }
 
-function applyBM25Boost(
+export function applyBM25Boost(
     denseCandidates: ScoredChunk[],
     sparseResults: ScoredChunk[],
     boostWeight: number,
@@ -228,7 +228,7 @@ async function transformQueries(
     return [workingQuery];
 }
 
-function maximalMarginalRelevanceCustom(
+export function maximalMarginalRelevanceCustom(
     queryEmbedding: number[],
     embeddingList: number[][],
     relevanceScores: number[],
@@ -283,7 +283,7 @@ function maximalMarginalRelevanceCustom(
     return selected;
 }
 
-function cosineSimilarity(a: number[], b: number[]): number {
+export function cosineSimilarity(a: number[], b: number[]): number {
     let dot = 0;
     let normA = 0;
     let normB = 0;

@@ -7,7 +7,8 @@
   "scripts": {
     "rag": "pnpm --filter docs-rag-agent run start",
     "rag:index": "pnpm --filter docs-rag-agent run index",
-    "typecheck": "pnpm -r run typecheck"
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test"
   },
   "repository": {
     "type": "git",

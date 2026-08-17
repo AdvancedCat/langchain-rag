@@ -150,8 +150,12 @@ eval-gen-json: ## Run generation evaluation (JSON output)
 typecheck: ## Run TypeScript type check
 	$(PNPM) run typecheck
 
+.PHONY: test
+test: ## Run unit tests (Vitest)
+	$(PNPM) run test
+
 .PHONY: check
-check: typecheck ## Run all checks (alias: typecheck)
+check: typecheck test ## Run all checks (typecheck + unit tests)
 
 # =============================================================================
 # Clean

@@ -4,18 +4,18 @@ function isRelevantChunk(chunk: RetrievedChunk, expectedDocPaths: string[]): boo
     return expectedDocPaths.includes(chunk.docPath);
 }
 
-function hitAtK(retrieved: RetrievedChunk[], expectedDocPaths: string[], k: number): boolean {
+export function hitAtK(retrieved: RetrievedChunk[], expectedDocPaths: string[], k: number): boolean {
     return retrieved.slice(0, k).some((c) => isRelevantChunk(c, expectedDocPaths));
 }
 
-function precisionAtK(retrieved: RetrievedChunk[], expectedDocPaths: string[], k: number): number {
+export function precisionAtK(retrieved: RetrievedChunk[], expectedDocPaths: string[], k: number): number {
     const topK = retrieved.slice(0, k);
     if (topK.length === 0) return 0;
     const relevant = topK.filter((c) => isRelevantChunk(c, expectedDocPaths)).length;
     return relevant / k;
 }
 
-function reciprocalRank(retrieved: RetrievedChunk[], expectedDocPaths: string[]): number {
+export function reciprocalRank(retrieved: RetrievedChunk[], expectedDocPaths: string[]): number {
     for (let i = 0; i < retrieved.length; i++) {
         if (isRelevantChunk(retrieved[i], expectedDocPaths)) {
             return 1 / (i + 1);
@@ -24,7 +24,7 @@ function reciprocalRank(retrieved: RetrievedChunk[], expectedDocPaths: string[])
     return 0;
 }
 
-function ndcgAtK(
+export function ndcgAtK(
     retrieved: RetrievedChunk[],
     expectedDocPaths: string[],
     k: number,
@@ -50,7 +50,7 @@ function escapeRegex(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function keywordRecall(
+export function keywordRecall(
     retrieved: RetrievedChunk[],
     expectedKeywords: string[],
     topK: number,
@@ -68,7 +68,7 @@ function keywordRecall(
     return { hits, total: expectedKeywords.length };
 }
 
-function duplicateChunkRatioAtK(retrieved: RetrievedChunk[], k: number): number {
+export function duplicateChunkRatioAtK(retrieved: RetrievedChunk[], k: number): number {
     const topK = retrieved.slice(0, k);
     if (topK.length === 0) return 0;
 
@@ -90,7 +90,7 @@ function duplicateChunkRatioAtK(retrieved: RetrievedChunk[], k: number): number 
     return duplicateCount / topK.length;
 }
 
-function uniqueSourceCoverageAtK(retrieved: RetrievedChunk[], k: number): number {
+export function uniqueSourceCoverageAtK(retrieved: RetrievedChunk[], k: number): number {
     if (k <= 0) return 0;
     const uniqueSources = new Set(retrieved.slice(0, k).map((chunk) => chunk.docPath));
     return uniqueSources.size / k;
@@ -101,7 +101,7 @@ function harmonicMean(a: number, b: number): number {
     return (2 * a * b) / (a + b);
 }
 
-function generationContextQualityAtK(
+export function generationContextQualityAtK(
     retrieved: RetrievedChunk[],
     query: GoldenQuery,
     k: number,

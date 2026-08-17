@@ -11,7 +11,8 @@
     "eval:json": "tsx evals/retrieval/run.ts --json",
     "eval:gen": "tsx evals/generation/run.ts",
     "eval:gen:json": "tsx evals/generation/run.ts --json",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
   },
   "keywords": [
     "langchain",
@@ -36,6 +37,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   }
 }
