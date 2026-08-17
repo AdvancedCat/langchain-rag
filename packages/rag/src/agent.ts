@@ -9,6 +9,10 @@ async function main() {
     const args = process.argv.slice(2);
     const isIndexOnly = args.includes('--index-only');
     const forceRebuild = args.includes('--rebuild');
+    const query = args
+        .filter((arg) => !arg.startsWith('--'))
+        .join(' ')
+        .trim() || EXAMPLE_QUERY;
 
     console.log('='.repeat(80));
     console.log('Deep Agents RAG - Documentation Q&A Agent');
@@ -24,12 +28,12 @@ async function main() {
     const agent = await createRagAgent(forceRebuild);
 
     console.log();
-    console.log(`Query: ${EXAMPLE_QUERY}`);
+    console.log(`Query: ${query}`);
     console.log('-'.repeat(80));
     console.log();
 
     const run = await agent.streamEvents(
-        { messages: [new HumanMessage(EXAMPLE_QUERY)] },
+        { messages: [new HumanMessage(query)] },
         { version: 'v3' },
     );
 
