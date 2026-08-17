@@ -15,6 +15,7 @@ export interface RetrievalConfig {
     topK: number;
     fetchK: number;
     scoreThreshold?: number;
+    abstentionThreshold: number;
     mmr: {
         enabled: boolean;
         lambda: number;
@@ -42,6 +43,7 @@ export interface RetrievalConfig {
 
 const DEFAULT_RETRIEVAL_TOP_K = 4;
 const DEFAULT_RETRIEVAL_FETCH_K = 20;
+export const DEFAULT_ABSTENTION_THRESHOLD = 0.78;
 const DEFAULT_RETRIEVAL_MMR_LAMBDA = 0.9;
 const DEFAULT_RRF_CONSTANT = 60;
 const DEFAULT_SPARSE_TOP_K = 5;
@@ -89,6 +91,9 @@ export function getRetrievalConfig(): RetrievalConfig {
     const topK = parseIntegerEnv('RETRIEVAL_TOP_K', DEFAULT_RETRIEVAL_TOP_K);
     const fetchK = parseIntegerEnv('RETRIEVAL_FETCH_K', DEFAULT_RETRIEVAL_FETCH_K);
     const scoreThreshold = parseNumberEnv('RETRIEVAL_SCORE_THRESHOLD', undefined);
+    const abstentionThreshold =
+        parseNumberEnv('RETRIEVAL_ABSTENTION_THRESHOLD', DEFAULT_ABSTENTION_THRESHOLD) ??
+        DEFAULT_ABSTENTION_THRESHOLD;
     const mmrLambda =
         parseNumberEnv('RETRIEVAL_MMR_LAMBDA', DEFAULT_RETRIEVAL_MMR_LAMBDA) ??
         DEFAULT_RETRIEVAL_MMR_LAMBDA;
@@ -116,6 +121,11 @@ export function getRetrievalConfig(): RetrievalConfig {
     if (scoreThreshold !== undefined && (scoreThreshold < -1 || scoreThreshold > 1)) {
         throw new Error(
             `RETRIEVAL_SCORE_THRESHOLD must be between -1 and 1, received: ${scoreThreshold}`,
+        );
+    }
+    if (abstentionThreshold < 0 || abstentionThreshold > 1) {
+        throw new Error(
+            `RETRIEVAL_ABSTENTION_THRESHOLD must be between 0 and 1, received: ${abstentionThreshold}`,
         );
     }
     if (mmrLambda < 0 || mmrLambda > 1) {
@@ -151,6 +161,7 @@ export function getRetrievalConfig(): RetrievalConfig {
         topK,
         fetchK,
         scoreThreshold,
+        abstentionThreshold,
         mmr: {
             enabled: mmrEnabled,
             lambda: mmrLambda,

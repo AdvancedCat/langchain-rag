@@ -32,7 +32,7 @@
 - **✍️ Query Transformation** — 基于 DeepSeek 的 Query Rewrite（LRU 缓存 500 条，失败自动 fallback 原查询），并提供 Multi-Query 生成能力。
 - **🎯 Cross-encoder Rerank** — 两阶段检索架构：Bi-encoder 粗筛（~2700 → 20），Cross-encoder 精排（20 → 4）。通用 `Reranker` 接口，默认接入 DashScope `qwen3-rerank`，可替换为任意 reranker。
 - **🧠 Deep Agents 架构** — 实现 **Retrieve → Offload → Delegate** 三步工作流：检索到的 chunks offload 到 StateBackend 文件系统，由并行子 Agent（chunk-analyst）独立分析，避免主 Agent 上下文膨胀。
-- **🚫 Abstention（拒答）** — 基于 cosine score 阈值（0.78）识别无答案问题，避免"自信地犯错"。生产配置下 7/7 unanswerable query 全部正确拒答。
+- **🚫 Abstention（拒答）** — 基于 cosine score 阈值（默认 0.78，`RETRIEVAL_ABSTENTION_THRESHOLD` 可配）识别无答案问题，避免"自信地犯错"。生产配置下 7/7 unanswerable query 全部正确拒答。
 - **🧪 内置离线评测** — Retrieval（Hit@K / MRR / NDCG / Precision / Keyword Recall / Duplicate Ratio）与 Generation（Faithfulness + Relevance）双维度评测，支持 baseline 冻结与 A/B 对比。
 - **🇨🇳 中英文混合场景** — 中文 Query over English Docs，Python 文档作为 cross-language hard negative，专门评测检索策略的抗噪与消歧能力。
 - **⚙️ 严格工程规范** — TypeScript `strict: true`、环境变量边界校验、Makefile 命令封装、docker-compose 一键启动基础设施。

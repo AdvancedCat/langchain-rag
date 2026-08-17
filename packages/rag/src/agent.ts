@@ -39,85 +39,23 @@ async function main() {
 
     const COLORS = {
         reset: '\x1b[0m',
-        dim: '\x1b[2m',
-        cyan: '\x1b[36m',
-        yellow: '\x1b[33m',
-        magenta: '\x1b[35m',
         green: '\x1b[32m',
-        red: '\x1b[31m',
     };
-
-    const indent = (level: number) => '  '.repeat(level);
 
     let finalAnswer = '';
     let answerStarted = false;
 
-    await Promise.all(
-        [
-            (async () => {
-                for await (const msg of run.messages) {
-                    if (!answerStarted) {
-                        console.log();
-                        console.log(`${COLORS.green}💬 Answer:${COLORS.reset}`);
-                        answerStarted = true;
-                    }
-                    for await (const token of msg.text) {
-                        process.stdout.write(token);
-                        finalAnswer += token;
-                    }
-                }
-            })(),
-
-            false &&
-                (async () => {
-                    for await (const call of run.toolCalls) {
-                        console.log();
-                        console.log(
-                            `${COLORS.yellow}🔧 Tool Call: ${call.name}${COLORS.reset}`,
-                        );
-                        console.log(
-                            `${COLORS.dim}${indent(1)}Input: ${JSON.stringify(
-                                call.input,
-                                null,
-                                2,
-                            )
-                                .split('\n')
-                                .join(`\n${indent(1)}`)}${COLORS.reset}`,
-                        );
-                        const output = await call.output;
-                        const outputStr =
-                            typeof output === 'string'
-                                ? output
-                                : JSON.stringify(output, null, 2);
-                        const preview =
-                            outputStr.length > 500
-                                ? outputStr.slice(0, 500) + '...'
-                                : outputStr;
-                        console.log(
-                            `${COLORS.dim}${indent(1)}Output: ${preview.split('\n').join(`\n${indent(1)}`)}${COLORS.reset}`,
-                        );
-                    }
-                })(),
-
-            false &&
-                (async () => {
-                    for await (const sub of run.subagents) {
-                        console.log();
-                        console.log(
-                            `${COLORS.magenta}🤖 Subagent: ${sub.name}${COLORS.reset}`,
-                        );
-                        for await (const msg of sub.messages) {
-                            for await (const token of msg.text) {
-                                process.stdout.write(
-                                    `${COLORS.magenta}${indent(1)}${token}${COLORS.reset}`,
-                                );
-                            }
-                        }
-                        console.log();
-                    }
-                })(),
-        ].filter(Boolean),
-    );
+    for await (const msg of run.messages) {
+        if (!answerStarted) {
+            console.log();
+            console.log(`${COLORS.green}💬 Answer:${COLORS.reset}`);
+            answerStarted = true;
+        }
+        for await (const token of msg.text) {
+            process.stdout.write(token);
+            finalAnswer += token;
+        }
+    }
 
     console.log();
     console.log('-'.repeat(80));

@@ -10,6 +10,7 @@ import { getMaxDenseScore } from '../../src/retrieval/types.js';
 import { createDashScopeReranker, type Reranker } from '../../src/retrieval/rerankers/index.js';
 import { getLLM } from '../../../libs/llm-provider.js';
 import type { RetrievalConfig } from '../../src/config.js';
+import { DEFAULT_ABSTENTION_THRESHOLD } from '../../src/config.js';
 import { evaluateQuery, mean } from './metrics.js';
 import type {
     GoldenDataset,
@@ -51,7 +52,7 @@ function parseArgs(): CliArgs {
         topK: 4,
         datasetPath: DEFAULT_DATASET,
         jsonOutput: false,
-        abstentionThreshold: 0.78,
+        abstentionThreshold: DEFAULT_ABSTENTION_THRESHOLD,
         strategy: 'hybrid-rewrite',
         mmrLambda: 0.9,
     };
@@ -141,6 +142,7 @@ function buildRetrievalConfig(cli: CliArgs): RetrievalConfig {
         topK: cli.topK,
         fetchK: cli.fetchK,
         scoreThreshold: cli.scoreThreshold,
+        abstentionThreshold: cli.abstentionThreshold,
         mmr: {
             enabled: false,
             lambda: cli.mmrLambda,

@@ -10,8 +10,6 @@ import { getGlobalBM25Retriever } from './retrievers/bm25.js';
 import { getMaxDenseScore } from './types.js';
 import { createDashScopeReranker, type Reranker } from './rerankers/index.js';
 
-const ABSTENTION_THRESHOLD = 0.78;
-
 const RAG_WORKFLOW_INSTRUCTIONS = `# Documentation Q&A workflow
 
 Answer questions about LangChain using the indexed documentation corpus.
@@ -65,7 +63,10 @@ export async function createRagAgent(forceRebuild = false) {
 
             const retrievedChunks = allCandidates.slice(0, retrievalConfig.topK);
             const maxDenseScore = getMaxDenseScore(allCandidates);
-            if (retrievedChunks.length === 0 || maxDenseScore < ABSTENTION_THRESHOLD) {
+            if (
+                retrievedChunks.length === 0 ||
+                maxDenseScore < retrievalConfig.abstentionThreshold
+            ) {
                 return 'No documentation chunks passed the retrieval filters. Reformulate the query and call search_documentation again.';
             }
 
