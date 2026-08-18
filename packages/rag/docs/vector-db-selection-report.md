@@ -238,9 +238,9 @@ Qdrant 在六个评估维度上表现均衡且优异，没有明显短板，完�
 ### 6.3 与项目现状的匹配验证
 
 决策前已在项目中完成 Qdrant 集成验证，具体表现：
-- ✅ 已实现通过 Docker 一键启动 Qdrant（参见 [docker-compose.yml](file://~/Documents/Code/langchain-lib/packages/rag/docker-compose.yml)）
-- ✅ 已实现 `ensureQdrantRunning()` 前置健康检查（参见 [vectorStore.ts](file://~/Documents/Code/langchain-lib/packages/rag/src/vectorStore.ts)）
-- ✅ 已完成向量索引构建、检索、过滤等核心功能验证（参见 [ingestion/index.ts](file://~/Documents/Code/langchain-lib/packages/rag/src/ingestion/index.ts)、[retrieval/pipeline.ts](file://~/Documents/Code/langchain-lib/packages/rag/src/retrieval/pipeline.ts)）
+- ✅ 已实现通过 Docker 一键启动 Qdrant（参见 [docker-compose.yml](../docker-compose.yml)）
+- ✅ 已实现 `ensureQdrantRunning()` 前置健康检查（参见 [vectorStore.ts](../src/vectorStore.ts)）
+- ✅ 已完成向量索引构建、检索、过滤等核心功能验证（参见 [ingestion/index.ts](../src/ingestion/index.ts)、[retrieval/pipeline.ts](../src/retrieval/pipeline.ts)）
 - ✅ 评测系统（Hit Rate/MRR/NDCG/Precision）运行正常，基线指标符合预期
 - ✅ 移除了原有的 MemoryVectorStore 及相关配置，架构更加简洁
 
@@ -294,4 +294,4 @@ Qdrant 能够支撑本项目分阶段演进：
 2. [A Comprehensive Empirical Evaluation of Vector Database Systems](https://arxiv.org/pdf/2608.12812) - arXiv 学术评测论文 (2026-08)
 3. [2026 程序员必读的向量数据库原理与选型指南](https://blog.csdn.net/davidwang456/article/details/162473224) - CSDN 技术博客 (2026-07)
 4. [Qdrant 官方文档](https://qdrant.tech/documentation/)
-5. 项目现有实现：[vectorStore.ts](file://~/Documents/Code/langchain-lib/packages/rag/src/vectorStore.ts)
+5. 项目现有实现：[vectorStore.ts](../src/vectorStore.ts)

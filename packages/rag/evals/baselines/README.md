@@ -95,11 +95,11 @@ Phase 3 在 Phase 2 混合检索（Dense + BM25 Boost + Query Rewrite）的基�
 
 虽然 qwen3-rerank 模型在当前场景下未带来净增益，但以下工程框架已完成并可复用：
 
-1. **[rerankers/index.ts](file://~/Documents/Code/langchain-lib/packages/rag/src/retrieval/rerankers/index.ts)**：通用 `Reranker` 接口 + DashScope HTTP 客户端实现（超时、错误处理、fallback），接入新 reranker 只需实现 `rank()` 方法。
-2. **[pipeline.ts](file://~/Documents/Code/langchain-lib/packages/rag/src/retrieval/pipeline.ts#L59-L108)**：Weighted RRF 融合层，可通过 `BI_ENCODER_WEIGHT`/`RERANK_WEIGHT` 常量调节权重比。
-3. **[config.ts](file://~/Documents/Code/langchain-lib/packages/rag/src/config.ts)**：完整的 rerank 配置段（enabled/model/topN/rerankUrl）+ MMR 互斥校验 + 环境变量解析。
-4. **[types.ts](file://~/Documents/Code/langchain-lib/packages/rag/src/retrieval/types.ts)**：`ScoredChunk.rerankScore` 字段用于观测调试。
-5. **[transformers/rewrite.ts](file://~/Documents/Code/langchain-lib/packages/rag/src/retrieval/transformers/rewrite.ts#L31-L34)**：Query Rewrite temperature 从 0.7 降至 0.1，改善 API 名称保留。
+1. **[rerankers/index.ts](../../src/retrieval/rerankers/index.ts)**：通用 `Reranker` 接口 + DashScope HTTP 客户端实现（超时、错误处理、fallback），接入新 reranker 只需实现 `rank()` 方法。
+2. **[pipeline.ts](../../src/retrieval/pipeline.ts#L59-L108)**：Weighted RRF 融合层，可通过 `BI_ENCODER_WEIGHT`/`RERANK_WEIGHT` 常量调节权重比。
+3. **[config.ts](../../src/config.ts)**：完整的 rerank 配置段（enabled/model/topN/rerankUrl）+ MMR 互斥校验 + 环境变量解析。
+4. **[types.ts](../../src/retrieval/types.ts)**：`ScoredChunk.rerankScore` 字段用于观测调试。
+5. **[transformers/rewrite.ts](../../src/retrieval/transformers/rewrite.ts#L31-L34)**：Query Rewrite temperature 从 0.7 降至 0.1，改善 API 名称保留。
 6. **Bug 修复**：初版 rerank 只返回 `topN=4` 条导致 Hit@10/@20 指标失真（已修复，返回全量重排列表）。
 
 ### 失败分析（4 条，最终配置）
@@ -224,7 +224,7 @@ Hit@4 从 89.2% → 91.9%（hybrid-bm25 vs baseline-dense）的核心来源：
 
 ### 工程修复记录
 
-评测过程中发现并修复了 retrieval pipeline 的一个 bug：[pipeline.ts](file://~/Documents/Code/langchain-lib/packages/rag/src/retrieval/pipeline.ts#L82) 在非 MMR 模式下 `slice(0, config.topK)` 只返回 4 个结果，导致 @10/@20 指标无法正确计算。修复后 `retrieve()` 返回完整候选列表，由生产调用方 [index.ts](file://~/Documents/Code/langchain-lib/packages/rag/src/retrieval/index.ts#L51) 显式 `slice(0, topK)`，不影响生产行为。
+评测过程中发现并修复了 retrieval pipeline 的一个 bug：[pipeline.ts](../../src/retrieval/pipeline.ts#L82) 在非 MMR 模式下 `slice(0, config.topK)` 只返回 4 个结果，导致 @10/@20 指标无法正确计算。修复后 `retrieve()` 返回完整候选列表，由生产调用方 [index.ts](../../src/retrieval/index.ts#L51) 显式 `slice(0, topK)`，不影响生产行为。
 
 ## 2026-08-14 Phase 1 Calibration（未启用）
 

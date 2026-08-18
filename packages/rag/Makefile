@@ -103,17 +103,19 @@ ifdef DATASET
 	EVAL_FLAGS += --dataset $(DATASET)
 endif
 
+# NOTE: eval 系列目标加 --silent：pnpm 的命令回显含本机绝对路径，
+# 输出常被重定向进 evals/results/*.raw.json，须避免机器路径泄漏进仓库。
 .PHONY: eval
 eval: ## Run retrieval evaluation (text report). Vars: K TOP_K STRATEGY SCORE_THRESHOLD MMR_LAMBDA TYPE DIFFICULTY
-	$(PNPM) run eval -- $(EVAL_FLAGS)
+	$(PNPM) --silent run eval -- $(EVAL_FLAGS)
 
 .PHONY: eval-json
 eval-json: ## Run retrieval evaluation (JSON output)
-	$(PNPM) run eval:json -- $(EVAL_FLAGS)
+	$(PNPM) --silent run eval:json -- $(EVAL_FLAGS)
 
 .PHONY: eval-rebuild
 eval-rebuild: ## Run retrieval evaluation with forced vector index rebuild
-	$(PNPM) run eval:rebuild -- $(EVAL_FLAGS)
+	$(PNPM) --silent run eval:rebuild -- $(EVAL_FLAGS)
 
 # =============================================================================
 # Generation Evaluation
@@ -137,11 +139,11 @@ endif
 
 .PHONY: eval-gen
 eval-gen: ## Run generation evaluation (faithfulness + relevance). Vars: K TOP_K LIMIT SAVE TYPE DIFFICULTY
-	$(PNPM) run eval:gen -- $(GEN_FLAGS)
+	$(PNPM) --silent run eval:gen -- $(GEN_FLAGS)
 
 .PHONY: eval-gen-json
 eval-gen-json: ## Run generation evaluation (JSON output)
-	$(PNPM) run eval:gen:json -- $(GEN_FLAGS)
+	$(PNPM) --silent run eval:gen:json -- $(GEN_FLAGS)
 
 # =============================================================================
 # Quality

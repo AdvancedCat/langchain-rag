@@ -1,5 +1,5 @@
 
-> docs-rag-agent@1.0.0 eval ~/Documents/Code/langchain-lib/packages/rag
+> docs-rag-agent@1.0.0 eval .
 > tsx evals/retrieval/run.ts --strategy hybrid-bm25 --json
 
 {
