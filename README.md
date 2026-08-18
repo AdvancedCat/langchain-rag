@@ -1,4 +1,4 @@
-# langchain-lib
+# langchain-rag
 
 > 基于 LangChain Deep Agents 的**生产级 RAG Agent** — 混合检索（Dense + BM25）、Query Rewrite、Markdown 结构化切分（`md-header-v2`），并内置完整的离线评测体系（Cross-encoder Rerank 框架已就绪，实验性、默认关闭）。
 
@@ -128,8 +128,8 @@ Loader（抓取 58 篇文档）
 ### 1. 克隆并安装依赖
 
 ```bash
-git clone https://github.com/advancedcat/langchain-lib.git
-cd langchain-lib
+git clone https://github.com/advancedcat/langchain-rag.git
+cd langchain-rag
 pnpm install
 ```
 
@@ -173,7 +173,7 @@ pnpm run rag         # 启动交互式问答
 Monorepo 使用 pnpm workspace 管理：
 
 ```
-langchain-lib/
+langchain-rag/
 ├── packages/
 │   ├── rag/                        # 📦 核心 RAG Agent 包
 │   │   ├── src/

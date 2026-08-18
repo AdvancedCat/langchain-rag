@@ -1,4 +1,4 @@
-# AGENTS.md — langchain-lib
+# AGENTS.md — langchain-rag
 
 面向 AI 编码代理的项目指南。人类工程师也可将其作为快速上手文档。
 
@@ -9,7 +9,7 @@ pnpm（`pnpm@10.7.0`）monorepo，TypeScript ESM（`"type": "module"`）。基�
 | 目录 | 包名 | 说明 |
 |---|---|---|
 | `packages/rag` | `docs-rag-agent` | 主应用：文档索引 + 混合检索 + 评测工具链 |
-| `packages/libs` | `@langchain-lib/shared` | 跨包共享的 LLM provider 工厂（`llm-provider.ts`） |
+| `packages/libs` | `@langchain-rag/shared` | 跨包共享的 LLM provider 工厂（`llm-provider.ts`） |
 
 ## 常用命令
 

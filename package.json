@@ -1,5 +1,5 @@
 {
-  "name": "langchain-lib",
+  "name": "langchain-rag",
   "version": "1.0.0",
   "description": "Production-grade RAG agent built on LangChain Deep Agents: hybrid retrieval (Dense + BM25), query rewrite, cross-encoder rerank, and a built-in offline evaluation toolkit.",
   "private": true,
@@ -12,7 +12,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/advancedcat/langchain-lib.git"
+    "url": "git+https://github.com/advancedcat/langchain-rag.git"
   },
   "keywords": [
     "langchain",
@@ -31,8 +31,8 @@
   "author": "advancedcat",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/advancedcat/langchain-lib/issues"
+    "url": "https://github.com/advancedcat/langchain-rag/issues"
   },
-  "homepage": "https://github.com/advancedcat/langchain-lib#readme",
+  "homepage": "https://github.com/advancedcat/langchain-rag#readme",
   "packageManager": "pnpm@10.7.0"
 }
