@@ -2,23 +2,27 @@
 
 基于 LangChain Deep Agents 的文档问答 Agent，实现 **Retrieve → Offload → Delegate** 三步 RAG 工作流。
 
+当前生产配置：**hybrid-rewrite**（Dense + BM25 Boost Fusion + Query Rewrite）+ **md-header-v2** 结构化切分。演进历史见 [Milestone.md](./Milestone.md)。
+
 ## 架构概览
 
 ```
 用户提问
   │
   ▼
-search_documentation (向量检索)
-  │  top-4 chunks
-  ▼
-StateBackend (Offload 到 /retrieved/ 文件系统)
-  │  避免上下文膨胀
-  ▼
-chunk-analyst × N (并行子 Agent 分析)
-  │  每个子 Agent 独立上下文
-  ▼
+search_documentation（混合检索）
+│  Query Rewrite → Dense(Qdrant) + BM25 Boost Fusion → top-4 chunks
+▼
+StateBackend（Offload 到 /retrieved/ 文件系统）
+│  避免上下文膨胀
+▼
+chunk-analyst × N（并行子 Agent 分析）
+│  每个子 Agent 独立上下文
+▼
 主 Agent 综合回答（含来源引用）
 ```
+
+离线索引侧为插件化切分管道：`Loader → TypeDetector → SplitterRegistry → MarkdownSplitter(md-header-v2) → ChunkValidator`，统一 Chunk 契约由 zod schema 守门，详见 [docs/chunking-pipeline-plan.md](./docs/chunking-pipeline-plan.md)。
 
 ## 技术栈
 
@@ -26,9 +30,10 @@ chunk-analyst × N (并行子 Agent 分析)
 |-----|------|
 | Agent 框架 | `deepagents` v1.x |
 | 向量存储 | `QdrantVectorStore`（Qdrant，本地 Docker 部署） |
-| 文档拆分 | `RecursiveCharacterTextSplitter` (chunk 1000, overlap 200) |
+| 文档切分 | 插件化管道 + 自研 Markdown header 切分核 `md-header-v2`（h1-h2，超长 section 字符级二级切分） |
 | Embedding | 千问 `qwen3.7-text-embedding`（DashScope OpenAI 兼容模式） |
 | Chat 模型 | 通过 `libs/llm-provider` 统一提供（DeepSeek） |
+| 测试 | Vitest（171 用例） |
 
 ## 快速开始
 
@@ -47,7 +52,7 @@ cp .env.example .env
 可选配置：
 
 - `QDRANT_URL` — Qdrant 地址，默认 `http://localhost:6333`
-- `QDRANT_COLLECTION` — 集合名称，默认 `langchain_docs`
+- `QDRANT_COLLECTION` — 集合名称，默认 `langchain_docs_mdheader`
 
 ### 2. 启动向量数据库 Qdrant
 
@@ -81,9 +86,12 @@ pnpm run index
 # 强制重建索引
 pnpm run start -- --rebuild
 
-# 类型检查
+# 类型检查 / 单元测试
 pnpm run typecheck
+pnpm run test
 ```
+
+> **注意**：切分策略变更后必须 `--rebuild` 重建索引。`chunkerVersion` 热启动守卫会检测 collection 与当前切分器版本不一致并提示重建，避免旧索引被静默复用。
 
 ## Embedding 配置
 
@@ -96,11 +104,11 @@ pnpm run typecheck
 
 ## 索引文档
 
-默认索引 **58 篇** LangChain OSS 文档（路径见 `src/config.ts` 中 `DOC_PATHS`），覆盖 LangChain / deepagents / LangGraph 三大模块的 JS 与 Python 文档，主题包括 Agents、RAG、Tools、Models、Middleware、Subagents、Streaming、MCP、Human-in-the-loop 等。
+默认索引 **58 篇** LangChain OSS 文档（路径见 `src/config.ts` 中 `DOC_PATHS`），覆盖 LangChain / deepagents / LangGraph 三大模块的 JS 与 Python 文档，主题包括 Agents、RAG、Tools、Models、Middleware、Subagents、Streaming、MCP、Human-in-the-loop 等。`md-header-v2` 切分后共 **2858 chunks**。
 
 > 其中 Python 文档与 JS 文档主题高度重叠，被刻意保留作为「跨语言 hard negative」噪声，用于评测检索策略的区分能力。
 
-扩展索引只需在 `DOC_PATHS` 中追加新路径。
+扩展索引只需在 `DOC_PATHS` 中追加新路径；切分粒度可通过 `INGESTION_MAX_HEADER_DEPTH`（默认 2，即 h1-h2）与 `CHUNK_SIZE` / `CHUNK_OVERLAP`（超长 section 二级切分）调整。
 
 ## 项目结构
 
@@ -110,20 +118,33 @@ pnpm run typecheck
 rag/
 ├── src/
 │   ├── agent.ts              # 主入口：CLI 参数解析 + 流式事件渲染
-│   ├── config.ts             # 共享配置常量、类型定义
+│   ├── config.ts             # 共享配置常量、RetrievalConfig / IngestionConfig 解析
 │   ├── embeddings.ts         # 千问 Embedding 工厂
-│   ├── vectorStore.ts        # Qdrant 向量存储（连接/校验/索引/重建）
+│   ├── vectorStore.ts        # Qdrant 向量存储（连接/校验/索引/热启动守卫）
+│   ├── chunking/             # 🧩 切分管道
+│   │   ├── pipeline.ts       #   Loader → Detect → Split → Validate 编排
+│   │   ├── detect.ts         #   文档类型四层识别
+│   │   ├── registry.ts       #   DocType → Splitter 注册表
+│   │   ├── schema.ts         #   Chunk 契约（zod）
+│   │   ├── splitters/        #   Markdown header / plaintext 切分器
+│   │   └── compose.ts        #   消费侧 sectionPath 上下文组装
 │   ├── ingestion/            # 📥 知识入库链路（Offline Indexing）
-│   │   └── index.ts          #   文档抓取 → 文本切分 → Embedding → 索引
+│   │   └── index.ts          #   文档抓取 → 切分 → Embedding → 索引
 │   └── retrieval/            # 🔍 在线召回链路（Online Serving）
-│       └── index.ts          #   RAG Agent 构建：检索工具 + chunk-analyst 子代理
+│       ├── index.ts          #   RAG Agent 构建：检索工具 + chunk-analyst 子代理
+│       ├── pipeline.ts       #   检索管线编排（多策略/融合/截断）
+│       ├── retrievers/       #   Dense / BM25 检索器
+│       ├── transformers/     #   Query Rewrite / Multi-Query
+│       └── rerankers/        #   Cross-encoder Reranker 接口（实验性）
 ├── evals/                    # 🧪 离线评测（检索 + 生成）
 │   ├── shared/               #   共享类型（GoldenQuery、RetrievedChunk）
 │   ├── retrieval/            #   检索评测（Hit@k / MRR / NDCG / Keyword Recall）
 │   ├── generation/           #   生成评测（Faithfulness + Relevance）
 │   ├── datasets/             #   Golden queries 数据集
-│   └── baselines/            #   基线报告存档
-├── docs/                     # 设计文档（检索策略升级、评测方案）
+│   ├── baselines/            #   冻结基线报告（只增不改）
+│   └── results/              #   A/B 原始结果存档
+├── docs/                     # 设计文档（计划 + 回填结果）
+├── Milestone.md              # 里程碑记录（重要特性变更同步维护）
 ├── Makefile                  # 开发 / 评测命令入口
 ├── docker-compose.yml        # 本地 Qdrant
 ├── package.json
@@ -136,11 +157,26 @@ rag/
 
 | 模块 | 职责 | 关键导出 |
 |-----|------|---------|
-| `config.ts` | 常量与类型 | `DOC_PATHS`, `EXAMPLE_QUERY`, `DOCS_BASE` |
+| `config.ts` | 常量与配置解析 | `DOC_PATHS`, `RetrievalConfig`, `IngestionConfig` |
 | `embeddings.ts` | 千问 Embedding 工厂 | `getEmbeddingConfig()`, `createEmbeddings()` |
 | `vectorStore.ts` | Qdrant 向量存储 | `ensureQdrantRunning()`, `loadVectorStore()`, `createVectorStoreFromDocuments()` |
+| `chunking/` | 插件化切分管道 | `runChunkingPipeline()`, `ChunkSchema`, `composeSearchText()` |
 | `ingestion/` | 离线索引 Pipeline | `buildVectorStore()` |
 | `retrieval/` | 在线 Agent 服务 | `createRagAgent()` |
+
+## 检索策略
+
+通过 `--strategy`（评测）或 `RETRIEVAL_*` 环境变量（在线）切换：
+
+| 策略 | 说明 | 状态 |
+|-----|------|-----|
+| `baseline-dense` | 纯向量相似度 | 冻结基线 |
+| `hybrid-bm25` | Dense + BM25 Boost Fusion | 消融对照 |
+| `hybrid-rewrite` | + Query Rewrite | **生产默认** |
+| `hybrid-rerank` | + Cross-encoder Rerank（qwen3-rerank） | 实验性，默认关闭 |
+| `threshold-mmr` | 阈值过滤 + MMR | 校准参数保留，未启用 |
+
+最新指标对比见 [evals/baselines/README.md](./evals/baselines/README.md)；策略演进的设计与 A/B 结论见 [docs/](./docs/) 下各计划文档。
 
 ## 评测
 
@@ -158,3 +194,5 @@ pnpm run eval:gen:json
 ```
 
 常用 `make` 目标：`make help` 查看全部，`make eval` / `make eval-gen` 支持通过变量覆盖参数（如 `make eval K=30 TOP_K=8`）。
+
+**评测纪律**：baseline 一经冻结不再修改；策略变更必须与冻结基线 A/B 对比且主指标不退化（gate）才可设为生产默认，负结果同样记录原因（参照 Phase 1 / Phase 3）。
