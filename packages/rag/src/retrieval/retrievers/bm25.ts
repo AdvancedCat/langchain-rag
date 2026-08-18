@@ -1,5 +1,6 @@
 import type { DocumentInterface } from '@langchain/core/documents';
 import type { ScoredChunk } from '../types.js';
+import { composeSearchText } from '../../chunking/compose.js';
 
 const BM25_K1 = 1.5;
 const BM25_B = 0.75;
@@ -81,7 +82,9 @@ export class BM25Retriever {
         let totalLength = 0;
 
         for (const doc of documents) {
-            const tokens = tokenize(doc.pageContent);
+            // sectionPath 前缀注入（决策 D3）：与 embedding / rerank / MMR 同一实现；
+            // 无 sectionPath 的旧文档行为不变（composeSearchText 原样返回）
+            const tokens = tokenize(composeSearchText(doc.pageContent, doc.metadata));
             const termFreq = new Map<string, number>();
             for (const token of tokens) {
                 termFreq.set(token, (termFreq.get(token) ?? 0) + 1);

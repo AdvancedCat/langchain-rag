@@ -1,10 +1,11 @@
 import type { VectorStore } from '@langchain/core/vectorstores';
 import type { Document, DocumentInterface } from '@langchain/core/documents';
 import { QdrantVectorStore } from '@langchain/qdrant';
-import type { QdrantLibArgs } from '@langchain/qdrant';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import type { QdrantConfig } from './config.js';
 import { getEmbeddingConfig, createEmbeddings } from './embeddings.js';
+import { composeSearchText } from './chunking/compose.js';
+import { contentHash, toDeterministicUuid } from './chunking/ids.js';
 
 const DEFAULT_COLLECTION_NAME = 'langchain_docs';
 const UPSERT_BATCH_SIZE = 100;
@@ -127,6 +128,15 @@ export async function loadVectorStore(): Promise<VectorStore | null> {
     });
 }
 
+/**
+ * 入库路径：自定义 upsert（plan §2.5）。
+ *
+ * - embedding 输入用 composeSearchText（sectionPath 前缀注入，决策 D3）；
+ * - Qdrant payload 只存干净 content + 结构化 metadata，与 @langchain/qdrant
+ *   的读写格式同源（F2），fromExistingCollection 查询路径完全兼容；
+ * - point id 由 chunk id 派生确定性 UUID（sha256 格式化），rebuild 幂等、
+ *   同文档重入覆盖不追加。
+ */
 export async function createVectorStoreFromDocuments(
     documents: Document[],
 ): Promise<VectorStore> {
@@ -147,35 +157,50 @@ export async function createVectorStoreFromDocuments(
         await client.deleteCollection(qdrantConfig.collectionName);
     }
 
-    const dbConfig: QdrantLibArgs = {
-        client,
-        collectionName: qdrantConfig.collectionName,
-    };
-
-    if (embeddingConfig.dimensions) {
-        dbConfig.collectionConfig = {
-            vectors: {
-                size: embeddingConfig.dimensions,
-                distance: 'Cosine',
-            },
-        };
-    }
-
-    const vectorStore = new QdrantVectorStore(embeddings, dbConfig);
+    const dimensions =
+        embeddingConfig.dimensions ?? (await embeddings.embedQuery('dimension probe')).length;
+    await client.createCollection(qdrantConfig.collectionName, {
+        vectors: {
+            size: dimensions,
+            distance: 'Cosine',
+        },
+    });
 
     const batches = chunkArray(documents, UPSERT_BATCH_SIZE);
     console.log(
         `📦 Indexing ${documents.length} chunks in ${batches.length} batches (batchSize=${UPSERT_BATCH_SIZE})...`,
     );
     for (let i = 0; i < batches.length; i++) {
-        await vectorStore.addDocuments(batches[i]);
-        console.log(`   Batch ${i + 1}/${batches.length} done (${batches[i].length} chunks)`);
+        const batch = batches[i];
+        const vectors = await embeddings.embedDocuments(
+            batch.map((doc) => composeSearchText(doc.pageContent, doc.metadata)),
+        );
+        await client.upsert(qdrantConfig.collectionName, {
+            wait: true,
+            points: batch.map((doc, j) => ({
+                id: pointIdFor(doc),
+                vector: vectors[j],
+                payload: { content: doc.pageContent, metadata: doc.metadata ?? {} },
+            })),
+        });
+        console.log(`   Batch ${i + 1}/${batches.length} done (${batch.length} chunks)`);
     }
 
     console.log(
         `✅ Indexed ${documents.length} chunks into Qdrant collection "${qdrantConfig.collectionName}"`,
     );
-    return vectorStore;
+
+    // 查询路径仍走 lib 的 VectorStore 实现，与 loadVectorStore 返回一致
+    return QdrantVectorStore.fromExistingCollection(embeddings, {
+        client,
+        collectionName: qdrantConfig.collectionName,
+    });
+}
+
+function pointIdFor(doc: Document): string {
+    const id = doc.metadata?.id;
+    if (typeof id === 'string' && id.length > 0) return toDeterministicUuid(id);
+    return toDeterministicUuid(contentHash(doc.pageContent));
 }
 
 export function getSharedQdrantClient(): QdrantClient {

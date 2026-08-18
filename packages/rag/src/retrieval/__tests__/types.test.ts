@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { ScoredChunk } from './types.js';
-import { getChunkId, getMaxDenseScore } from './types.js';
+import type { ScoredChunk } from '../types.js';
+import { getChunkId, getMaxDenseScore } from '../types.js';
 
 function chunk(overrides: Partial<ScoredChunk>): ScoredChunk {
     return {
@@ -48,5 +48,23 @@ describe('getMaxDenseScore', () => {
             chunk({ score: 0.95, retrievalSource: 'sparse' }),
         ];
         expect(getMaxDenseScore(chunks)).toBe(0.7);
+    });
+});
+
+describe('getChunkId with deterministic chunk ids', () => {
+    it('prefers metadata.id when present (new collections)', () => {
+        expect(
+            getChunkId(chunk({ document: { pageContent: 'x', metadata: { id: 'deadbeef'.repeat(8) } } })),
+        ).toBe('deadbeef'.repeat(8));
+    });
+
+    it('falls back to docPath#chunkIndex for legacy metadata', () => {
+        expect(getChunkId(chunk({}))).toBe('a.md#0');
+    });
+
+    it('ignores non-string id values defensively', () => {
+        expect(
+            getChunkId(chunk({ document: { pageContent: 'x', metadata: { id: 42, docPath: 'b.md', chunkIndex: 3 } } })),
+        ).toBe('b.md#3');
     });
 });

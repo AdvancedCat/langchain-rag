@@ -8,6 +8,7 @@ import { retrieveDense } from './retrievers/dense.js';
 import { deduplicate } from './retrievers/hybrid.js';
 import { rewriteQuery } from './transformers/rewrite.js';
 import { generateMultiQueries } from './transformers/multiQuery.js';
+import { composeSearchText } from '../chunking/compose.js';
 import type { Reranker } from './rerankers/index.js';
 
 export interface RetrieveDeps {
@@ -58,7 +59,10 @@ export async function retrieve(
 
     if (config.rerank.enabled && reranker && finalCandidates.length > 0) {
         const fetchCandidates = finalCandidates.slice(0, config.fetchK);
-        const documents = fetchCandidates.map((c) => c.document.pageContent);
+        // rerank 输入注入 sectionPath 前缀，与 embedding/BM25/MMR 同一实现（决策 D3）
+        const documents = fetchCandidates.map((c) =>
+            composeSearchText(c.document.pageContent, c.document.metadata),
+        );
         const primaryQuery = queries[0];
         const rerankCount = Math.min(documents.length, config.fetchK);
         const RRF_K = 60;
@@ -118,7 +122,9 @@ export async function retrieve(
     if (config.mmr.enabled) {
         const queryEmbedding = await vectorStore.embeddings.embedQuery(queries[0]);
         const candidateEmbeddings = await vectorStore.embeddings.embedDocuments(
-            rerankedCandidates.map(({ document }) => document.pageContent),
+            rerankedCandidates.map(({ document }) =>
+                composeSearchText(document.pageContent, document.metadata),
+            ),
         );
 
         const relevanceScores = rerankedCandidates.map((c) => c.denseScore ?? c.score);

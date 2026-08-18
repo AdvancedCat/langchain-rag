@@ -5,7 +5,7 @@ import {
     BM25Retriever,
     getGlobalBM25Retriever,
     resetGlobalBM25Retriever,
-} from './bm25.js';
+} from '../bm25.js';
 
 function doc(pageContent: string): DocumentInterface {
     return { pageContent, metadata: { docPath: 'test.md', chunkIndex: 0 } };
@@ -141,5 +141,32 @@ describe('BM25Retriever', () => {
         expect(getGlobalBM25Retriever()).toBe(first);
         resetGlobalBM25Retriever();
         expect(getGlobalBM25Retriever()).not.toBe(first);
+    });
+});
+
+describe('build with sectionPath injection', () => {
+    it('indexes sectionPath words so header terms hit (D3 consumption)', () => {
+        const retriever = new BM25Retriever();
+        retriever.build([
+            {
+                pageContent: 'Run the helper and inspect the output.',
+                metadata: { sectionPath: ['Agents', 'Tools', 'Custom tools'] },
+            },
+            { pageContent: 'streaming tokens from the graph', metadata: {} },
+        ]);
+
+        const hits = retriever.retrieve('custom tools', 2);
+        expect(hits.length).toBeGreaterThan(0);
+        expect(hits[0].document.metadata?.sectionPath).toEqual([
+            'Agents',
+            'Tools',
+            'Custom tools',
+        ]);
+    });
+
+    it('behaves identically for documents without sectionPath (legacy)', () => {
+        const retriever = new BM25Retriever();
+        retriever.build([{ pageContent: 'streaming tokens from the graph', metadata: {} }]);
+        expect(retriever.retrieve('streaming', 1)).toHaveLength(1);
     });
 });

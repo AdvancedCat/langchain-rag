@@ -8,6 +8,7 @@ import { getRetrievalConfig } from '../config.js';
 import { retrieve } from './pipeline.js';
 import { getGlobalBM25Retriever } from './retrievers/bm25.js';
 import { getMaxDenseScore } from './types.js';
+import { extractSectionPath } from '../chunking/compose.js';
 import { createDashScopeReranker, type Reranker } from './rerankers/index.js';
 
 const RAG_WORKFLOW_INSTRUCTIONS = `# Documentation Q&A workflow
@@ -77,8 +78,14 @@ export async function createRagAgent(forceRebuild = false) {
             retrievedChunks.forEach(({ document, score }, index) => {
                 const path = `/retrieved/${batchId}/chunk_${index + 1}.md`;
                 const displayScore = score.toFixed(4);
+                const sectionPath = extractSectionPath(document.metadata);
+                const sectionLine =
+                    sectionPath && sectionPath.length > 0
+                        ? `# Section: ${sectionPath.join(' > ')}\n`
+                        : '';
                 const content =
                     `# Source: ${document.metadata?.source ?? 'unknown'}\n` +
+                    sectionLine +
                     `# Retrieval score: ${displayScore}\n\n` +
                     document.pageContent;
                 uploads.push([path, new TextEncoder().encode(content)]);

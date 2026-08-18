@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import type { ScoredChunk } from './types.js';
+import type { ScoredChunk } from '../types.js';
 import {
     deduplicateMerge,
     applyBM25Boost,
     maximalMarginalRelevanceCustom,
     cosineSimilarity,
-} from './pipeline.js';
+} from '../pipeline.js';
 
 function chunk(
     docPath: string,

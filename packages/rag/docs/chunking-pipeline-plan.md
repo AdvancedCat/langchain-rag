@@ -3,7 +3,7 @@
 > **Phase 标记**：`Chunking Pipeline（契约 + MarkdownSplitter）`
 > **所属**：`packages/rag` 文档切分管道升级
 > **上游文档**：[evaluation-plan.md](./evaluation-plan.md) §5.3（A/B 流程）、[retrieval-strategy-upgrade.md](./retrieval-strategy-upgrade.md)（检索侧背景）
-> **状态**：方案定稿，待实施
+> **状态**：已实施，A/B 通过（`md-header-v2`，默认 header 深度 h1-h2），结果见 §6
 > **性质**：架构解耦 + 切分质量优化，不引入新依赖（zod 已有，hash 用 node:crypto）
 
 ---
@@ -231,6 +231,47 @@ QDRANT_COLLECTION=langchain_docs_mdheader pnpm run eval:rebuild -- --json \
 
 ---
 
-## 6. 实施与标定结果
+## 6. 实施与标定结果（2026-08-18 回填）
 
-> 预留：实施完成后回填各 gate 结果、A/B 数据、阈值标定（如涉及）、bad case 分析。
+### 6.1 实施 gate 结果
+
+| Gate | 内容 | 结果 |
+|---|---|---|
+| 1 契约层 | types / schema（zod looseObject + 编译期双向 assignable 断言）/ validate | ✅ |
+| 2 管道组件 | detect（四层判定）/ registry / ids（sha256 确定性）/ compose | ✅ |
+| 3 Splitter | markdown header 核（围栏跳过、栈扫描、二级切）+ plaintext + pipeline | ✅ 171 单测全绿，现有测试零回归 |
+| 4 接线 | `IngestionConfig`（`CHUNK_SIZE`/`CHUNK_OVERLAP`/`INGESTION_MAX_HEADER_DEPTH`）+ ingestion Loader 化 | ✅ |
+| 5 存储检索 | 自定义 upsert（确定性 UUID + payload 同源）+ bm25/pipeline/getChunkId/agent Section 头 | ✅ smoke 通过（`fromExistingCollection` 查询与 scroll 回读路径均正常） |
+| 6 全量验证 | typecheck + 171 tests | ✅ 全绿 |
+| 7 A/B eval | 见下 | ✅ 通过（迭代一轮后） |
+
+热启动守卫实测生效：对照组旧 collection（无 `chunkerVersion` 字段）热启动即提示 `--rebuild`（§1.3 坑的根治验证）。
+
+### 6.2 A/B 数据（同策略 hybrid-rewrite，dataset v2，44 query）
+
+| 指标 | 对照·旧切分（2681 chunks） | 实验·h1-h4（2968） | **实验·h1-h2（2858）** | v2 复跑确认 |
+|---|---|---|---|---|
+| Hit@4 | 91.9% | 83.8% ❌ | **94.6%** ✅ | 91.9%（LLM 改写波动 ±1 query） |
+| Hit@10 | 97.3% | 91.9% | **100%** ✅ | **100%** ✅ |
+| MRR | 0.677 | 0.649 | **0.685** | 0.673（持平） |
+| Precision@4 | 40.5% | 41.9% | **45.3%** | **47.3%** ✅ |
+| KeywordRecall | 57.4% | 53.4% | 54.3%（-3.1pp，§3.3 预期内） | 53.6% |
+| Abstention@0.78 | 100% | 85.7% ❌ | **100%** ✅（无需重标定） | **100%** ✅ |
+| 失败 query 数 | 3 | 6 | **2** | — |
+| top4 同文档霸屏 avg | 1.89 | 2.08 | 1.92 | — |
+
+结果文件：`evals/results/mdheader-baseline-old-chunking.raw.json`（对照）、`mdheader-v1.raw.json`（h4，人类可读报告）、`mdheader-h2.raw.json`（h2 胜出）、`mdheader-v2-final.raw.json`（v2 确认）。
+
+### 6.3 迭代过程与 bad case 分析
+
+1. **首轮 `md-header-v1`（h1-h4）不通过**：Hit@4 回退 8.1pp。perQuery 对比定位失败模式为**同文档 section 霸屏 top4**（q010 得 knowledge-base×4、q033 得 rag×4、q014 得 overview×4）；top4 内同文档 chunk 均值 1.89→2.08，4 连霸 1→4 例。Hit@10/20 持平说明正确文档未被挤出去，只是被同文档兄弟 section 挤出前 4 —— h4 粒度下 section 小而"语义尖"，同文档兄弟 section 在 embedding 空间彼此更近（sectionPath 前缀注入放大了这一点）。
+2. **按 §3.2 预设路径调 header 深度重跑**：`INGESTION_MAX_HEADER_DEPTH=2`（h1-h2）后 section 更大更少（2968→2858），霸屏回落（avg 2.08→1.92），Hit@4 94.6%、Hit@10 100%，**全面优于对照组**。
+3. **abstention 阈值**：h4 时分布移动致 q040（0.7832）越线（离线网格：t=0.80 可恢复 7/7 但 answerable 误杀 16）；h2 下 unanswerable max 回落至 0.7654，**t=0.78 维持原值**，无需重标定。
+4. 剩余失败 q031/q033：q031 为对照组也失败的 hard query（跨文档 API 对比）；q033 仍为 rag×4 霸屏（rag 与 models/knowledge-base 文档主题重叠），留观。
+
+### 6.4 定案与现状
+
+- **`CHUNKER_VERSION = 'md-header-v2'`，默认 `INGESTION_MAX_HEADER_DEPTH = 2`**（默认值即最优配置，env 可覆盖）。
+- 正式 collection：`langchain_docs_mdheader`（2858 chunks，`.env` 默认）；旧 `langchain_docs`（旧切分）按 §3.2 保留观察一段时间后删除；A/B 中间产物 `langchain_docs_mdheader_h2` 已清理。
+- 真实语料中 header 层级跳级（h1→h3 等）文档会被 validator 软警告记录（`section-path-depth-skip`），不阻断。
+- 遗留观察项：KeywordRecall -3.1pp（关键词被新边界切断的尾部效应，§3.3 预期内）；q033 霸屏型失败；二者均不影响主指标，后续检索侧若引入显式多样性策略（MMR 默认关闭）可进一步吸收。

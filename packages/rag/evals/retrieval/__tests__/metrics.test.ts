@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { GoldenQuery, RetrievedChunk, EvalConfig } from './types.js';
+import type { GoldenQuery, RetrievedChunk, EvalConfig } from '../types.js';
 import {
     hitAtK,
     precisionAtK,
@@ -11,7 +11,7 @@ import {
     generationContextQualityAtK,
     evaluateQuery,
     mean,
-} from './metrics.js';
+} from '../metrics.js';
 
 function rc(
     docPath: string,

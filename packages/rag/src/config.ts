@@ -11,6 +11,13 @@ export interface EmbeddingConfig {
     dimensions?: number;
 }
 
+export interface IngestionConfig {
+    chunkSize: number;
+    chunkOverlap: number;
+    /** markdown header 切分的最大层级（h1-hN），影响 section 粒度 */
+    maxHeaderDepth: number;
+}
+
 export interface RetrievalConfig {
     topK: number;
     fetchK: number;
@@ -44,6 +51,13 @@ export interface RetrievalConfig {
 const DEFAULT_RETRIEVAL_TOP_K = 4;
 const DEFAULT_RETRIEVAL_FETCH_K = 20;
 export const DEFAULT_ABSTENTION_THRESHOLD = 0.78;
+export const DEFAULT_CHUNK_SIZE = 1000;
+export const DEFAULT_CHUNK_OVERLAP = 200;
+/**
+ * A/B 结论（evals/results/mdheader-*.raw.json）：h4 粒度下同文档 section 霸屏
+ * top4 致 Hit@4 回退 8pp；h1-h2 切分 Hit@4 94.6% / Hit@10 100%，全面优于旧切分。
+ */
+export const DEFAULT_MAX_HEADER_DEPTH = 2;
 const DEFAULT_RETRIEVAL_MMR_LAMBDA = 0.9;
 const DEFAULT_RRF_CONSTANT = 60;
 const DEFAULT_SPARSE_TOP_K = 5;
@@ -85,6 +99,25 @@ function parseBooleanEnv(name: string, fallback: boolean): boolean {
     if (raw === 'true') return true;
     if (raw === 'false') return false;
     throw new Error(`${name} must be "true" or "false", received: ${raw}`);
+}
+
+export function getIngestionConfig(): IngestionConfig {
+    const chunkSize = parseIntegerEnv('CHUNK_SIZE', DEFAULT_CHUNK_SIZE);
+    const chunkOverlap = parseIntegerEnv('CHUNK_OVERLAP', DEFAULT_CHUNK_OVERLAP);
+    const maxHeaderDepth = parseIntegerEnv('INGESTION_MAX_HEADER_DEPTH', DEFAULT_MAX_HEADER_DEPTH);
+
+    if (chunkOverlap >= chunkSize) {
+        throw new Error(
+            `CHUNK_OVERLAP (${chunkOverlap}) must be smaller than CHUNK_SIZE (${chunkSize})`,
+        );
+    }
+    if (maxHeaderDepth < 1 || maxHeaderDepth > 6) {
+        throw new Error(
+            `INGESTION_MAX_HEADER_DEPTH must be between 1 and 6, received: ${maxHeaderDepth}`,
+        );
+    }
+
+    return { chunkSize, chunkOverlap, maxHeaderDepth };
 }
 
 export function getRetrievalConfig(): RetrievalConfig {

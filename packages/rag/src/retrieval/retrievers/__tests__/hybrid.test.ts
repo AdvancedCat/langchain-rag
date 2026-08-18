@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { ScoredChunk } from '../types.js';
-import { reciprocalRankFusion, deduplicate } from './hybrid.js';
+import type { ScoredChunk } from '../../types.js';
+import { reciprocalRankFusion, deduplicate } from '../hybrid.js';
 
 function chunk(
     docPath: string,
