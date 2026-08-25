@@ -166,6 +166,8 @@ pnpm run rag         # 启动交互式问答
 
 默认索引 58 篇 LangChain / deepagents / LangGraph 文档（JS + Python），`md-header-v2` 切分后共 2858 chunks。**注意**：切分策略变更后必须 `--rebuild` 重建索引（`chunkerVersion` 热启动守卫会自动检测并提示）。
 
+> **语料来源与版权**：文档语料在运行时从 [docs.langchain.com](https://docs.langchain.com/) 按需抓取，版权归 LangChain 所有，本仓库不随包分发语料原文。`evals/baselines/` 评测结果文件中因复现需要嵌入了少量检索命中的文档片段（chunk），仅用于指标归因分析。
+
 ---
 
 ## 项目结构

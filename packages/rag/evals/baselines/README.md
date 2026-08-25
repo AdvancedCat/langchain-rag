@@ -2,6 +2,8 @@
 
 本目录保存 RAG 评测的基准结果，按评测层级分为：
 
+> **数据来源说明**：评测语料为运行时从 [docs.langchain.com](https://docs.langchain.com/) 抓取的 LangChain 官方文档（版权归 LangChain 所有）；下列 JSON 中的 `content` 字段是检索命中的文档片段（chunk），为评测归因与复现而保留。
+
 - `retrieval/` — 检索评测 baseline（Hit Rate、MRR、NDCG、Precision 等）
 - `generation/` — 生成评测 baseline（Faithfulness、Relevance、Abstention 等）
 
