@@ -14,11 +14,10 @@
 
 - [特性](#特性)
 - [架构概览](#架构概览)
-- [评测结果](#评测结果)
+- [评测](#评测)
 - [快速开始](#快速开始)
 - [项目结构](#项目结构)
 - [配置说明](#配置说明)
-- [评测体系](#评测体系)
 - [技术栈](#技术栈)
 - [迭代历史](#迭代历史)
 - [Roadmap](#roadmap)
@@ -94,9 +93,13 @@ Loader（抓取 58 篇文档）
 
 ---
 
-## 评测结果
+## 评测
 
-在 44 条 golden query（37 answerable + 7 unanswerable）上的检索评测：
+项目内置检索 + 生成两套离线评测体系，本节先给出当前基线结果，再说明复跑方式与指标口径。
+
+### 评测结果
+
+在 44 条 golden query（37 answerable + 7 unanswerable）上的检索评测（指标含义见 [指标说明](#指标说明)）：
 
 | 策略 | 切分 | Hit@4 | Hit@10 | Prec@4 | MRR | NDCG@10 | Abstention |
 |------|------|-------|--------|--------|-----|---------|------------|
@@ -112,6 +115,64 @@ Loader（抓取 58 篇文档）
 - 切分管道 A/B 中 md-header-v2 首轮 Hit@4 94.6%，复跑 91.9%（Query Rewrite 的 LLM 波动 ±1 query），Hit@10 / Prec@4 / Abstention 稳定，通过 gate 成为默认。
 - Rerank 消融实验证明 `qwen3-rerank` 在当前语料上无净增益（Rerank Drift + 模型偏差），默认关闭。
 - 详细的消融实验、失败分析与策略 trade-off 见 [baselines/README.md](packages/rag/evals/baselines/README.md)。
+
+### 运行评测
+
+两套评测均通过 Makefile 触发：
+
+```bash
+cd packages/rag
+
+# 检索评测（不调用 Chat LLM，纯检索）
+make eval                                    # 文本报告
+make eval STRATEGY=hybrid-bm25 K=30 TOP_K=8  # 自定义策略与参数
+make eval-json                               # JSON 输出
+make eval-rebuild                            # 强制重建索引后评测
+
+# 生成评测（检索 → 生成 → Faithfulness + Relevance）
+make eval-gen
+make eval-gen LIMIT=5 SAVE=my-baseline.json
+```
+
+支持的检索策略：
+
+- `baseline-dense` — 纯向量相似度
+- `hybrid-bm25` — Dense + BM25 Boost Fusion
+- `hybrid-rewrite` — Dense + BM25 + Query Rewrite（**生产默认**）
+- `hybrid-rerank` — 在 hybrid-rewrite 基础上叠加 Cross-encoder Rerank
+- `threshold-mmr` — 阈值过滤 + MMR 多样性选择
+
+### 指标说明
+
+**相关性判定口径**：检索指标以 chunk 粒度判定——chunk 的 `docPath` 落在该查询的 `expectedDocPaths` 内即视为相关；除弃答指标外，聚合均值仅统计 37 条 answerable 查询。指标实现见 [evals/retrieval/metrics.ts](packages/rag/evals/retrieval/metrics.ts)。
+
+**检索评测**（纯检索，不调 Chat LLM）：
+
+| 指标 | 含义 | 衡量什么 |
+|------|------|---------|
+| Hit@K | 前 K 条结果中至少 1 条来自期望文档的查询占比 | 召回——"找得到"（↑ 越高越好） |
+| Precision@K | 前 K 条结果中相关 chunk 的占比（相关数 / K） | top-K 信噪比——"返回的有多干净"（↑ 越高越好） |
+| MRR | 首条相关结果排名倒数（1/rank，未命中记 0）的均值 | 排序——"第一条正确答案排多前"（↑ 越高越好） |
+| NDCG@K | 位置折损的排序质量：相关结果越靠前贡献越大，除以理想排序做归一 | 排序——计入全部相关结果的位次（↑ 越高越好） |
+| Keyword Recall | 期望关键词（`expectedKeywords`）在 top-K chunk 文本中的命中比例（词边界匹配） | 文本覆盖——补充 docPath 级判定的不足（↑ 越高越好） |
+| Duplicate Chunk Ratio@K | top-K 中与前序结果同文档且 `chunkIndex` 相邻（±1）的 chunk 占比 | 上下文冗余（↓ 越低越好） |
+| Unique Source Coverage@K | top-K 覆盖的不同文档数 / K | 来源多样性（↑ 越高越好） |
+| Generation Context Quality@K | sourcePrecision 与 Keyword Recall 的调和平均 × 非重复率 | 这批上下文对生成价值的综合代理（↑ 越高越好） |
+
+**弃答评测**（仅统计 7 条 unanswerable 查询）：
+
+| 指标 | 含义 |
+|------|------|
+| Abstention Rate | top dense cosine score < 阈值（默认 0.78）的 unanswerable 查询占比，即正确拒答率（↑ 越高越好）。注意口径差异：**评测**基于 dense cosine；**在线生产**自 M8 起改用 cross-encoder rerank 分数闸门（默认阈值 0.52），dense 信号仅作 API 失败回退 |
+
+**生成评测**（检索 → 生成 → LLM-as-judge）：
+
+| 指标 | 含义 |
+|------|------|
+| Faithfulness | 将回答拆解为 ≤8 条原子事实声明，LLM 逐条判定是否被检索上下文直接支持，得分 = 支持数 / 声明数；拒答回答记满分 1.0。衡量幻觉（↑ 越高越好） |
+| Relevance | LLM 从回答反向生成若干"该回答能解决的问题"，其 embedding 与原问题 embedding 的余弦相似度均值（RAGAS Answer Relevancy 风格）。衡量答非所问（↑ 越高越好） |
+
+评测纪律：baseline 一经冻结不再修改；检索/切分策略变更必须与冻结基线 A/B 对比且主指标不退化（gate）才可设为生产默认；负结果同样记录原因。全部基准对比见 [evals/baselines/README.md](packages/rag/evals/baselines/README.md)。
 
 ---
 
@@ -243,36 +304,6 @@ langchain-rag/
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | `1000` / `200` | 超长 section 的二级字符切分参数 |
 
 完整配置见 [packages/rag/.env.example](packages/rag/.env.example) 和 [packages/rag/src/config.ts](packages/rag/src/config.ts)。
-
----
-
-## 评测体系
-
-项目内置两套离线评测，通过 Makefile 触发：
-
-```bash
-cd packages/rag
-
-# 检索评测（不调用 Chat LLM，纯检索）
-make eval                                    # 文本报告
-make eval STRATEGY=hybrid-bm25 K=30 TOP_K=8  # 自定义策略与参数
-make eval-json                               # JSON 输出
-make eval-rebuild                            # 强制重建索引后评测
-
-# 生成评测（检索 → 生成 → Faithfulness + Relevance）
-make eval-gen
-make eval-gen LIMIT=5 SAVE=my-baseline.json
-```
-
-支持的检索策略：
-
-- `baseline-dense` — 纯向量相似度
-- `hybrid-bm25` — Dense + BM25 Boost Fusion
-- `hybrid-rewrite` — Dense + BM25 + Query Rewrite（**生产默认**）
-- `hybrid-rerank` — 在 hybrid-rewrite 基础上叠加 Cross-encoder Rerank
-- `threshold-mmr` — 阈值过滤 + MMR 多样性选择
-
-评测纪律：baseline 一经冻结不再修改；检索/切分策略变更必须与冻结基线 A/B 对比且主指标不退化（gate）才可设为生产默认；负结果同样记录原因。评测指标定义与全部基准对比详见 [evals/baselines/README.md](packages/rag/evals/baselines/README.md)。
 
 ---
 
