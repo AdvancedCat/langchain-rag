@@ -1,5 +1,6 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { HumanMessage } from '@langchain/core/messages';
+import { extractTextContent } from './rewrite.js';
 
 const MULTI_QUERY_PROMPT = `你是一个搜索专家。对于下面的技术问题，生成 {count} 个不同角度的检索查询，以覆盖技术文档库中可能相关的内容。
 
@@ -53,7 +54,7 @@ export async function generateMultiQueries(
 
     try {
         const response = await llm.invoke([new HumanMessage(prompt)]);
-        const text = response.content.toString().trim();
+        const text = extractTextContent(response.content).trim();
         const queries = parseQueryArray(text, count);
 
         const result = queries.length > 0 ? queries : [query];

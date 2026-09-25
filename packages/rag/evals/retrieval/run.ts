@@ -10,7 +10,7 @@ import { getMaxDenseScore } from '../../src/retrieval/types.js';
 import { createDashScopeReranker, type Reranker } from '../../src/retrieval/rerankers/index.js';
 import { getLLM } from '../../../libs/llm-provider.js';
 import type { RetrievalConfig } from '../../src/config.js';
-import { DEFAULT_ABSTENTION_THRESHOLD } from '../../src/config.js';
+import { DEFAULT_ABSTENTION_THRESHOLD, DEFAULT_RERANK_GATE_THRESHOLD } from '../../src/config.js';
 import { evaluateQuery, mean } from './metrics.js';
 import type {
     GoldenDataset,
@@ -165,6 +165,11 @@ function buildRetrievalConfig(cli: CliArgs): RetrievalConfig {
             model: 'qwen3-rerank',
             topN: cli.topK,
             rerankUrl: 'https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank',
+        },
+        // 评测的 abstention 指标仍基于 dense cosine（topScore）；rerank 闸门是 agent 在线行为，另行标定
+        rerankGate: {
+            enabled: false,
+            threshold: DEFAULT_RERANK_GATE_THRESHOLD,
         },
     };
 

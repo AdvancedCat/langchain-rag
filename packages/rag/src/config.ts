@@ -46,6 +46,16 @@ export interface RetrievalConfig {
         topN: number;
         rerankUrl: string;
     };
+    /**
+     * Rerank 弃答闸门（方向二）：检索排序不变（仍 hybrid-rewrite 融合），
+     * 仅用 cross-encoder 对 top-fetchK 候选打分做"是否值得回答"判定，
+     * 替代 dense cosine 作为 abstention 信号（dense 信号保留为 API 失败回退）。
+     * 与 MMR 互斥：MMR 只返回 topK 多样性筛选结果，会饿死 fetchK 闸门候选池。
+     */
+    rerankGate: {
+        enabled: boolean;
+        threshold: number;
+    };
 }
 
 const DEFAULT_RETRIEVAL_TOP_K = 4;
@@ -67,6 +77,12 @@ const DEFAULT_SPARSE_WEIGHT = 0.5;
 const DEFAULT_MULTI_QUERY_COUNT = 3;
 const DEFAULT_RERANK_MODEL = 'qwen3-rerank';
 const DEFAULT_RERANK_URL = 'https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank';
+/**
+ * 2026-09-22 golden 数据集标定（evals/results/rerank-gate-calibration-20260922.json）：
+ * answerable 最低 0.4949、unanswerable 次低 0.5327，取零误杀区间中点，
+ * 误杀 0/37、漏判 6/7（漏判项交由生成层 analyst 判无关兜底）、总正确率 86.4%（全局最优）。
+ */
+export const DEFAULT_RERANK_GATE_THRESHOLD = 0.52;
 
 function parseIntegerEnv(name: string, fallback: number): number {
     const raw = process.env[name];
@@ -145,6 +161,10 @@ export function getRetrievalConfig(): RetrievalConfig {
     const rerankModel = process.env.RETRIEVAL_RERANK_MODEL ?? DEFAULT_RERANK_MODEL;
     const rerankTopN = parseIntegerEnv('RETRIEVAL_RERANK_TOP_N', DEFAULT_RETRIEVAL_TOP_K);
     const rerankUrl = process.env.DASHSCOPE_RERANK_URL ?? DEFAULT_RERANK_URL;
+    const rerankGateEnabled = parseBooleanEnv('RETRIEVAL_RERANK_GATE_ENABLED', true);
+    const rerankGateThreshold =
+        parseNumberEnv('RETRIEVAL_RERANK_GATE_THRESHOLD', DEFAULT_RERANK_GATE_THRESHOLD) ??
+        DEFAULT_RERANK_GATE_THRESHOLD;
 
     if (fetchK < topK) {
         throw new Error(
@@ -181,6 +201,13 @@ export function getRetrievalConfig(): RetrievalConfig {
     if (rerankEnabled && mmrEnabled) {
         throw new Error('RETRIEVAL_RERANK_ENABLED and RETRIEVAL_MMR_ENABLED cannot both be true');
     }
+    if (rerankGateEnabled && mmrEnabled) {
+        throw new Error(
+            'RETRIEVAL_RERANK_GATE_ENABLED and RETRIEVAL_MMR_ENABLED cannot both be true: ' +
+                'MMR returns only topK diversity-filtered chunks, so the gate would score a starved ' +
+                'pool and bias toward false abstentions. Disable the gate to use MMR with the dense fallback.',
+        );
+    }
     if (rerankEnabled && rerankTopN > fetchK) {
         throw new Error(
             `RETRIEVAL_RERANK_TOP_N (${rerankTopN}) must be less than or equal to RETRIEVAL_FETCH_K (${fetchK})`,
@@ -188,6 +215,11 @@ export function getRetrievalConfig(): RetrievalConfig {
     }
     if (rerankTopN <= 0) {
         throw new Error('RETRIEVAL_RERANK_TOP_N must be positive');
+    }
+    if (rerankGateThreshold < 0 || rerankGateThreshold > 1) {
+        throw new Error(
+            `RETRIEVAL_RERANK_GATE_THRESHOLD must be between 0 and 1, received: ${rerankGateThreshold}`,
+        );
     }
 
     return {
@@ -217,6 +249,10 @@ export function getRetrievalConfig(): RetrievalConfig {
             model: rerankModel,
             topN: rerankTopN,
             rerankUrl,
+        },
+        rerankGate: {
+            enabled: rerankGateEnabled,
+            threshold: rerankGateThreshold,
         },
     };
 }

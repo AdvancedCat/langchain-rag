@@ -5,10 +5,14 @@ import {
     DEFAULT_ABSTENTION_THRESHOLD,
     DEFAULT_CHUNK_SIZE,
     DEFAULT_CHUNK_OVERLAP,
+    DEFAULT_RERANK_GATE_THRESHOLD,
 } from '../config.js';
 
 afterEach(() => {
     delete process.env.RETRIEVAL_ABSTENTION_THRESHOLD;
+    delete process.env.RETRIEVAL_RERANK_GATE_ENABLED;
+    delete process.env.RETRIEVAL_RERANK_GATE_THRESHOLD;
+    delete process.env.RETRIEVAL_MMR_ENABLED;
     delete process.env.CHUNK_SIZE;
     delete process.env.CHUNK_OVERLAP;
 });
@@ -42,6 +46,37 @@ describe('getRetrievalConfig abstentionThreshold', () => {
     it('rejects non-numeric values', () => {
         process.env.RETRIEVAL_ABSTENTION_THRESHOLD = 'high';
         expect(() => getRetrievalConfig()).toThrow(/RETRIEVAL_ABSTENTION_THRESHOLD/);
+    });
+});
+
+describe('getRetrievalConfig rerankGate', () => {
+    it('defaults to enabled with the calibrated threshold', () => {
+        expect(DEFAULT_RERANK_GATE_THRESHOLD).toBe(0.52);
+        expect(getRetrievalConfig().rerankGate).toEqual({
+            enabled: true,
+            threshold: 0.52,
+        });
+    });
+
+    it('reads RETRIEVAL_RERANK_GATE_* from the environment', () => {
+        process.env.RETRIEVAL_RERANK_GATE_ENABLED = 'false';
+        process.env.RETRIEVAL_RERANK_GATE_THRESHOLD = '0.4';
+        expect(getRetrievalConfig().rerankGate).toEqual({
+            enabled: false,
+            threshold: 0.4,
+        });
+    });
+
+    it('rejects values outside [0, 1]', () => {
+        process.env.RETRIEVAL_RERANK_GATE_THRESHOLD = '1.2';
+        expect(() => getRetrievalConfig()).toThrow(/RETRIEVAL_RERANK_GATE_THRESHOLD/);
+        process.env.RETRIEVAL_RERANK_GATE_THRESHOLD = '-0.1';
+        expect(() => getRetrievalConfig()).toThrow(/RETRIEVAL_RERANK_GATE_THRESHOLD/);
+    });
+
+    it('rejects gate + MMR both enabled (MMR starves the fetchK gate pool)', () => {
+        process.env.RETRIEVAL_MMR_ENABLED = 'true';
+        expect(() => getRetrievalConfig()).toThrow(/RETRIEVAL_RERANK_GATE_ENABLED/);
     });
 });
 

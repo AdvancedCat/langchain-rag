@@ -8,8 +8,11 @@ import { getRetrievalConfig } from '../config.js';
 import { retrieve } from './pipeline.js';
 import { getGlobalBM25Retriever } from './retrievers/bm25.js';
 import { getMaxDenseScore } from './types.js';
-import { extractSectionPath } from '../chunking/compose.js';
+import { extractSectionPath, composeSearchText } from '../chunking/compose.js';
 import { createDashScopeReranker, type Reranker } from './rerankers/index.js';
+
+const ABSTENTION_MESSAGE =
+    'No documentation chunks passed the retrieval filters. You may reformulate the query and call search_documentation again (at most 2 retries). If retries keep failing, state that the documentation does not contain the answer instead of answering from prior knowledge.';
 
 const RAG_WORKFLOW_INSTRUCTIONS = `# Documentation Q&A workflow
 
@@ -20,7 +23,7 @@ Answer questions about LangChain using the indexed documentation corpus.
 3. **Analyze**: For each saved chunk file, delegate to the chunk-analyst subagent. Pass the file path so the analyst can read it. Run at most {max_concurrent_analysts} analysts in parallel.
 4. **Synthesize**: Combine analyst reports into a final answer. Cite source URLs from the chunk headers.
 
-If search results do not contain relevant information, reformulate the query and search again before answering from prior knowledge.`;
+If search results do not contain relevant information, reformulate the query and search again (at most 2 retries). If the reformulated searches still return nothing relevant, do NOT answer from prior knowledge — tell the user that the indexed documentation does not cover this question.`;
 
 const SUBAGENT_DELEGATION_INSTRUCTIONS = `# Delegating to subagents
 
@@ -41,17 +44,30 @@ export async function createRagAgent(forceRebuild = false) {
     const llm = getLLM();
 
     let reranker: Reranker | undefined;
-    if (retrievalConfig.rerank.enabled) {
+    if (retrievalConfig.rerank.enabled || retrievalConfig.rerankGate.enabled) {
         const apiKey = process.env.DASHSCOPE_API_KEY;
         if (!apiKey) {
-            throw new Error('DASHSCOPE_API_KEY is required when rerank is enabled');
+            throw new Error('DASHSCOPE_API_KEY is required when rerank or the rerank gate is enabled');
         }
         reranker = createDashScopeReranker({
             apiKey,
             model: retrievalConfig.rerank.model,
             rerankUrl: retrievalConfig.rerank.rerankUrl,
         });
-        console.log(`🔄 Reranker enabled: ${retrievalConfig.rerank.model}, topN=${retrievalConfig.rerank.topN}`);
+        if (retrievalConfig.rerank.enabled) {
+            console.log(`🔄 Reranker enabled: ${retrievalConfig.rerank.model}, topN=${retrievalConfig.rerank.topN}`);
+        }
+        if (retrievalConfig.rerankGate.enabled) {
+            console.log(
+                `🚪 Rerank abstention gate enabled: ${retrievalConfig.rerank.model}, threshold=${retrievalConfig.rerankGate.threshold} (ranking unchanged)`,
+            );
+            if (retrievalConfig.rerank.enabled) {
+                console.log(
+                    '⚠️ Fusion rerank + gate both enabled: each search calls the rerank API twice ' +
+                        '(pipeline scores the rewritten query, gate scores the raw query — signals differ, not reusable)',
+                );
+            }
+        }
     }
 
     const searchDocumentation = tool(
@@ -63,12 +79,54 @@ export async function createRagAgent(forceRebuild = false) {
             );
 
             const retrievedChunks = allCandidates.slice(0, retrievalConfig.topK);
+            if (retrievedChunks.length === 0) {
+                return ABSTENTION_MESSAGE;
+            }
+
             const maxDenseScore = getMaxDenseScore(allCandidates);
-            if (
-                retrievedChunks.length === 0 ||
-                maxDenseScore < retrievalConfig.abstentionThreshold
-            ) {
-                return 'No documentation chunks passed the retrieval filters. Reformulate the query and call search_documentation again.';
+            const denseAbstain = maxDenseScore < retrievalConfig.abstentionThreshold;
+
+            if (reranker && retrievalConfig.rerankGate.enabled) {
+                // 闸门信号：cross-encoder 对 top-fetchK 候选打分（输入文本与 embedding/BM25 同构，决策 D3）。
+                // 排序不变；API 失败或退化响应回退 dense cosine 阈值。
+                try {
+                    const gatePool = allCandidates.slice(0, retrievalConfig.fetchK);
+                    const documents = gatePool.map((c) =>
+                        composeSearchText(c.document.pageContent, c.document.metadata),
+                    );
+                    const results = await reranker.rank(query, documents, documents.length);
+                    if (results.length === 0) {
+                        // 200 但缺 output.results 的退化响应会让 bestScore 归零 → 恒弃答，必须按失败处理
+                        throw new Error('rerank API returned no results for the candidate pool');
+                    }
+                    const bestRerankScore = results.reduce(
+                        (max, r) => Math.max(max, r.relevanceScore),
+                        0,
+                    );
+                    const topDocPath = (
+                        gatePool[0]?.document.metadata as Record<string, unknown> | undefined
+                    )?.docPath;
+                    const decision =
+                        bestRerankScore < retrievalConfig.rerankGate.threshold ? 'ABSTAIN' : 'PASS';
+                    console.log(
+                        `🚪 Gate: rerank=${bestRerankScore.toFixed(4)} ` +
+                            `threshold=${retrievalConfig.rerankGate.threshold} ` +
+                            `dense=${maxDenseScore.toFixed(4)} candidates=${allCandidates.length} ` +
+                            `top=${String(topDocPath ?? '?')} query="${query}" → ${decision}`,
+                    );
+                    if (bestRerankScore < retrievalConfig.rerankGate.threshold) {
+                        return ABSTENTION_MESSAGE;
+                    }
+                } catch (error) {
+                    console.warn(
+                        `[RerankGate] API failed, falling back to dense threshold: ${error instanceof Error ? error.message : String(error)}`,
+                    );
+                    if (denseAbstain) {
+                        return ABSTENTION_MESSAGE;
+                    }
+                }
+            } else if (denseAbstain) {
+                return ABSTENTION_MESSAGE;
             }
 
             const batchId = randomUUID().slice(0, 8);

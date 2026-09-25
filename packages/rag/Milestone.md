@@ -17,8 +17,9 @@
 | M5 | 2026-08-16 | Phase 3：Cross-encoder Rerank 精排 | `e03f042`、`441ff58`、`700e16d` | ⚠️ 实验性，默认关闭 |
 | M6 | 2026-08-17 | 工程加固：参数化 + 单元测试 + 配置收敛 | `3aa743e`、`7d4178a`、`f35bae4` | ✅ 171 测试全绿 |
 | M7 | 2026-08-18 | 切分管道：类型识别 + Splitter 插件化 + 统一 Chunk 契约 | `d4cee6a`、`e34694e` | ✅ A/B 通过，md-header-v2 成为默认 |
+| M8 | 2026-09-22 | Rerank 弃答闸门：abstention 信号从 dense cosine 切换为 cross-encoder | — | ✅ 误杀 19/37 → 0/37，成为生产默认 |
 
-**当前生产配置**：hybrid-rewrite 检索策略（M4）+ `md-header-v2` 切分（M7，collection `langchain_docs_mdheader`，2858 chunks）。
+**当前生产配置**：hybrid-rewrite 检索策略（M4）+ `md-header-v2` 切分（M7，collection `langchain_docs_mdheader`）+ rerank 弃答闸门（M8，`qwen3-rerank` @0.52，排序不变）。
 
 ---
 
@@ -91,6 +92,17 @@
   | Abstention@0.78 | 100% | **100%** | **100%** |
 
 - 定案：`CHUNKER_VERSION='md-header-v2'`、默认 header 深度 2，正式 collection `langchain_docs_mdheader`（2858 chunks）；abstention 阈值 0.78 无需重标定。遗留观察：KeywordRecall -3.1pp（预期内）、q033 霸屏型失败。详见 [docs/chunking-pipeline-plan.md](./docs/chunking-pipeline-plan.md) §6。
+
+## M8（2026-09-22）Rerank 弃答闸门：abstention 信号切换
+
+**提交**：（本次变更，含同日 agent 提示词修复：检索无果时禁止先验知识作答、改写重试上限 2 次）
+
+- **动机**：线上对"什么是langchain"等概念型问题误弃答。诊断证明检索命中正确、dense cosine 闸门误杀过半（19/37，51%）；阈值网格扫描（`evals/results/dense-gate-grid-hybrid-rewrite-20260922.json`）证明两分布严重重叠、无单点分界可用，且 0.78 的原标定已随 collection 漂移（2858→2981）失效（q040 越线漏判）。
+- **设计**：rerank 只做闸门不做排序——Phase 3 的 Rerank Drift 教训（融合引入 Hit@4 -2.7pp）因此完全规避，检索主指标与 hybrid-rewrite 冻结基线一致。闸门对 top-fetchK 候选调 `qwen3-rerank`，`max(relevance_score) < 0.52` 弃答，API 失败回退 dense 阈值；与实验性融合 rerank（`RETRIEVAL_RERANK_ENABLED`）通过 `RETRIEVAL_RERANK_GATE_*` 解耦。
+- **A/B（golden v2，44 query）**：误杀 19/37 → **0/37**，总正确率 54.5% → **86.4%**（与 dense 网格最优持平但零误杀）；漏判 1/7 → 6/7，全部为"主题相近但语料没有"难例，交由生成层兜底（analyst 判无关 + 禁止先验知识提示词）。阈值 0.52 取零误杀区间 (0.4949, 0.5327) 中点。标定数据：`evals/results/rerank-gate-calibration-20260922.json`。
+- 验证：typecheck + 175 测试全绿（+4 配置用例）。已知边界：q043/q039 级深度混淆（rerank 0.92/0.89）为 score 闸门天花板，Abstention → 100% 需 LLM judge。详见 [docs/rerank-abstention-gate-plan.md](./docs/rerank-abstention-gate-plan.md)。
+- **附带修复（重要）**：冒烟暴露 `rewriteQuery`/`generateMultiQueries` 用 `content.toString()` 提取 LLM 响应——agent 进程内共享 ChatOpenAI 实例返回多段 content block 数组时退化为 `"[object Object]"` 垃圾查询，导致在线检索 query 无关（dense 恒 0.5518）。新增 `extractTextContent()` 兼容两种形态，闸门决策日志（`🚪 Gate:`）常驻便于观测。
+- **评审加固（2026-09-25，ocr 评审）**：① rerank 200 但空结果的退化响应原先会令 bestScore=0 恒弃答，现按 API 失败走 dense 回退；② gate 与 MMR 增设 config 互斥守卫——MMR 只返回 topK 多样性筛选结果，会饿死 fetchK 闸门候选池；③ `extractTextContent` 对未识别 content 形态告警，防静默降级重演；④ 融合 rerank 与闸门同开时同一候选池双调用为已知成本（pipeline 打分用改写后 query、闸门用原始 query，信号不同不可复用），以启动日志与计划文档 §4.2 记录。
 
 ---
 

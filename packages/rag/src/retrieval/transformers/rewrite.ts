@@ -17,6 +17,33 @@ const REWRITE_PROMPT = `你是一个专业的搜索查询优化器。你的任�
 const QUERY_REWRITE_CACHE_MAX = 500;
 const queryRewriteCache = new Map<string, string>();
 
+/**
+ * 兼容 string 与多段 content block 两种响应形态。
+ * agent 进程内共享的 ChatOpenAI 实例可能返回块数组，直接 toString() 会得到
+ * "[object Object],[object Object]" 并污染下游 embedding 查询。
+ */
+export function extractTextContent(content: unknown): string {
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) {
+        return content
+            .map((part) => {
+                if (typeof part === 'string') return part;
+                if (part !== null && typeof part === 'object' && 'text' in part) {
+                    const text = (part as { text?: unknown }).text;
+                    return typeof text === 'string' ? text : '';
+                }
+                return '';
+            })
+            .join('');
+    }
+    // 静默降级正是 "[object Object]" bug 当初长期未被发现的原因：形态漂移必须立刻可见
+    console.warn(
+        `[extractTextContent] Unrecognized LLM content shape (${typeof content}); ` +
+            'returning empty string, callers will fall back to the original query',
+    );
+    return '';
+}
+
 export async function rewriteQuery(
     query: string,
     llm: BaseChatModel,
@@ -33,7 +60,7 @@ export async function rewriteQuery(
             temperature: 0.1,
         } as Parameters<typeof llm.invoke>[1]);
 
-        const text = response.content.toString().trim();
+        const text = extractTextContent(response.content).trim();
 
         const rewritten = text
             .replace(/^["'「」『』\s]+|["'「」『』\s]+$/g, '')
