@@ -120,11 +120,12 @@ State = { phase, turns: Turn[], activeRunId?, lastEventId, seenEventIds: Set, ch
 
 **实施发现（2026-10-10 联调）**：
 
-1. **`packages/api` 进程级崩溃 bug（M9-P3 待修，非前端问题）**：某 chunk-analyst 子代理失败时，`Subagent chunk-analyst failed` 从 LangChain StreamMux 同步抛出，穿透 `RunManager.execute` 的 for-await 未被捕获，直接炸掉整个 Node 进程。触发疑似 DashScope TPM 限流（见既有备忘）。修法应在 `execute` 的流消费处再包一层 try/catch 归一为 `RUN_ERROR{server_error}`。前端在该场景的表现（重连→回放 server_restart）已实测正确。
-2. **恢复顺序修正**：attachLoop 的 resume 路径必须是「先续传回放、后 meta 裁决」——服务重启后进程会清理 activeRun 并补发 `RUN_ERROR{server_restart}`，若先查 meta（activeRun 已空）会走 resolveStaleRun，用户只能看到「状态未知」而非准确的「服务重启」提示。
-3. **重连横幅残留**：多个并行 attachLoop 竞态下，晚醒的循环经早退路径返回时不清除横幅（残留「正在重连（第 N 次）」）；已在 reducer 的 resolveStaleRun 与循环早退处双重复位。
-4. **弃答渲染**：真实冒烟命中 rerank 闸门 ABSTAIN（4 次检索均 <0.52），最终答案为弃答文案——前端按正常 Markdown 回答渲染，符合「弃答不是错误」的契约。
-5. **中间轮无 snapshot 的重试缺口**：run 被中断（无 MESSAGES_SNAPSHOT）时该轮用户消息仅在发送端有乐观值，刷新后回放无法回填 → 不显示重试按钮（重试需原问题文本）。可接受的已知限制。
+1. **`packages/api` 进程级崩溃（已加兜底，系统性治理留 M9-P3）**：LangGraph StreamMux 内部微任务链上的失败以 unhandledRejection 逃逸，不经 `RunManager.execute` 的 for-await、try/catch 拦不住，默认行为是炸掉进程。联调实测三种触发源：chunk-analyst 子代理失败（`Subagent failed`，疑似 DashScope TPM 限流诱发）、DeepSeek 思考模式 400（`reasoning_content must be passed back`）。已在 `index.ts` 挂 `unhandledRejection` 兜底（记录后保活，受影响 run 由超时 abort 收口）；run 级异常归一为 RUN_ERROR{server_error} 的完整加固仍列 P3。前端在该场景的表现（重连→回放 server_restart）已实测正确。
+2. **TOOL_CALL_ARGS 快照叠加 bug（已修，双层）**：LangChain v3 流对 deepseek 返回的 `tool_call_chunk.args` 是「到当前为止的完整快照」（每帧恒以前帧为前缀，抓帧实测），translator 原样透传为 AG-UI `delta`（语义应为增量）→ 前端按增量拼接后工具参数呈现为前缀串（`{{"query{"query": …`）。修复：① translator 按 toolCallId 记录已发射内容，快照只发新增后缀（增量式 provider 原样透传，单测锁定两种形态）；② 前端 chatStore 以「delta 是否以已累积内容为前缀」判别替换/追加，兼容未升级服务端。
+3. **恢复顺序修正**：attachLoop 的 resume 路径必须是「先续传回放、后 meta 裁决」——服务重启后进程会清理 activeRun 并补发 `RUN_ERROR{server_restart}`，若先查 meta（activeRun 已空）会走 resolveStaleRun，用户只能看到「状态未知」而非准确的「服务重启」提示。
+4. **重连横幅残留**：多个并行 attachLoop 竞态下，晚醒的循环经早退路径返回时不清除横幅（残留「正在重连（第 N 次）」）；已在 reducer 的 resolveStaleRun 与循环早退处双重复位。
+5. **弃答渲染**：真实冒烟命中 rerank 闸门 ABSTAIN（4 次检索均 <0.52），最终答案为弃答文案——前端按正常 Markdown 回答渲染，符合「弃答不是错误」的契约。
+6. **中间轮无 snapshot 的重试缺口**：run 被中断（无 MESSAGES_SNAPSHOT）时该轮用户消息仅在发送端有乐观值，刷新后回放无法回填 → 不显示重试按钮（重试需原问题文本）。可接受的已知限制。
 
 ## 10. 后续方向
 

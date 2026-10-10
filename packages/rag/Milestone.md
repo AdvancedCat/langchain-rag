@@ -156,7 +156,8 @@
 
 **联调发现**：
 
-- **`packages/api` 进程级崩溃 bug（重要，M9-P3 待修）**：chunk-analyst 子代理失败时 `Subagent chunk-analyst failed` 从 LangChain StreamMux 同步抛出，未被 RunManager 捕获即炸掉 Node 进程（触发疑似 DashScope TPM 限流）。前端侧表现正确（重连→回放 server_restart），但服务可用性缺口必须修：execute 流消费处补 try/catch 归一为 `RUN_ERROR{server_error}`。
+- **TOOL_CALL_ARGS 快照叠加 bug（已修，双层）**：LangChain v3 流对 deepseek 返回的 `tool_call_chunk.args` 是「完整快照」而非增量（抓帧实测：每帧恒以前帧为前缀），translator 原样透传为 AG-UI `delta` 导致前端拼接出 `{{"query{"query":…` 前缀串。修复：translator 按 toolCallId 归一为增量（快照发后缀、增量原样透传，单测锁定）；前端 chatStore 前缀判别兼容旧帧。复抓一整轮真实 run（90+ 工具调用）验证全部为真增量。
+- **`packages/api` 进程级崩溃（已加兜底，系统性治理留 M9-P3）**：StreamMux 内部微任务链的失败（子代理失败、DeepSeek 思考模式 400 等）以 unhandledRejection 逃逸，不经 execute 的 try/catch，默认炸进程（联调实测三种触发源）。已在 `index.ts` 挂 `unhandledRejection` 兜底（记录后保活，受影响 run 由超时收口）；run 级异常归一 RUN_ERROR{server_error} 的完整加固仍列 P3。
 - 恢复顺序须「先回放后 meta 裁决」、重连横幅并行竞态残留——两处前端缺陷已在联调中发现并修复（单测锁定：server_restart 回放用例、resolveStaleRun 横幅复位）。
 
 ---

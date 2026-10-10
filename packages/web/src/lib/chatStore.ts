@@ -313,9 +313,14 @@ function onToolCallStart(state: ChatState, event: ToolCallStartEvent): ChatState
 function onToolCallArgs(state: ChatState, event: ToolCallArgsEvent): ChatState {
     const found = findToolCall(state, event.toolCallId);
     if (!found) return state;
-    const updated = found.blocks.map((block, i) =>
-        i === found.index && block.kind === 'toolcall' ? { ...block, args: block.args + event.delta } : block,
-    );
+    const updated = found.blocks.map((block, i) => {
+        if (i !== found.index || block.kind !== 'toolcall') return block;
+        // AG-UI 语义 delta 为增量；但快照式上游（未归一的旧服务端）每帧发完整
+        // 参数，直接拼接会产生前缀串。以「delta 是否以已累积内容为前缀」判别：
+        // 是 → 用 delta 整体替换（快照），否 → 追加（增量）。
+        const args = event.delta.startsWith(block.args) ? event.delta : block.args + event.delta;
+        return { ...block, args };
+    });
     return replaceContainer(state, found.turnIndex, found.blocks, updated);
 }
 

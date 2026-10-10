@@ -83,6 +83,19 @@ describe('applyEvents 流式归约', () => {
         });
     });
 
+    it('工具调用：快照式 ARGS 帧（每帧完整参数）以替换而非拼接收敛', () => {
+        let state = initialChatState('ready');
+        state = applyEvents(state, [
+            RUN_STARTED('r1'),
+            ev({ type: 'TOOL_CALL_START', toolCallId: 'tc1', toolCallName: 'search_documentation' }),
+            ev({ type: 'TOOL_CALL_ARGS', toolCallId: 'tc1', delta: '{"que' }),
+            ev({ type: 'TOOL_CALL_ARGS', toolCallId: 'tc1', delta: '{"query": "What' }),
+            ev({ type: 'TOOL_CALL_ARGS', toolCallId: 'tc1', delta: '{"query": "What is LangGraph"}' }),
+            RUN_FINISHED('r1'),
+        ]);
+        expect(state.turns[0]!.blocks[0]).toMatchObject({ kind: 'toolcall', args: '{"query": "What is LangGraph"}' });
+    });
+
     it('子代理：SUBAGENT_STARTED 后，携 subagentRunId 的工具/文本挂入其嵌套 blocks', () => {
         let state = initialChatState('ready');
         state = applyEvents(state, [
