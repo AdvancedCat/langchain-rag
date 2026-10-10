@@ -1,0 +1,140 @@
+import { useState } from 'react';
+import type { ChatBlock, SubagentBlock, ToolCallBlock } from '../lib/chatStore';
+import { Markdown } from './Markdown';
+import { IconBot, IconBrain, IconCheck, IconChevron, IconSpinner, IconWrench } from './icons';
+
+/** 已知工具名的中文标签（未知工具显示原始名） */
+const TOOL_LABELS: Record<string, string> = {
+    search_documentation: '文档检索',
+    write_todos: '记录任务',
+    task: '子代理委派',
+    read_file: '读取文件',
+    read_documentation: '读取文档',
+};
+
+function prettyJson(text: string): string {
+    try {
+        return JSON.stringify(JSON.parse(text), null, 2);
+    } catch {
+        return text;
+    }
+}
+
+/** 工具调用卡片：名称 + 运行状态，展开看参数与结果 */
+export function ToolCallCard({ block }: { block: ToolCallBlock }) {
+    const [open, setOpen] = useState(false);
+    const running = !block.done;
+    const label = TOOL_LABELS[block.name] ?? block.name;
+    return (
+        <div className="rounded-lg border border-zinc-200 bg-white text-sm">
+            <button
+                type="button"
+                onClick={() => setOpen((value) => !value)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-zinc-600 hover:bg-zinc-50"
+            >
+                <IconChevron open={open} />
+                <span className="text-zinc-400">
+                    <IconWrench />
+                </span>
+                <span className="font-medium">{label}</span>
+                {running ? <IconSpinner /> : <IconCheck />}
+            </button>
+            {open && (
+                <div className="space-y-2 border-t border-zinc-100 px-3 py-2">
+                    {block.args && (
+                        <div>
+                            <div className="mb-1 text-xs font-medium text-zinc-400">参数</div>
+                          <pre className="thin-scrollbar max-h-40 overflow-auto rounded bg-zinc-50 p-2 text-xs text-zinc-700">
+                                {prettyJson(block.args)}
+                            </pre>
+                        </div>
+                    )}
+                    {block.result !== null && (
+                        <div>
+                            <div className="mb-1 text-xs font-medium text-zinc-400">结果</div>
+                            <pre className="thin-scrollbar max-h-60 overflow-auto whitespace-pre-wrap rounded bg-zinc-50 p-2 text-xs text-zinc-700">
+                                {block.result || '（空）'}
+                            </pre>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+/** 思考过程（reasoning）：默认折叠，流式时标题脉动 */
+export function ReasoningBlockView({ block }: { block: Extract<ChatBlock, { kind: 'reasoning' }> }) {
+    const [open, setOpen] = useState(false);
+    return (
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50/60 text-sm">
+            <button
+                type="button"
+                onClick={() => setOpen((value) => !value)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-zinc-500 hover:bg-zinc-100/60"
+            >
+                <IconChevron open={open} />
+                <span className="text-zinc-400">
+                    <IconBrain />
+                </span>
+                <span className="font-medium">思考过程</span>
+                {!block.done && <IconSpinner />}
+            </button>
+            {open && (
+                <pre className="thin-scrollbar max-h-72 overflow-auto whitespace-pre-wrap border-t border-zinc-200/70 px-3 py-2 text-xs leading-relaxed text-zinc-500">
+                    {block.content}
+                </pre>
+            )}
+        </div>
+    );
+}
+
+/** 子代理组（chunk-analyst 等）：卡片内嵌套其内部工具/文本 */
+export function SubagentGroup({ block }: { block: SubagentBlock }) {
+    const [open, setOpen] = useState(true);
+    return (
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50/40 text-sm">
+            <button
+                type="button"
+                onClick={() => setOpen((value) => !value)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-indigo-700 hover:bg-indigo-50"
+            >
+                <IconChevron open={open} />
+                <span className="text-indigo-400">
+                    <IconBot />
+                </span>
+                <span className="font-medium">子代理 · {block.name}</span>
+                {block.finished ? <IconCheck /> : <IconSpinner />}
+            </button>
+            {open && (
+                <div className="space-y-2 border-t border-indigo-100 px-3 py-2">
+                    <BlockList blocks={block.blocks} />
+                </div>
+            )}
+        </div>
+    );
+}
+
+/** blocks 渲染（子代理内嵌套复用） */
+export function BlockList({ blocks }: { blocks: ChatBlock[] }) {
+    return (
+        <div className="space-y-2">
+            {blocks.map((block) => {
+                switch (block.kind) {
+                    case 'reasoning':
+                        return <ReasoningBlockView key={`reasoning-${block.messageId}`} block={block} />;
+                    case 'text':
+                        return (
+                            <div key={`text-${block.messageId}`} className="min-w-0">
+                                <Markdown content={block.content} streaming={!block.done} />
+                            </div>
+                        );
+                    case 'toolcall':
+                        return <ToolCallCard key={`tool-${block.toolCallId}`} block={block} />;
+                    case 'subagent':
+                        return <SubagentGroup key={`sub-${block.subagentRunId}`} block={block} />;
+                }
+            })}
+        </div>
+    );
+}

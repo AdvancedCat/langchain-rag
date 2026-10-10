@@ -19,6 +19,7 @@
 | M7 | 2026-08-18 | 切分管道：类型识别 + Splitter 插件化 + 统一 Chunk 契约 | `d4cee6a`、`e34694e` | ✅ A/B 通过，md-header-v2 成为默认 |
 | M8 | 2026-09-22 | Rerank 弃答闸门：abstention 信号从 dense cosine 切换为 cross-encoder | — | ✅ 误杀 19/37 → 0/37，成为生产默认 |
 | M9 | 2026-10-10 ~ | API 服务化：Koa + AG-UI 事件流 + Redis 断线续传（独立包 `packages/api`） | — | 🚧 P0-P2 完成（断线续传可用），P3 进行中 |
+| M10 | 2026-10-10 | 前端问答界面：React + Vite + AG-UI 双通道断线续传（独立包 `packages/web`） | — | ✅ 浏览器联调验收通过 |
 
 **当前生产配置**：hybrid-rewrite 检索策略（M4）+ `md-header-v2` 切分（M7，collection `langchain_docs_mdheader`）+ rerank 弃答闸门（M8，`qwen3-rerank` @0.52，排序不变）。
 
@@ -137,7 +138,26 @@
 - **实施发现（重要）**：`@langchain/langgraph-checkpoint-redis` 依赖 **RedisJSON**（JSON.GET/SET）——标准 Redis 7 报 `unknown command 'JSON.GET'`，compose 镜像升级为 `redis:8-alpine`（开源版已内置 JSON 模块）后解决。
 - 验证：测试 206 全绿（rag 175 + api 31，含真实 Redis 集成 4 例、回放/尾随/两轮对话/删除等 12 新例）；真实验收——刷新回放（断开时 1729 事件 → 重连回放+尾随至 FINISHED、id 零重复）、两轮对话（第二轮复述首问 + 首轮 `/retrieved/` 文件跨轮可读，风险 3 闭环）、kill -9 重启（interrupted 标记 + server_restart 补发 + 同 thread 可续问）。
 
-**待实施**：P3 加固（retrieval.trace CUSTOM 事件、长会话日志压缩、鉴权挂载）。
+**待实施**：P3 加固（retrieval.trace CUSTOM 事件、长会话日志压缩、鉴权挂载、**子代理异常进程级崩溃修复**——见 M10 联调发现）。
+
+---
+
+## M10（2026-10-10）前端问答界面：React + Vite + AG-UI 双通道断线续传
+
+**技术方案**：[docs/frontend-plan.md](./docs/frontend-plan.md)（契约摘要、状态模型、通道编排、验收回填）。独立包 `packages/web`（`@langchain-rag/web`），React 19 + Vite 8 + Tailwind CSS v4 + react-markdown，界面中文。
+
+**交付**：
+
+- **基础问答**：多会话管理（列表/删除/新对话/运行中徽标/服务状态点）；流式渲染思考过程（折叠）、工具调用卡片（参数/结果）、chunk-analyst 子代理嵌套组、Markdown 最终答案（GFM）；停止（显式 cancel，断开≠取消）。
+- **断线续传**：打开线程一律 `afterEventId=0` 全量回放重建（规避缺省语义歧义与 mid-run 游标缺口）；写通道（POST /agui）异常早断 → 读通道（GET /threads/:id/events）按最后游标指数退避（1s→2s→…≤15s）续传；`visibilitychange`/`online` 重同步；409 run_already_active → 跟随模式；服务重启 → 回放消费补发的 `RUN_ERROR{server_restart}`。
+- **核心设计**（详见方案 §4 决策表）：自研 ~150 行 fetch-SSE 读取器统一双通道（不引入 `@ag-ui/client`——attach 游标/去重/409 降级为自有扩展）；`useReducer` 纯函数事件归约（chatStore：Turn/Block 视图模型、eventId 幂等去重、MESSAGES_SNAPSHOT 仅回填用户消息——snapshot 会压平 tool_calls 不能替换渲染）；零额外状态库（hash 路由 20 行、无 react-router/zustand/react-query）。
+
+**验证**：验收清单 9 项中 8 项浏览器实测通过（刷新续传恢复、停止、双标签页跟随、删除收敛、服务崩溃重启恢复等，见方案 §9 回填表）；429 映射由单测覆盖。测试 246 全绿（rag 175 + api 31 + web 40：SSE 解析器半包/心跳/CRLF、归约器流式/回放/去重/快照/错误码/子代理挂靠、controller 全通道编排、REST 错误映射、hash 路由）；递归 typecheck 全绿。
+
+**联调发现**：
+
+- **`packages/api` 进程级崩溃 bug（重要，M9-P3 待修）**：chunk-analyst 子代理失败时 `Subagent chunk-analyst failed` 从 LangChain StreamMux 同步抛出，未被 RunManager 捕获即炸掉 Node 进程（触发疑似 DashScope TPM 限流）。前端侧表现正确（重连→回放 server_restart），但服务可用性缺口必须修：execute 流消费处补 try/catch 归一为 `RUN_ERROR{server_error}`。
+- 恢复顺序须「先回放后 meta 裁决」、重连横幅并行竞态残留——两处前端缺陷已在联调中发现并修复（单测锁定：server_restart 回放用例、resolveStaleRun 横幅复位）。
 
 ---
 

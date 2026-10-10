@@ -1,0 +1,157 @@
+@import "tailwindcss";
+
+html,
+body,
+#root {
+    height: 100%;
+}
+
+body {
+    font-family:
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        "PingFang SC",
+        "Hiragino Sans GB",
+        "Microsoft YaHei",
+        sans-serif;
+}
+
+/* 细滚动条（消息区/侧栏） */
+.thin-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-zinc-300) transparent;
+}
+.thin-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--color-zinc-300);
+    border-radius: 3px;
+}
+.thin-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* ------------------------------------------------------------------ */
+/* Markdown 排版（不引入 typography 插件，手写最小集） */
+/* ------------------------------------------------------------------ */
+.md-body {
+    font-size: 0.9375rem;
+    line-height: 1.75;
+    color: var(--color-zinc-800);
+    overflow-wrap: break-word;
+}
+.md-body > :first-child {
+    margin-top: 0;
+}
+.md-body > :last-child {
+    margin-bottom: 0;
+}
+.md-body p {
+    margin: 0.5rem 0;
+}
+.md-body h1,
+.md-body h2,
+.md-body h3,
+.md-body h4 {
+    font-weight: 600;
+    color: var(--color-zinc-900);
+    margin: 1.2em 0 0.5em;
+    line-height: 1.4;
+}
+.md-body h1 {
+    font-size: 1.25rem;
+}
+.md-body h2 {
+    font-size: 1.125rem;
+}
+.md-body h3 {
+    font-size: 1rem;
+}
+.md-body ul,
+.md-body ol {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+}
+.md-body ul {
+    list-style: disc;
+}
+.md-body ol {
+    list-style: decimal;
+}
+.md-body li {
+    margin: 0.25rem 0;
+}
+.md-body a {
+    color: var(--color-indigo-600);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.md-body code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85em;
+    background: var(--color-zinc-100);
+    border: 1px solid var(--color-zinc-200);
+    border-radius: 4px;
+    padding: 0.1em 0.35em;
+}
+.md-body pre {
+    background: var(--color-zinc-900);
+    color: var(--color-zinc-100);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    overflow-x: auto;
+    margin: 0.75rem 0;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+}
+.md-body pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+}
+.md-body blockquote {
+    border-left: 3px solid var(--color-zinc-300);
+    padding-left: 0.75rem;
+    margin: 0.75rem 0;
+    color: var(--color-zinc-500);
+}
+.md-body table {
+    border-collapse: collapse;
+    margin: 0.75rem 0;
+    font-size: 0.875rem;
+    display: block;
+    overflow-x: auto;
+}
+.md-body th,
+.md-body td {
+    border: 1px solid var(--color-zinc-200);
+    padding: 0.35rem 0.75rem;
+    text-align: left;
+}
+.md-body th {
+    background: var(--color-zinc-50);
+    font-weight: 600;
+}
+.md-body hr {
+    border: none;
+    border-top: 1px solid var(--color-zinc-200);
+    margin: 1rem 0;
+}
+
+/* 流式光标 */
+.stream-cursor::after {
+    content: "▍";
+    margin-left: 1px;
+    color: var(--color-indigo-500);
+    animation: cursor-blink 1s steps(1) infinite;
+}
+@keyframes cursor-blink {
+    50% {
+        opacity: 0;
+    }
+}
