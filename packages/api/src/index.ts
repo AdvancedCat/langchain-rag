@@ -12,6 +12,14 @@ import { closeRedis } from './redis.js';
 
 const { app, config, runManager, persistence } = createApp();
 
+// 进程级兜底（2026-10-10 联调加固，系统性治理留 P3）：LangGraph StreamMux 的
+// 内部微任务链上的失败（子代理失败、provider 4xx 等）不经消费方的 for-await，
+// 以 unhandledRejection 形式逃逸——默认行为是炸掉整个进程（联调实测三种触发源）。
+// 记录后保活：受影响的 run 由 RAG_RUN_TIMEOUT_MS abort 收口 → RUN_ERROR{timeout}。
+process.on('unhandledRejection', (reason) => {
+    console.warn(`[api] unhandledRejection (kept alive): ${reason instanceof Error ? reason.stack : String(reason)}`);
+});
+
 const server = app.listen(config.port, config.host, () => {
     console.log(`[api] @langchain-rag/api listening on http://${config.host}:${config.port}`);
 });

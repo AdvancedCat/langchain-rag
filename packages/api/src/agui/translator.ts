@@ -93,6 +93,8 @@ interface TranslatorState {
     toolCallsStarted: Set<string>;
     /** tool-started 时登记的 task（子代理委派）调用，finished 判定用 */
     taskToolCalls: Set<string>;
+    /** toolCallId → 已发射的累计 args（把 provider 的快照式 chunk 归一为增量） */
+    toolCallArgsEmitted: Map<string, string>;
 }
 
 const now = () => Date.now();
@@ -158,7 +160,12 @@ export async function* translateRun(
 
     yield { type: EventType.RUN_STARTED, threadId, runId, timestamp: now() };
 
-    const state: TranslatorState = { messages: new Map(), toolCallsStarted: new Set(), taskToolCalls: new Set() };
+    const state: TranslatorState = {
+        messages: new Map(),
+        toolCallsStarted: new Set(),
+        taskToolCalls: new Set(),
+        toolCallArgsEmitted: new Map(),
+    };
 
     for await (const ev of run) {
         if (ev.method === 'messages' && shouldMapMessages(ev.params.namespace)) {
@@ -272,13 +279,12 @@ function* translateMessageEvent(
                     );
                 }
                 if (delta.fields.args) {
-                    yield {
-                        type: EventType.TOOL_CALL_ARGS,
-                        toolCallId: delta.fields.id ?? active.messageId,
-                        delta: delta.fields.args,
-                        subagentRunId: active.subagentRunId,
-                        timestamp: now(),
-                    };
+                    yield* toolCallArgs(
+                        delta.fields.id ?? active.messageId,
+                        delta.fields.args,
+                        active,
+                        state,
+                    );
                 }
             }
             return;
@@ -332,6 +338,29 @@ function* toolCallStart(
         toolCallId,
         toolCallName,
         parentMessageId: active.messageId,
+        subagentRunId: active.subagentRunId,
+        timestamp: now(),
+    };
+}
+
+/** TOOL_CALL_ARGS 归一：AG-UI 语义 delta 为增量追加，但部分 provider 的
+ *  tool_call_chunk.args 是「到当前为止的完整快照」（deepseek 实测如此，
+ *  2026-10-10 联调发现）。若 chunk 以已发射内容为前缀则只发射新增后缀，
+ *  否则按真增量原样透传（兼容增量式 provider）。 */
+function* toolCallArgs(
+    toolCallId: string,
+    chunk: string,
+    active: ActiveMessage,
+    state: TranslatorState,
+): Generator<AguiEvent> {
+    const emitted = state.toolCallArgsEmitted.get(toolCallId) ?? '';
+    const suffix = chunk.startsWith(emitted) ? chunk.slice(emitted.length) : chunk;
+    if (!suffix) return;
+    state.toolCallArgsEmitted.set(toolCallId, emitted + suffix);
+    yield {
+        type: EventType.TOOL_CALL_ARGS,
+        toolCallId,
+        delta: suffix,
         subagentRunId: active.subagentRunId,
         timestamp: now(),
     };

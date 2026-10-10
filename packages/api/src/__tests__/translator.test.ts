@@ -158,4 +158,51 @@ describe('translateRun golden 序列', () => {
             { id: 'a1', role: 'assistant', content: 'hello world' },
         ]);
     });
+
+    it('快照式 tool_call_chunk.args（deepseek 实测形态）归一为增量 delta', async () => {
+        // 每帧 args 为「到当前为止的完整快照」（2026-10-10 联调抓帧实测）
+        const snapshots = ['{', '{"q', '{"query', '{"query":', '{"query": "LangGraph"}'];
+        const events = [
+            msg('model_request:A', { event: 'message-start', id: 'm1' }),
+            ...snapshots.map((args) =>
+                msg('model_request:A', {
+                    event: 'content-block-delta',
+                    index: 0,
+                    delta: { type: 'block-delta', fields: { type: 'tool_call_chunk', id: 'c1', name: 'search_documentation', args } },
+                }),
+            ),
+            msg('model_request:A', { event: 'message-finish' }),
+        ];
+        const out = await collect(fakeRun(events, []));
+        // 每帧只发射新增后缀；增量式 provider 的输入不受影响（不满足前缀时原样透传）
+        expect(out).toEqual([
+            'RUN_STARTED|t1|r1',
+            'TOOL_CALL_START|c1|search_documentation|',
+            'TOOL_CALL_ARGS|c1|{',
+            'TOOL_CALL_ARGS|c1|"q',
+            'TOOL_CALL_ARGS|c1|uery',
+            'TOOL_CALL_ARGS|c1|":',
+            'TOOL_CALL_ARGS|c1| "LangGraph"}',
+            'MESSAGES_SNAPSHOT|0',
+            'RUN_FINISHED|success',
+        ]);
+    });
+
+    it('快照式 args：乱序/非前缀 chunk 原样透传（不误伤增量式 provider）', async () => {
+        const events = [
+            msg('model_request:A', { event: 'message-start', id: 'm1' }),
+            msg('model_request:A', { event: 'content-block-delta', index: 0, delta: { type: 'block-delta', fields: { type: 'tool_call_chunk', id: 'c1', name: 't', args: '{"a":1,' } } }),
+            // 不以已发射内容为前缀 → 真增量，原样透传
+            msg('model_request:A', { event: 'content-block-delta', index: 0, delta: { type: 'block-delta', fields: { type: 'tool_call_chunk', id: 'c1', args: '"b":2}' } } }),
+            msg('model_request:A', { event: 'message-finish' }),
+        ];
+        expect(await collect(fakeRun(events, []))).toEqual([
+            'RUN_STARTED|t1|r1',
+            'TOOL_CALL_START|c1|t|',
+            'TOOL_CALL_ARGS|c1|{"a":1,',
+            'TOOL_CALL_ARGS|c1|"b":2}',
+            'MESSAGES_SNAPSHOT|0',
+            'RUN_FINISHED|success',
+        ]);
+    });
 });
