@@ -1,26 +1,35 @@
 // ============================================================================
-// RunManager（P1：内存扇出版；方案 §8）
+// RunManager（P2：事件先持久化再扇出；方案 §8）
 //
+// - 事件顺序：execute 循环内 await persistence.appendEvent → 拿到 eventId
+//   （Redis Stream entry id）→ 再扇出内存订阅者。SSE 的 id: 帧即此游标，
+//   断线重连凭它回放（GET /threads/:id/events）
 // - run 与 SSE 连接解耦：订阅者断开只是退订，run 继续执行至终态（§8.3/D6）
 // - 每 thread 同时至多 1 个活跃 run（§5.1 约束，409）
 // - 进程级并发闸门 RAG_MAX_CONCURRENT_RUNS（§8.4，429）
-// - 超时 RAG_RUN_TIMEOUT_MS 强制 abort → RUN_ERROR{code:"timeout"}
-// - 取消：AbortController，语义为 RUN_ERROR{code:"cancelled"}（P1 无协议级取消事件）
-// - P2 接入 Redis Stream 持久化与断线回放时，emit() 处加 XADD 即可
+// - 超时 RAG_RUN_TIMEOUT_MS 强制 abort → RUN_ERROR{code:"timeout"}；
+//   显式取消 → RUN_ERROR{code:"cancelled"}
 // ============================================================================
 
 import { HumanMessage } from '@langchain/core/messages';
 import { EventType, type Event as AguiEvent } from '@ag-ui/core';
 import { getAgent } from './agentService.js';
 import { translateRun, type TranslatableRunStream } from './agui/translator.js';
+import type { Persistence } from './persistence/types.js';
 
 export type RunStatus = 'running' | 'finished' | 'error' | 'cancelled' | 'timeout';
 
-export type Subscriber = (event: AguiEvent) => void;
+/** 订阅者收到（事件, eventId）；eventId 为空串表示持久化降级（Redis 故障） */
+export type Subscriber = (event: AguiEvent, eventId: string) => void;
 
 export interface RunManagerConfig {
     maxConcurrentRuns: number;
     runTimeoutMs: number;
+}
+
+export interface RunManagerDeps {
+    config: RunManagerConfig;
+    persistence: Persistence;
 }
 
 export type RegisterResult =
@@ -52,11 +61,13 @@ interface ActiveRun {
 
 export class RunManager {
     private readonly active = new Map<string, ActiveRun>();
-    /** 终态快照（有界），支撑幂等 cancel / 状态查询；P2 起由 Redis 接管 */
+    /** thread 级订阅（GET /events 回放尾随用；run 级订阅给 POST /agui 的响应流） */
+    private readonly threadSubscribers = new Map<string, Set<Subscriber>>();
+    /** 终态快照（有界），支撑幂等 cancel / 状态查询 */
     private readonly finished = new Map<string, RunSnapshot>();
     private static readonly FINISHED_HISTORY_LIMIT = 256;
 
-    constructor(private readonly config: RunManagerConfig) {}
+    constructor(private readonly deps: RunManagerDeps) {}
 
     /** 占位登记（先登记后订阅再启动，保证订阅不漏首事件） */
     register(threadId: string, runId: string): RegisterResult {
@@ -65,7 +76,7 @@ export class RunManager {
                 return { ok: false, code: 'run_already_active', activeRunId: run.runId };
             }
         }
-        if (this.active.size >= this.config.maxConcurrentRuns) {
+        if (this.active.size >= this.deps.config.maxConcurrentRuns) {
             return { ok: false, code: 'too_many_concurrent' };
         }
         this.active.set(runId, {
@@ -76,6 +87,9 @@ export class RunManager {
             status: 'running',
             startedAt: Date.now(),
         });
+        void this.deps.persistence.createRun(runId, threadId).catch((error) => {
+            console.warn(`[run] createRun persist failed: ${error instanceof Error ? error.message : String(error)}`);
+        });
         return { ok: true };
     }
 
@@ -84,6 +98,20 @@ export class RunManager {
         if (!run) return undefined;
         run.subscribers.add(subscriber);
         return () => run.subscribers.delete(subscriber);
+    }
+
+    /** thread 级订阅：覆盖该 thread 下全部 run（含未来启动的）；返回退订函数 */
+    subscribeThread(threadId: string, subscriber: Subscriber): () => void {
+        let set = this.threadSubscribers.get(threadId);
+        if (!set) {
+            set = new Set();
+            this.threadSubscribers.set(threadId, set);
+        }
+        set.add(subscriber);
+        return () => {
+            set?.delete(subscriber);
+            if (set && set.size === 0) this.threadSubscribers.delete(threadId);
+        };
     }
 
     /** 启动执行（fire-and-forget；终态经事件流与 getRun 上报） */
@@ -109,6 +137,16 @@ export class RunManager {
         return run ? this.snapshot(run) : this.finished.get(runId);
     }
 
+    /** thread 的活跃 run（threads REST 的 activeRun 字段） */
+    getActiveRunByThread(threadId: string): { runId: string; status: 'running' } | null {
+        for (const run of this.active.values()) {
+            if (run.threadId === threadId && run.status === 'running') {
+                return { runId: run.runId, status: 'running' };
+            }
+        }
+        return null;
+    }
+
     /** 优雅停机用：等待活跃 run 收尾，至多 timeoutMs；返回是否全部结束 */
     async waitIdle(timeoutMs: number): Promise<boolean> {
         const deadline = Date.now() + timeoutMs;
@@ -129,47 +167,72 @@ export class RunManager {
         };
     }
 
-    private emit(run: ActiveRun, event: AguiEvent): void {
-        for (const subscriber of run.subscribers) {
+    private fanout(run: ActiveRun, event: AguiEvent, eventId: string): void {
+        const deliver = (subscriber: Subscriber) => {
             try {
-                subscriber(event);
+                subscriber(event, eventId);
             } catch (error) {
-                // 单个订阅者故障不影响 run 与其他订阅者
                 console.warn(`[run] subscriber error: ${error instanceof Error ? error.message : String(error)}`);
             }
-        }
+        };
+        for (const subscriber of run.subscribers) deliver(subscriber);
+        const threadSet = this.threadSubscribers.get(run.threadId);
+        if (threadSet) for (const subscriber of threadSet) deliver(subscriber);
     }
 
     private async execute(run: ActiveRun, query: string): Promise<void> {
         const timeout = setTimeout(() => {
             run.cancelReason = 'timeout';
             run.controller.abort();
-        }, this.config.runTimeoutMs);
+        }, this.deps.config.runTimeoutMs);
+        let lastSnapshotCount: number | undefined;
 
         try {
             const agent = getAgent();
             const stream = await agent.streamEvents(
                 { messages: [new HumanMessage(query)] },
-                { version: 'v3', signal: run.controller.signal },
+                {
+                    version: 'v3',
+                    signal: run.controller.signal,
+                    // thread_id 让 checkpointer 按 thread 恢复多轮上下文（方案 §7.3）
+                    configurable: { thread_id: run.threadId },
+                },
             );
             for await (const event of translateRun(stream as unknown as TranslatableRunStream, {
                 threadId: run.threadId,
                 runId: run.runId,
             })) {
-                this.emit(run, event);
+                // XADD 先行：拿到 eventId 再扇出，SSE id: 帧与回放游标一致；
+                // 持久化失败降级为内存直发（eventId=''，断线回放将缺失该事件——故障态可接受）
+                let eventId = '';
+                try {
+                    eventId = await this.deps.persistence.appendEvent(run.threadId, event);
+                } catch (error) {
+                    console.warn(`[run] appendEvent failed: ${error instanceof Error ? error.message : String(error)}`);
+                }
+                if (event.type === EventType.MESSAGES_SNAPSHOT) {
+                    lastSnapshotCount = (event as unknown as { messages: unknown[] }).messages.length;
+                }
+                this.fanout(run, event, eventId);
             }
             run.status = 'finished';
         } catch (error) {
-            // streamEvents/translate 抛出（含 abort）：统一转 RUN_ERROR 终态事件
             run.status = run.cancelReason === 'timeout' ? 'timeout' : run.cancelReason === 'cancelled' ? 'cancelled' : 'error';
             run.error = error instanceof Error ? error.message : String(error);
             const code = run.status === 'error' ? 'server_error' : run.status;
-            this.emit(run, {
+            const terminalEvent: AguiEvent = {
                 type: EventType.RUN_ERROR,
                 message: run.error,
                 code,
                 timestamp: Date.now(),
-            });
+            };
+            let eventId = '';
+            try {
+                eventId = await this.deps.persistence.appendEvent(run.threadId, terminalEvent);
+            } catch {
+                // 持久化已故障，warn 已在 appendEvent 内或此处降级
+            }
+            this.fanout(run, terminalEvent, eventId);
         } finally {
             clearTimeout(timeout);
             run.endedAt = Date.now();
@@ -178,6 +241,14 @@ export class RunManager {
             if (this.finished.size > RunManager.FINISHED_HISTORY_LIMIT) {
                 const oldest = this.finished.keys().next().value;
                 if (oldest !== undefined) this.finished.delete(oldest);
+            }
+            void this.deps.persistence
+                .finishRun(run.runId, run.status, run.error)
+                .catch(() => undefined);
+            if (lastSnapshotCount !== undefined) {
+                void this.deps.persistence
+                    .updateMessageCount(run.threadId, lastSnapshotCount)
+                    .catch(() => undefined);
             }
         }
     }

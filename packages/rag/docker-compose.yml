@@ -13,9 +13,10 @@ services:
       QDRANT__SERVICE__GRPC_PORT: 6334
 
   # API 服务的事件日志/会话元数据/LangGraph checkpoint（api-service-plan.md §7）
+  # 必须 Redis ≥ 8：langgraph-checkpoint-redis 依赖 RedisJSON（JSON.GET/SET）
   # 缓存语义：TTL 管生命周期，不开 AOF；数据可随索引重建
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     container_name: rag-redis
     restart: unless-stopped
     ports:

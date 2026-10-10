@@ -18,7 +18,7 @@
 | M6 | 2026-08-17 | 工程加固：参数化 + 单元测试 + 配置收敛 | `3aa743e`、`7d4178a`、`f35bae4` | ✅ 171 测试全绿 |
 | M7 | 2026-08-18 | 切分管道：类型识别 + Splitter 插件化 + 统一 Chunk 契约 | `d4cee6a`、`e34694e` | ✅ A/B 通过，md-header-v2 成为默认 |
 | M8 | 2026-09-22 | Rerank 弃答闸门：abstention 信号从 dense cosine 切换为 cross-encoder | — | ✅ 误杀 19/37 → 0/37，成为生产默认 |
-| M9 | 2026-10-10 ~ | API 服务化：Koa + AG-UI 事件流 + Redis 断线续传（独立包 `packages/api`） | — | 🚧 P0-P1 完成（AG-UI 事件流可用），P2-P3 进行中 |
+| M9 | 2026-10-10 ~ | API 服务化：Koa + AG-UI 事件流 + Redis 断线续传（独立包 `packages/api`） | — | 🚧 P0-P2 完成（断线续传可用），P3 进行中 |
 
 **当前生产配置**：hybrid-rewrite 检索策略（M4）+ `md-header-v2` 切分（M7，collection `langchain_docs_mdheader`）+ rerank 弃答闸门（M8，`qwen3-rerank` @0.52，排序不变）。
 
@@ -127,7 +127,17 @@
 - **风险 1 前置验证闭环**（探针 `scripts/probe-v3-stream.ts`）：`deepseek-v4-flash` 确认输出 reasoning_content（REASONING_MESSAGE_* 有真实内容）；实测两个坑——tool-finished 无 tool_name（在 output.name）、task 委派的输出是 LangGraph Command（内容在 update.messages 末条）而非 ToolMessage，translator 均已兼容。
 - 验证：递归 typecheck 全绿；测试 194 全绿（rag 175 + api 19：translator golden ×3、/agui 路由 ×6 含断开续跑与 cancel 幂等）；真实冒烟（"什么是langchain"）：完整事件序列、SUBAGENT_STARTED/FINISHED 严格配对（23/23）、断开 SSE 后 run 存活（同 thread 409）、cancel 终态 cancelled。
 
-**待实施**：P2 持久化与断线续传（Redis 事件日志 + checkpointer + threads REST + `GET /threads/:id/events` 回放尾随）→ P3 加固（trace CUSTOM 事件、日志压缩、鉴权）。
+**P2 持久化与断线续传（2026-10-10 完成）**：
+
+- **事件日志**（`persistence/`：types 契约 + memory（测试 fake）+ redis 实现）：`rag:thread:{id}:events`（Stream，entry id 即续传游标）、`rag:thread:{id}:meta`（Hash）、`rag:run:{runId}`（TTL 24h）、`rag:index:threads`（ZSet）。RunManager 改为 **XADD 先行再扇出**——SSE `id:` 帧即游标，持久化失败降级内存直发。
+- **断线续传端点** `GET /threads/:id/events?afterEventId=`：先订阅（防回放丢事件）→ XRANGE 回放 → 按 eventId 去重 → 实时尾随至终态关流；无活跃 run 发完即关。
+- **threads REST**：POST /threads（显式建档）、GET 列表（activeRun/status）、GET 详情、GET /messages（最近 MESSAGES_SNAPSHOT）、DELETE（含 checkpoint 清理，ShallowRedisSaver 自带 deleteThread）；POST /agui 自动建档 + title 回填首问摘要。
+- **checkpointer**：ShallowRedisSaver 挂入 createRagAgent，invoke 传 `configurable.thread_id`；初始化失败降级为无持久化单轮模式（启动日志可见）。
+- **重启语义**：启动扫描 `rag:run:*` running → interrupted + SETNX 幂等补发 `RUN_ERROR{code:"server_restart"}`。
+- **实施发现（重要）**：`@langchain/langgraph-checkpoint-redis` 依赖 **RedisJSON**（JSON.GET/SET）——标准 Redis 7 报 `unknown command 'JSON.GET'`，compose 镜像升级为 `redis:8-alpine`（开源版已内置 JSON 模块）后解决。
+- 验证：测试 206 全绿（rag 175 + api 31，含真实 Redis 集成 4 例、回放/尾随/两轮对话/删除等 12 新例）；真实验收——刷新回放（断开时 1729 事件 → 重连回放+尾随至 FINISHED、id 零重复）、两轮对话（第二轮复述首问 + 首轮 `/retrieved/` 文件跨轮可读，风险 3 闭环）、kill -9 重启（interrupted 标记 + server_restart 补发 + 同 thread 可续问）。
+
+**待实施**：P3 加固（retrieval.trace CUSTOM 事件、长会话日志压缩、鉴权挂载）。
 
 ---
 

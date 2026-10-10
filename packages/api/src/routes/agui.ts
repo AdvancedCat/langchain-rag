@@ -10,6 +10,7 @@ import Router from '@koa/router';
 import { RunAgentInputSchema } from '@ag-ui/core/schemas';
 import { getAgentState } from '../agentService.js';
 import type { RunManager } from '../runManager.js';
+import type { Persistence } from '../persistence/types.js';
 import { initSSE, startHeartbeat, writeEvent } from '../sse.js';
 import { EventEncoder } from '@ag-ui/encoder';
 
@@ -47,10 +48,11 @@ function extractLastUserQuery(messages: unknown): string | undefined {
 
 export interface AguiRouterDeps {
     runManager: RunManager;
+    persistence: Persistence;
     sseHeartbeatMs: number;
 }
 
-export function createAguiRouter({ runManager, sseHeartbeatMs }: AguiRouterDeps): Router {
+export function createAguiRouter({ runManager, persistence, sseHeartbeatMs }: AguiRouterDeps): Router {
     const router = new Router();
 
     router.post('/agui', async (ctx) => {
@@ -74,6 +76,17 @@ export function createAguiRouter({ runManager, sseHeartbeatMs }: AguiRouterDeps)
         if (!query) {
             ctx.status = 400;
             ctx.body = { error: { code: 'no_user_message', message: 'RunAgentInput.messages must contain at least one user message' } };
+            return;
+        }
+
+        // thread 自动建档（title 缺省回填首问摘要，方案 §5.2）
+        try {
+            await persistence.ensureThread(threadId, { title: query.slice(0, 50) });
+        } catch (error) {
+            ctx.status = 503;
+            ctx.body = {
+                error: { code: 'persistence_unavailable', message: error instanceof Error ? error.message : String(error) },
+            };
             return;
         }
 
@@ -116,8 +129,8 @@ export function createAguiRouter({ runManager, sseHeartbeatMs }: AguiRouterDeps)
             if (!res.writableEnded) res.end();
         };
 
-        const unsubscribe = runManager.subscribe(runId, (event) => {
-            writeEvent(res, encoder, event);
+        const unsubscribe = runManager.subscribe(runId, (event, eventId) => {
+            writeEvent(res, encoder, event, eventId || undefined);
             if (event.type === 'RUN_FINISHED' || event.type === 'RUN_ERROR') {
                 finish();
             }

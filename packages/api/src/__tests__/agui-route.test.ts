@@ -44,6 +44,7 @@ vi.mock('../agentService.js', () => ({
             Promise.resolve(makeFakeStream(config?.signal)),
     }),
     warmupAgent: vi.fn(),
+    getCheckpointer: vi.fn(async () => ({ deleteThread: vi.fn() })),
 }));
 
 vi.mock('../redis.js', () => ({
@@ -54,6 +55,7 @@ vi.mock('../redis.js', () => ({
 
 import { createApp } from '../app.js';
 import type { RunManager } from '../runManager.js';
+import { createMemoryPersistence } from '../persistence/memory.js';
 
 let server: Server | undefined;
 let runManager: RunManager | undefined;
@@ -72,7 +74,7 @@ afterEach(async () => {
 });
 
 async function listen(): Promise<string> {
-    const created = createApp();
+    const created = createApp({ persistence: createMemoryPersistence() });
     runManager = created.runManager;
     server = created.app.listen(0, '127.0.0.1');
     await once(server, 'listening');

@@ -31,8 +31,10 @@ export function startHeartbeat(res: ServerResponse, intervalMs: number): () => v
     return () => clearInterval(timer);
 }
 
-/** SSE 帧写出（单个 AG-UI 事件）；连接已关则丢弃 */
-export function writeEvent(res: ServerResponse, encoder: EventEncoder, event: unknown): void {
+/** SSE 帧写出（单个 AG-UI 事件）；eventId 非空时前置 id: 行（续传游标，
+ *  标准 AG-UI 客户端按规范忽略，EventSource 类客户端可借其自动重连） */
+export function writeEvent(res: ServerResponse, encoder: EventEncoder, event: unknown, eventId?: string): void {
     if (res.writableEnded || res.destroyed) return;
-    res.write(encoder.encodeSSE(event as Parameters<EventEncoder['encodeSSE']>[0]));
+    const frame = encoder.encodeSSE(event as Parameters<EventEncoder['encodeSSE']>[0]);
+    res.write(eventId ? `id: ${eventId}\n${frame}` : frame);
 }

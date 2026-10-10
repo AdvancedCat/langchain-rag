@@ -25,6 +25,9 @@ importers:
       '@langchain/core':
         specifier: ^1.2.5
         version: 1.2.5(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(ws@8.21.3)
+      '@langchain/langgraph-checkpoint':
+        specifier: ^1.1.6
+        version: 1.1.6(@langchain/core@1.2.5(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(ws@8.21.3))
       '@langchain/langgraph-checkpoint-redis':
         specifier: ^1.0.12
         version: 1.0.12(@langchain/core@1.2.5(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(ws@8.21.3))(@langchain/langgraph-checkpoint@1.1.6(@langchain/core@1.2.5(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(ws@8.21.3)))

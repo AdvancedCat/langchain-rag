@@ -215,7 +215,7 @@ make infra-up
 # 或 docker compose up -d
 ```
 
-Qdrant 监听 `http://localhost:6333`（向量库），Redis 监听 `localhost:6379`（API 服务的事件日志与 checkpoint，仅 `packages/api` 使用）。
+Qdrant 监听 `http://localhost:6333`（向量库），Redis 监听 `localhost:6379`（API 服务的事件日志与 checkpoint，仅 `packages/api` 使用；**必须 Redis ≥ 8**——checkpoint 依赖 RedisJSON 模块，镜像已用 `redis:8-alpine`）。
 
 ### 4. 索引文档 + 启动问答
 
@@ -236,7 +236,7 @@ pnpm run serve        # packages/api，默认 http://localhost:3000
 curl localhost:3000/ready   # agent 单例 + Redis 就绪探针
 ```
 
-API 服务基于 Koa + AG-UI 协议向前端暴露流式问答事件（流式正文/Reasoning/工具调用/子代理进度），断线续传（Redis 事件日志持久化）随 M9-P2 落地。技术方案与实施进度见 [packages/rag/docs/api-service-plan.md](packages/rag/docs/api-service-plan.md)（M9，实施中——P0 基座 + P1 AG-UI 事件流已完成）。
+API 服务基于 Koa + AG-UI 协议向前端暴露流式问答事件（流式正文/Reasoning/工具调用/子代理进度），支持断线续传（Redis Stream 事件日志：页面刷新后 `GET /threads/:id/events?afterEventId=<游标>` 回放+续流）与多轮会话（LangGraph checkpoint 按 thread 持久化）。技术方案与实施进度见 [packages/rag/docs/api-service-plan.md](packages/rag/docs/api-service-plan.md)（M9，实施中——P0-P2 已完成，P3 加固待做）。
 
 ```bash
 # 触发一次问答（AG-UI v1.0 SSE binding）
@@ -349,7 +349,7 @@ langchain-rag/
 | Rerank | DashScope `qwen3-rerank`（Cross-encoder，可插拔，实验性） |
 | 稀疏检索 | 纯内存 BM25（中文 unigram + 英文驼峰/连字符拆分） |
 | 文档切分 | 插件化切分管道（TypeDetector + ChunkValidator）；自研 Markdown header 切分核 `md-header-v2`（h1-h2 + 超长 section 字符级二级切分） |
-| 测试 | Vitest（194 用例，覆盖 chunking / BM25 / fusion / MMR / metrics / API 配置、AG-UI 翻译与路由） |
+| 测试 | Vitest（206 用例，覆盖 chunking / BM25 / fusion / MMR / metrics / API 配置、AG-UI 翻译、路由与 Redis 持久化集成） |
 | 运行时 | Node.js + tsx（TypeScript native ESM） |
 | 包管理 | pnpm workspace |
 

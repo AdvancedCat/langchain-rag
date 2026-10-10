@@ -1,6 +1,6 @@
 # API 服务化改造（Koa + AG-UI + 断线续传）技术方案
 
-> 状态：**实施中（2026-10-10）**——P0 基座、P1 AG-UI 事件流已完成（见 §11 与 Milestone M9），P2-P3 待实施；实施后按惯例回填结果与本文件状态。
+> 状态：**实施中（2026-10-10）**——P0 基座、P1 AG-UI 事件流、P2 持久化与断线续传已完成（见 §11 与 Milestone M9），P3 待实施；实施后按惯例回填结果与本文件状态。
 > 范围：仅后端 RAG 服务改造与前端对接契约；前端界面另行设计（分支 `feat/frontend`）。
 
 ## 1. 背景与目标
@@ -305,7 +305,7 @@ packages/api/                        # @langchain-rag/api（新包）
 - **跨包装配**：`docs-rag-agent: workspace:*` 经 pnpm 符号链接解析到 rag TS 源，tsx 运行时直接执行、tsc `bundler` 解析可类型检查；rag 的传递依赖（deepagents、@langchain/*）从 `packages/rag/node_modules` 就近解析，无需在 api 重复声明；
 - **env 级联加载**：api 启动先加载自身 `.env`，再以不覆盖（override: false）方式加载 `../rag/.env` 补齐 LLM/Embedding/Qdrant/Retrieval 配置——现有 `.env` 不搬家，新增服务变量就近放 `packages/api/.env`；
 - **脚本**：api 增 `"serve": "tsx src/index.ts"`、`"typecheck"`、`"test"`；根 package.json 增 `"serve": "pnpm --filter @langchain-rag/api run serve"`（`pnpm typecheck`/`pnpm test` 根脚本本就递归，自然覆盖新包）；
-- **基础设施**：`docker-compose.yml` 仍在 `packages/rag`（共享数据设施定位不变），追加 `redis:7-alpine`（`6379`，AOF 关闭——缓存语义，TTL 管生命周期）；
+- **基础设施**：`docker-compose.yml` 仍在 `packages/rag`（共享数据设施定位不变），追加 **`redis:8-alpine`**（`6379`；≥8 为硬约束——checkpointer 依赖 RedisJSON；AOF 关闭——缓存语义，TTL 管生命周期）；
 - **同步维护**：AGENTS.md 包表与常用命令、根 README（P0 一并更新）；本方案文档按 AGENTS.md 惯例继续留在 `packages/rag/docs/`。
 
 ## 10. 测试与验收
@@ -326,7 +326,7 @@ packages/api/                        # @langchain-rag/api（新包）
 |---|---|---|
 | P0 基座 ✅（2026-10-10） | 脚手架 `packages/api`（package.json / tsconfig / vitest / .env.example）、rag 增库导出（barrel + exports）与 `checkpointer` 参数（暂不启用）、compose 加 redis、Koa 骨架 + health/ready、agent 单例服务化；同步 AGENTS.md 包表与根 README | `/ready` 200，CLI 回归不变，根递归 typecheck/test 覆盖新包 —— **已达成**（185 测试全绿：rag 175 + api 10） |
 | P1 AG-UI 事件流 ✅（2026-10-10） | translator、RunManager（内存扇出，暂不持久化）、`POST /agui` + SSE、cancel 端点 | curl 全事件序列冒烟通过 —— **已达成**（真实问答：RUN_STARTED → REASONING 流（deepseek-v4-flash 确认输出 reasoning_content）→ TEXT 流 → 流式 TOOL_CALL → SUBAGENT_STARTED/FINISHED 配对 → MESSAGES_SNAPSHOT → RUN_FINISHED；断开 SSE 后 run 存活（409 验证）、cancel 收流 RUN_ERROR{code:cancelled}） |
-| P2 持久化与续传 | Redis eventStore + checkpointer、threads REST、`GET /events` 回放尾随、重启语义 | 验收 2/3 两条通过 |
+| P2 持久化与续传 ✅（2026-10-10） | Redis eventStore + checkpointer、threads REST、`GET /events` 回放尾随、重启语义 | 验收 2/3 两条通过 —— **已达成**：①刷新——run 进行中断开 SSE（已收 1729 事件）→ `GET /events?afterEventId=0` 回放前缀+实时尾随至 RUN_FINISHED，id 帧零重复；②两轮对话——第二轮准确复述首问（checkpointer 历史恢复），第一轮 `/retrieved/` 文件第二轮仍可访问（§12 风险 3 闭环）；③重启——kill -9 后重启，run 置 interrupted 并补发 `RUN_ERROR{server_restart}`，同 thread 新 run 可继续。**实施发现：langgraph-checkpoint-redis 依赖 RedisJSON（JSON.GET/SET），Redis 必须 ≥ 8（开源版内置 JSON 模块），compose 已从 7-alpine 升级** |
 | P3 加固与打磨 | cancel/超时/信号量/CORS、trace CUSTOM 事件、日志压缩、测试补齐、文档回填 + Milestone M9 登记 | §10 全表绿 |
 
 依赖关系串行；P1 结束即可给前端提供可联调的 mock 契约（本文件 §5/§6 即契约源）。
@@ -337,7 +337,7 @@ packages/api/                        # @langchain-rag/api（新包）
 |---|---|---|
 | 1 | deepagents v3 流的确切事件形状与文档表述有出入（`.reasoning`、子代理流挂载点）；且 `deepseek-v4-flash` 是否输出 `reasoning_content` 未验证——协议与解析链路已就绪，但模型不输出则 `REASONING_*` 事件为空（前端以 `write_todos` + 主代理文本流近似呈现规划过程） | P1 首日用最小脚本实测确认两者，translator 隔离在纯函数层，变更不影响契约 |
 | 2 | DashScope TPM 限流在并发 run 下放大（多 run 各自 embedding/rewrite） | 并发闸门 4 + 既有 maxRetries；上线后观察 429，必要时降到 2 或引入 run 排队 |
-| 3 | StateBackend 与 checkpointer 组合下 `/retrieved/` 文件跨轮恢复行为未实测 | P2 首个验证项；异常则降级为「文件仅本轮可见」（对答案正确性无影响，仅影响跨轮引用） |
+| 3 | StateBackend 与 checkpointer 组合下 `/retrieved/` 文件跨轮恢复行为未实测 | **P2 已实测闭环（2026-10-10）**：跨轮对话中第二轮可 ls/读取第一轮的 `/retrieved/` 目录与文件 |
 | 4 | Redis 成为新单点（宕机 = 无法问答） | v1 接受（本地 compose，restart: unless-stopped）；事件日志有 TTL 自愈，checkpoints 丢失仅丢会话历史 |
 | 5 | 开放：BM25 未就绪时是否降级纯 dense 而非 503 | 倾向 v1 不降级（检索行为一致性优先），有诉求再开开关 |
 | 6 | 开放：长会话事件日志膨胀 | P3 的压缩折叠（§7.2）+ TTL 兜底；更长期可导出 PG/对象存储做审计 |

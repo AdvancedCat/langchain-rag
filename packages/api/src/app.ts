@@ -1,5 +1,5 @@
 // ============================================================================
-// Koa 应用装配（与监听分离，便于测试直接 import createApp）
+// Koa 应用装配（与监听分离，便于测试直接 import createApp 并注入内存持久化）
 // ============================================================================
 
 import Koa from 'koa';
@@ -9,6 +9,9 @@ import { getApiServerConfig, type ApiServerConfig } from './config.js';
 import { RunManager } from './runManager.js';
 import { createHealthRouter } from './routes/health.js';
 import { createAguiRouter } from './routes/agui.js';
+import { createThreadsRouter } from './routes/threads.js';
+import { createRedisPersistence } from './persistence/redis.js';
+import type { Persistence } from './persistence/types.js';
 
 /** 统一错误体：{"error":{"code":…,"message":…}}（方案 §5 约定） */
 export interface ApiErrorBody {
@@ -36,16 +39,25 @@ export interface CreateAppResult {
     app: Koa;
     config: ApiServerConfig;
     runManager: RunManager;
+    persistence: Persistence;
 }
 
-export function createApp(): CreateAppResult {
+export interface CreateAppOptions {
+    /** 测试注入内存实现；缺省为 Redis 实现（事件日志/元数据，方案 §7） */
+    persistence?: Persistence;
+}
+
+export function createApp(options: CreateAppOptions = {}): CreateAppResult {
     const config = getApiServerConfig();
     const app = new Koa();
     // tsx 直跑（非 npm 脚本上下文）时 npm_package_version 不存在，读 package.json 兜底
     const require = createRequire(import.meta.url);
+    const persistence =
+        options.persistence ??
+        createRedisPersistence({ redisUrl: config.redisUrl, threadTtlHours: config.threadTtlHours });
     const runManager = new RunManager({
-        maxConcurrentRuns: config.maxConcurrentRuns,
-        runTimeoutMs: config.runTimeoutMs,
+        config: { maxConcurrentRuns: config.maxConcurrentRuns, runTimeoutMs: config.runTimeoutMs },
+        persistence,
     });
 
     app.use(corsMiddleware(config.corsOrigins));
@@ -76,6 +88,15 @@ export function createApp(): CreateAppResult {
     app.use(
         createAguiRouter({
             runManager,
+            persistence,
+            sseHeartbeatMs: config.sseHeartbeatMs,
+        }).routes(),
+    );
+
+    app.use(
+        createThreadsRouter({
+            runManager,
+            persistence,
             sseHeartbeatMs: config.sseHeartbeatMs,
         }).routes(),
     );
@@ -86,5 +107,5 @@ export function createApp(): CreateAppResult {
         ctx.body = { error: { code: 'not_found', message: `no route: ${ctx.method} ${ctx.path}` } };
     });
 
-    return { app, config, runManager };
+    return { app, config, runManager, persistence };
 }

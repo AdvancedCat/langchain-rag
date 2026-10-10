@@ -18,7 +18,7 @@ pnpm（`pnpm@10.7.0`）monorepo，TypeScript ESM（`"type": "module"`）。基�
 # 根目录
 pnpm install              # 安装依赖
 pnpm typecheck            # 递归 tsc --noEmit
-pnpm test                 # 递归 vitest run（当前 194 个用例，必须全绿）
+pnpm test                 # 递归 vitest run（当前 206 个用例，必须全绿）
 pnpm rag                  # 启动 RAG agent（交互问答）
 pnpm rag:index            # 仅构建/更新向量索引
 pnpm serve                # 启动 API 服务（packages/api，默认 :3000，/health /ready）
@@ -39,7 +39,7 @@ make eval STRATEGY=hybrid-rewrite TOP_K=4   # 带参数评测，详见 make help
 - 运行前需要 `packages/rag/.env`（由 `.env.example` 复制）：`DEEPSEEK_API_KEY`（Chat/Query Rewrite）、`DASHSCOPE_API_KEY`（embedding `qwen3.7-text-embedding`、rerank）、`QDRANT_URL`/`QDRANT_COLLECTION`。
 - API 服务（`packages/api`）另读自身 `.env`（`PORT`/`REDIS_URL` 等，见其 `.env.example`），并级联加载 `packages/rag/.env` 补齐检索/LLM 配置（不覆盖）。
 - 向量库 **Qdrant**，选型决策见 `packages/rag/docs/vector-db-selection-report.md`。默认 collection `langchain_docs_mdheader`（`md-header-v2` 切分，2858 chunks）。
-- **Redis**（`packages/rag/docker-compose.yml` 一并启动）：API 服务的事件日志/会话元数据/LangGraph checkpoint（`api-service-plan.md` §7）。
+- **Redis**（`packages/rag/docker-compose.yml` 一并启动，**必须 ≥ 8**：langgraph-checkpoint-redis 依赖 RedisJSON）：API 服务的事件日志/会话元数据/LangGraph checkpoint（`api-service-plan.md` §7）。
 - 检索参数统一走 `RETRIEVAL_*` 环境变量 → `packages/rag/src/config.ts` 的 `RetrievalConfig`，不要在代码里硬编码。
 
 ## 架构速览（packages/rag/src）
