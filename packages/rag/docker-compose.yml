@@ -12,5 +12,14 @@ services:
       QDRANT__SERVICE__HTTP_PORT: 6333
       QDRANT__SERVICE__GRPC_PORT: 6334
 
+  # API 服务的事件日志/会话元数据/LangGraph checkpoint（api-service-plan.md §7）
+  # 缓存语义：TTL 管生命周期，不开 AOF；数据可随索引重建
+  redis:
+    image: redis:7-alpine
+    container_name: rag-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
 volumes:
   qdrant_storage:

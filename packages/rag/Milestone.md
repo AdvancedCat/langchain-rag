@@ -18,6 +18,7 @@
 | M6 | 2026-08-17 | 工程加固：参数化 + 单元测试 + 配置收敛 | `3aa743e`、`7d4178a`、`f35bae4` | ✅ 171 测试全绿 |
 | M7 | 2026-08-18 | 切分管道：类型识别 + Splitter 插件化 + 统一 Chunk 契约 | `d4cee6a`、`e34694e` | ✅ A/B 通过，md-header-v2 成为默认 |
 | M8 | 2026-09-22 | Rerank 弃答闸门：abstention 信号从 dense cosine 切换为 cross-encoder | — | ✅ 误杀 19/37 → 0/37，成为生产默认 |
+| M9 | 2026-10-10 ~ | API 服务化：Koa + AG-UI 事件流 + Redis 断线续传（独立包 `packages/api`） | — | 🚧 P0 基座完成，P1-P3 进行中 |
 
 **当前生产配置**：hybrid-rewrite 检索策略（M4）+ `md-header-v2` 切分（M7，collection `langchain_docs_mdheader`）+ rerank 弃答闸门（M8，`qwen3-rerank` @0.52，排序不变）。
 
@@ -103,6 +104,22 @@
 - 验证：typecheck + 175 测试全绿（+4 配置用例）。已知边界：q043/q039 级深度混淆（rerank 0.92/0.89）为 score 闸门天花板，Abstention → 100% 需 LLM judge。详见 [docs/rerank-abstention-gate-plan.md](./docs/rerank-abstention-gate-plan.md)。
 - **附带修复（重要）**：冒烟暴露 `rewriteQuery`/`generateMultiQueries` 用 `content.toString()` 提取 LLM 响应——agent 进程内共享 ChatOpenAI 实例返回多段 content block 数组时退化为 `"[object Object]"` 垃圾查询，导致在线检索 query 无关（dense 恒 0.5518）。新增 `extractTextContent()` 兼容两种形态，闸门决策日志（`🚪 Gate:`）常驻便于观测。
 - **评审加固（2026-09-25，ocr 评审）**：① rerank 200 但空结果的退化响应原先会令 bestScore=0 恒弃答，现按 API 失败走 dense 回退；② gate 与 MMR 增设 config 互斥守卫——MMR 只返回 topK 多样性筛选结果，会饿死 fetchK 闸门候选池；③ `extractTextContent` 对未识别 content 形态告警，防静默降级重演；④ 融合 rerank 与闸门同开时同一候选池双调用为已知成本（pipeline 打分用改写后 query、闸门用原始 query，信号不同不可复用），以启动日志与计划文档 §4.2 记录。
+
+---
+
+## M9（2026-10-10 ~，进行中）API 服务化：Koa + AG-UI + Redis 断线续传
+
+**技术方案**：[docs/api-service-plan.md](./docs/api-service-plan.md)（事件映射、API 契约、持久化模型、P0-P3 分阶段计划）。本条目随各阶段落地滚动更新，全部完成后终稿。
+
+**P0 基座（2026-10-10 完成）**：
+
+- 新增独立包 `packages/api`（`@langchain-rag/api`）：Koa 骨架 + CORS + 统一错误体 + `/health` `/ready` 探针 + 优雅停机；agent 进程内单例（构建失败不缓存、探针触发重建）；Redis 懒连接客户端（compose 新增 `redis:7-alpine`）。依赖单向 `api → rag`（`workspace:*` + rag `exports` 直指 TS 源，no-build）。
+- rag 侧最小改动两处：新增库入口 `src/index.ts`（barrel：`createRagAgent` / `RagAgent` / `getRetrievalConfig`）；`createRagAgent` 参数化（`{forceRebuild?, checkpointer?}`，checkpointer 为 M9-P2 预留，CLI 不传行为零变化）。显式依赖 `@langchain/langgraph-checkpoint`（checkpointer 类型引入）。
+- env 级联：api 先读自身 `.env`，再以不覆盖方式补读 `packages/rag/.env`（冒烟验证 28 项注入）。
+- 验证：递归 typecheck 全绿；测试 185 全绿（rag 175 不变 + api 10 新增）；冒烟 `pnpm serve` → `/ready` 200（agent 单例 + BM25 热启动 + Redis）；CLI 回归（`pnpm rag "什么是langchain"`）完整问答链路不变。
+- 检索/切分/评测路径零改动，无需 A/B（变更纪律 §1-3 不触发）。
+
+**待实施**：P1 AG-UI 事件流（translator + `POST /agui`）→ P2 持久化与断线续传（Redis 事件日志 + checkpointer + threads REST）→ P3 加固（cancel/超时/并发闸门/trace 事件）。
 
 ---
 

@@ -182,7 +182,7 @@ make eval-gen LIMIT=5 SAVE=my-baseline.json
 
 - Node.js ≥ 18
 - pnpm ≥ 10
-- Docker（用于启动 Qdrant）
+- Docker（用于启动 Qdrant / Redis）
 - DeepSeek API Key（Chat 模型）
 - DashScope API Key（Embedding + Rerank）
 
@@ -207,7 +207,7 @@ cp .env.example .env
 - `DEEPSEEK_API_KEY` — [DeepSeek](https://platform.deepseek.com/) Chat 模型 API Key
 - `DASHSCOPE_API_KEY` — [阿里云 DashScope](https://platform.qianwenai.com/home/api-keys) Embedding API Key
 
-### 3. 启动 Qdrant 向量数据库
+### 3. 启动基础设施（Qdrant + Redis）
 
 ```bash
 # 在 packages/rag 目录下
@@ -215,7 +215,7 @@ make infra-up
 # 或 docker compose up -d
 ```
 
-Qdrant 会监听在 `http://localhost:6333`。
+Qdrant 监听 `http://localhost:6333`（向量库），Redis 监听 `localhost:6379`（API 服务的事件日志与 checkpoint，仅 `packages/api` 使用）。
 
 ### 4. 索引文档 + 启动问答
 
@@ -229,6 +229,15 @@ pnpm run rag         # 启动交互式问答
 
 > **语料来源与版权**：文档语料在运行时从 [docs.langchain.com](https://docs.langchain.com/) 按需抓取，版权归 LangChain 所有，本仓库不随包分发语料原文。`evals/baselines/` 评测结果文件中因复现需要嵌入了少量检索命中的文档片段（chunk），仅用于指标归因分析。
 
+### 5.（可选）启动 API 服务
+
+```bash
+pnpm run serve        # packages/api，默认 http://localhost:3000
+curl localhost:3000/ready   # agent 单例 + Redis 就绪探针
+```
+
+API 服务基于 Koa + AG-UI 协议向前端暴露流式问答事件，支持断线续传（事件日志持久化于 Redis）。技术方案与实施进度见 [packages/rag/docs/api-service-plan.md](packages/rag/docs/api-service-plan.md)（M9，实施中——当前 P0 基座：health/ready + agent 单例服务化；问答事件流随后续阶段接入）。
+
 ---
 
 ## 项目结构
@@ -238,9 +247,10 @@ Monorepo 使用 pnpm workspace 管理：
 ```
 langchain-rag/
 ├── packages/
-│   ├── rag/                        # 📦 核心 RAG Agent 包
+│   ├── rag/                        # 📦 核心 RAG Agent 包（检索/切分/评测基座）
 │   │   ├── src/
-│   │   │   ├── agent.ts            # 主入口：CLI + 流式事件渲染
+│   │   │   ├── index.ts            # 库入口（barrel）：createRagAgent 等，供 api 包导入
+│   │   │   ├── agent.ts            # CLI 入口：交互问答 / --index-only 索引
 │   │   │   ├── config.ts           # 环境变量解析与边界校验
 │   │   │   ├── embeddings.ts       # 千问 Embedding 工厂
 │   │   │   ├── vectorStore.ts      # Qdrant 向量存储（连接/索引/热启动守卫）
@@ -254,7 +264,7 @@ langchain-rag/
 │   │   │   ├── ingestion/          # 📥 离线索引链路
 │   │   │   │   └── index.ts        #   文档抓取 → 切分 → Embedding → 索引
 │   │   │   └── retrieval/          # 🔍 在线召回链路
-│   │   │       ├── index.ts        #   RAG Agent 构建
+│   │   │       ├── index.ts        #   RAG Agent 构建（可选 checkpointer）
 │   │   │       ├── pipeline.ts     #   检索管线编排（融合/截断）
 │   │   │       ├── retrievers/     #   Dense / BM25 / Hybrid 检索器
 │   │   │       ├── transformers/   #   Query Rewrite / Multi-Query
@@ -268,7 +278,17 @@ langchain-rag/
 │   │   ├── docs/                   # 设计文档（计划 + 回填结果）
 │   │   ├── Milestone.md            # 里程碑记录（重要特性变更同步维护）
 │   │   ├── Makefile                # 开发/评测命令入口
-│   │   ├── docker-compose.yml      # 本地 Qdrant
+│   │   ├── docker-compose.yml      # 本地基础设施：Qdrant + Redis
+│   │   └── .env.example
+│   ├── api/                        # 📦 API 服务包（@langchain-rag/api，M9 实施中）
+│   │   ├── src/
+│   │   │   ├── index.ts            # 服务入口：env 级联 → Koa 监听 → agent 预热
+│   │   │   ├── app.ts              # 应用装配（CORS / 错误体 / 路由）
+│   │   │   ├── config.ts           # 服务配置（PORT / REDIS_URL / 并发闸门…）
+│   │   │   ├── env.ts              # .env 级联加载（自身 + rag）
+│   │   │   ├── agentService.ts     # agent 进程内单例
+│   │   │   ├── redis.ts            # Redis 客户端（懒连接）
+│   │   │   └── routes/             # health / ready（AG-UI 与会话路由随 P1/P2 接入）
 │   │   └── .env.example
 │   └── libs/                       # 📦 跨包共享工具
 │       └── llm-provider.ts         #   统一 LLM 工厂
@@ -303,7 +323,7 @@ langchain-rag/
 | `INGESTION_MAX_HEADER_DEPTH` | `2` | Markdown header 切分深度（h1-h2） |
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | `1000` / `200` | 超长 section 的二级字符切分参数 |
 
-完整配置见 [packages/rag/.env.example](packages/rag/.env.example) 和 [packages/rag/src/config.ts](packages/rag/src/config.ts)。
+完整配置见 [packages/rag/.env.example](packages/rag/.env.example) 和 [packages/rag/src/config.ts](packages/rag/src/config.ts)。API 服务另有 `PORT` / `REDIS_URL` / `RAG_MAX_CONCURRENT_RUNS` 等服务配置（见 [packages/api/.env.example](packages/api/.env.example)，检索/LLM 配置自动级联自 rag 的 `.env`）。
 
 ---
 
@@ -313,13 +333,14 @@ langchain-rag/
 |----|------|
 | Agent 框架 | [deepagents](https://www.npmjs.com/package/deepagents) v1.x + LangChain 1.x |
 | 编排运行时 | LangGraph（subagent streaming / StateBackend） |
+| API 服务 | Koa + [AG-UI 协议](https://docs.ag-ui.com)（流式事件 / 断线续传，M9 实施中） |
 | 向量存储 | [Qdrant](https://qdrant.tech/)（本地 Docker 部署，[选型报告](packages/rag/docs/vector-db-selection-report.md)） |
 | Embedding | 千问 `qwen3.7-text-embedding`（DashScope OpenAI 兼容模式，1024 维） |
 | Chat 模型 | DeepSeek `deepseek-v4-flash`（OpenAI 兼容 API） |
 | Rerank | DashScope `qwen3-rerank`（Cross-encoder，可插拔，实验性） |
 | 稀疏检索 | 纯内存 BM25（中文 unigram + 英文驼峰/连字符拆分） |
 | 文档切分 | 插件化切分管道（TypeDetector + ChunkValidator）；自研 Markdown header 切分核 `md-header-v2`（h1-h2 + 超长 section 字符级二级切分） |
-| 测试 | Vitest（171 用例，覆盖 chunking / BM25 / fusion / MMR / metrics） |
+| 测试 | Vitest（185 用例，覆盖 chunking / BM25 / fusion / MMR / metrics / API 配置与路由） |
 | 运行时 | Node.js + tsx（TypeScript native ESM） |
 | 包管理 | pnpm workspace |
 
@@ -338,6 +359,8 @@ langchain-rag/
 | 08-16 | Phase 3：Cross-encoder Rerank | ⚠️ 实验性，默认关闭 |
 | 08-17 | 工程加固：参数化 + Vitest + 配置收敛 | ✅ |
 | 08-18 | 切分管道：类型识别 + Splitter 插件化 + Chunk 契约 | ✅ md-header-v2 成为默认 |
+| 09-22 | Rerank 弃答闸门（abstention 信号切换为 cross-encoder） | ✅ 误杀 19/37 → 0/37 |
+| 10-10 | API 服务化：Koa + AG-UI + Redis 断线续传（M9） | 🚧 P0 基座完成，P1-P3 进行中 |
 
 各阶段设计文档（含计划与回填的评测结果）见 [packages/rag/docs/](packages/rag/docs/)。
 

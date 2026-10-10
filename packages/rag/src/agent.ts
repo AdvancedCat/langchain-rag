@@ -25,7 +25,7 @@ async function main() {
         return;
     }
 
-    const agent = await createRagAgent(forceRebuild);
+    const agent = await createRagAgent({ forceRebuild });
 
     console.log();
     console.log(`Query: ${query}`);
