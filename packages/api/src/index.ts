@@ -9,7 +9,7 @@ import { createApp } from './app.js';
 import { warmupAgent } from './agentService.js';
 import { closeRedis } from './redis.js';
 
-const { app, config } = createApp();
+const { app, config, runManager } = createApp();
 
 const server = app.listen(config.port, config.host, () => {
     console.log(`[api] @langchain-rag/api listening on http://${config.host}:${config.port}`);
@@ -19,6 +19,8 @@ const server = app.listen(config.port, config.host, () => {
 // 构建失败不退出进程：/ready 探测会触发重建（如基础设施晚启动的竞态恢复后）。
 warmupAgent().catch(() => {});
 
+const GRACEFUL_SHUTDOWN_MS = 30_000;
+
 let shuttingDown = false;
 async function shutdown(signal: string) {
     if (shuttingDown) return;
@@ -26,7 +28,10 @@ async function shutdown(signal: string) {
     console.log(`[api] ${signal} received, shutting down…`);
 
     server.close(() => console.log('[api] http server closed'));
-    // P0 无活跃 run 需等待；P1/P2 起 RunManager 在此等待 in-flight run 收尾
+    // 等待 in-flight run 收尾（至多 30s；超时仍未结束的由进程退出终止，
+    // P2 起持久化后补 interrupted 标记与 RUN_ERROR 补发）
+    const idle = await runManager.waitIdle(GRACEFUL_SHUTDOWN_MS);
+    console.log(`[api] runs ${idle ? 'all settled' : 'still active at deadline'}`);
     await closeRedis();
     // 兜底：close 回调迟迟不来（挂起的 keep-alive 连接）时强制退出
     setTimeout(() => process.exit(0), 10_000).unref();

@@ -1,6 +1,6 @@
 # API 服务化改造（Koa + AG-UI + 断线续传）技术方案
 
-> 状态：**实施中（2026-10-10）**——P0 基座已完成（见 §11 与 Milestone M9），P1-P3 待实施；实施后按惯例回填结果与本文件状态。
+> 状态：**实施中（2026-10-10）**——P0 基座、P1 AG-UI 事件流已完成（见 §11 与 Milestone M9），P2-P3 待实施；实施后按惯例回填结果与本文件状态。
 > 范围：仅后端 RAG 服务改造与前端对接契约；前端界面另行设计（分支 `feat/frontend`）。
 
 ## 1. 背景与目标
@@ -194,7 +194,7 @@ RUN_STARTED
 └ MESSAGES_SNAPSHOT
 ```
 
-> 实现注记：deepagents v3 流中消息生命周期的具体形状（`run.messages` 各阶段触发时机、`.reasoning` 可用性）在 P1 期间对照本地 `deepagents@1.12.2` 的 d.ts 与实际运行确认，翻译层为纯函数 + 生成器，配 golden 单测（§10）。
+> 实现注记（P1 已实测确认，2026-10-10，探针 `packages/api/scripts/probe-v3-stream.ts`）：消费 `run` 的**单一全局有序 ProtocolEvent 流**（比分别迭代 `run.messages`/`run.toolCalls`/`run.subagents` 三个投影更能保证跨类事件顺序）。归属规则：ns `model_request:*`（深度 1）= 主代理；ns `tools:X/model_request:Y`（深度 ≥2）= 子代理（subagentRunId=X）；ns `tools:X`（深度 1）= 工具内部 LLM（query rewrite，不映射，P3 转 retrieval.trace）。`deepseek-v4-flash` 确认输出 reasoning（reasoning-delta 块）。两个实测坑：① `tool-finished` 无 `tool_name` 字段（普通工具 name 在 `output.name`）；② task（子代理委派）的 output 是 LangGraph **Command**（内容在 `update.messages` 末条 ToolMessage），非普通 ToolMessage。
 
 ## 7. 持久化设计
 
@@ -325,7 +325,7 @@ packages/api/                        # @langchain-rag/api（新包）
 | 阶段 | 内容 | 交付判据 |
 |---|---|---|
 | P0 基座 ✅（2026-10-10） | 脚手架 `packages/api`（package.json / tsconfig / vitest / .env.example）、rag 增库导出（barrel + exports）与 `checkpointer` 参数（暂不启用）、compose 加 redis、Koa 骨架 + health/ready、agent 单例服务化；同步 AGENTS.md 包表与根 README | `/ready` 200，CLI 回归不变，根递归 typecheck/test 覆盖新包 —— **已达成**（185 测试全绿：rag 175 + api 10） |
-| P1 AG-UI 事件流 | translator、RunManager（内存扇出，暂不持久化）、`POST /agui` + SSE | curl 全事件序列冒烟通过 |
+| P1 AG-UI 事件流 ✅（2026-10-10） | translator、RunManager（内存扇出，暂不持久化）、`POST /agui` + SSE、cancel 端点 | curl 全事件序列冒烟通过 —— **已达成**（真实问答：RUN_STARTED → REASONING 流（deepseek-v4-flash 确认输出 reasoning_content）→ TEXT 流 → 流式 TOOL_CALL → SUBAGENT_STARTED/FINISHED 配对 → MESSAGES_SNAPSHOT → RUN_FINISHED；断开 SSE 后 run 存活（409 验证）、cancel 收流 RUN_ERROR{code:cancelled}） |
 | P2 持久化与续传 | Redis eventStore + checkpointer、threads REST、`GET /events` 回放尾随、重启语义 | 验收 2/3 两条通过 |
 | P3 加固与打磨 | cancel/超时/信号量/CORS、trace CUSTOM 事件、日志压缩、测试补齐、文档回填 + Milestone M9 登记 | §10 全表绿 |
 

@@ -236,7 +236,13 @@ pnpm run serve        # packages/api，默认 http://localhost:3000
 curl localhost:3000/ready   # agent 单例 + Redis 就绪探针
 ```
 
-API 服务基于 Koa + AG-UI 协议向前端暴露流式问答事件，支持断线续传（事件日志持久化于 Redis）。技术方案与实施进度见 [packages/rag/docs/api-service-plan.md](packages/rag/docs/api-service-plan.md)（M9，实施中——当前 P0 基座：health/ready + agent 单例服务化；问答事件流随后续阶段接入）。
+API 服务基于 Koa + AG-UI 协议向前端暴露流式问答事件（流式正文/Reasoning/工具调用/子代理进度），断线续传（Redis 事件日志持久化）随 M9-P2 落地。技术方案与实施进度见 [packages/rag/docs/api-service-plan.md](packages/rag/docs/api-service-plan.md)（M9，实施中——P0 基座 + P1 AG-UI 事件流已完成）。
+
+```bash
+# 触发一次问答（AG-UI v1.0 SSE binding）
+curl -N -X POST localhost:3000/agui -H 'Content-Type: application/json' \
+  -d '{"threadId":"t1","runId":"'"$(uuidgen)"'","messages":[{"id":"u0","role":"user","content":"什么是langchain"}]}'
+```
 
 ---
 
@@ -287,8 +293,11 @@ langchain-rag/
 │   │   │   ├── config.ts           # 服务配置（PORT / REDIS_URL / 并发闸门…）
 │   │   │   ├── env.ts              # .env 级联加载（自身 + rag）
 │   │   │   ├── agentService.ts     # agent 进程内单例
+│   │   │   ├── runManager.ts       # run 状态机：并发闸门/超时/取消/事件扇出
+│   │   │   ├── agui/translator.ts  # deepagents v3 流 → AG-UI 事件（纯函数）
+│   │   │   ├── sse.ts              # SSE 帧/心跳（断开≠取消）
 │   │   │   ├── redis.ts            # Redis 客户端（懒连接）
-│   │   │   └── routes/             # health / ready（AG-UI 与会话路由随 P1/P2 接入）
+│   │   │   └── routes/             # health/ready、POST /agui（AG-UI SSE）、cancel
 │   │   └── .env.example
 │   └── libs/                       # 📦 跨包共享工具
 │       └── llm-provider.ts         #   统一 LLM 工厂
@@ -340,7 +349,7 @@ langchain-rag/
 | Rerank | DashScope `qwen3-rerank`（Cross-encoder，可插拔，实验性） |
 | 稀疏检索 | 纯内存 BM25（中文 unigram + 英文驼峰/连字符拆分） |
 | 文档切分 | 插件化切分管道（TypeDetector + ChunkValidator）；自研 Markdown header 切分核 `md-header-v2`（h1-h2 + 超长 section 字符级二级切分） |
-| 测试 | Vitest（185 用例，覆盖 chunking / BM25 / fusion / MMR / metrics / API 配置与路由） |
+| 测试 | Vitest（194 用例，覆盖 chunking / BM25 / fusion / MMR / metrics / API 配置、AG-UI 翻译与路由） |
 | 运行时 | Node.js + tsx（TypeScript native ESM） |
 | 包管理 | pnpm workspace |
 

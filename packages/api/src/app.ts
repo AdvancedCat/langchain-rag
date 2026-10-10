@@ -4,8 +4,11 @@
 
 import Koa from 'koa';
 import { createRequire } from 'node:module';
+import bodyParser from '@koa/bodyparser';
 import { getApiServerConfig, type ApiServerConfig } from './config.js';
+import { RunManager } from './runManager.js';
 import { createHealthRouter } from './routes/health.js';
+import { createAguiRouter } from './routes/agui.js';
 
 /** 统一错误体：{"error":{"code":…,"message":…}}（方案 §5 约定） */
 export interface ApiErrorBody {
@@ -32,6 +35,7 @@ function corsMiddleware(corsOrigins: string[] | '*'): Koa.Middleware {
 export interface CreateAppResult {
     app: Koa;
     config: ApiServerConfig;
+    runManager: RunManager;
 }
 
 export function createApp(): CreateAppResult {
@@ -39,8 +43,13 @@ export function createApp(): CreateAppResult {
     const app = new Koa();
     // tsx 直跑（非 npm 脚本上下文）时 npm_package_version 不存在，读 package.json 兜底
     const require = createRequire(import.meta.url);
+    const runManager = new RunManager({
+        maxConcurrentRuns: config.maxConcurrentRuns,
+        runTimeoutMs: config.runTimeoutMs,
+    });
 
     app.use(corsMiddleware(config.corsOrigins));
+    app.use(bodyParser({ enableTypes: ['json'] }));
 
     // 错误兜底：路由/下游异常统一为 JSON 错误体，不向客户端泄漏堆栈
     app.use(async (ctx, next) => {
@@ -64,11 +73,18 @@ export function createApp(): CreateAppResult {
         }).routes(),
     );
 
+    app.use(
+        createAguiRouter({
+            runManager,
+            sseHeartbeatMs: config.sseHeartbeatMs,
+        }).routes(),
+    );
+
     // 404 兜底（路由未命中时 Koa 默认裸文本 Not Found）
     app.use((ctx) => {
         ctx.status = 404;
         ctx.body = { error: { code: 'not_found', message: `no route: ${ctx.method} ${ctx.path}` } };
     });
 
-    return { app, config };
+    return { app, config, runManager };
 }

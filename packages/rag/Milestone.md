@@ -18,7 +18,7 @@
 | M6 | 2026-08-17 | 工程加固：参数化 + 单元测试 + 配置收敛 | `3aa743e`、`7d4178a`、`f35bae4` | ✅ 171 测试全绿 |
 | M7 | 2026-08-18 | 切分管道：类型识别 + Splitter 插件化 + 统一 Chunk 契约 | `d4cee6a`、`e34694e` | ✅ A/B 通过，md-header-v2 成为默认 |
 | M8 | 2026-09-22 | Rerank 弃答闸门：abstention 信号从 dense cosine 切换为 cross-encoder | — | ✅ 误杀 19/37 → 0/37，成为生产默认 |
-| M9 | 2026-10-10 ~ | API 服务化：Koa + AG-UI 事件流 + Redis 断线续传（独立包 `packages/api`） | — | 🚧 P0 基座完成，P1-P3 进行中 |
+| M9 | 2026-10-10 ~ | API 服务化：Koa + AG-UI 事件流 + Redis 断线续传（独立包 `packages/api`） | — | 🚧 P0-P1 完成（AG-UI 事件流可用），P2-P3 进行中 |
 
 **当前生产配置**：hybrid-rewrite 检索策略（M4）+ `md-header-v2` 切分（M7，collection `langchain_docs_mdheader`）+ rerank 弃答闸门（M8，`qwen3-rerank` @0.52，排序不变）。
 
@@ -119,7 +119,15 @@
 - 验证：递归 typecheck 全绿；测试 185 全绿（rag 175 不变 + api 10 新增）；冒烟 `pnpm serve` → `/ready` 200（agent 单例 + BM25 热启动 + Redis）；CLI 回归（`pnpm rag "什么是langchain"`）完整问答链路不变。
 - 检索/切分/评测路径零改动，无需 A/B（变更纪律 §1-3 不触发）。
 
-**待实施**：P1 AG-UI 事件流（translator + `POST /agui`）→ P2 持久化与断线续传（Redis 事件日志 + checkpointer + threads REST）→ P3 加固（cancel/超时/并发闸门/trace 事件）。
+**P1 AG-UI 事件流（2026-10-10 完成）**：
+
+- `POST /agui`（AG-UI v1.0 HTTP+SSE binding，HttpAgent 可直连）+ `POST /threads/:threadId/runs/:runId/cancel`；SSE 帧（`@ag-ui/encoder`）、心跳、**断开 ≠ 取消**（连接关闭仅退订，run 继续执行）。
+- translator（`packages/api/src/agui/translator.ts`）：消费 deepagents v3 的**单一全局有序 ProtocolEvent 流**，映射 TEXT/REASONING/TOOL_CALL/SUBAGENT/MESSAGES_SNAPSHOT/RUN_* 事件；归属规则按 namespace 深度区分主代理/子代理/工具内部 LLM（query rewrite 不映射，P3 转 retrieval.trace）。golden 单测锁定序列。
+- RunManager：run 状态机、每 thread 单活跃 run（409）、进程级并发闸门（429 + Retry-After）、超时 abort、显式取消（RUN_ERROR{code:cancelled}）、优雅停机 waitIdle。
+- **风险 1 前置验证闭环**（探针 `scripts/probe-v3-stream.ts`）：`deepseek-v4-flash` 确认输出 reasoning_content（REASONING_MESSAGE_* 有真实内容）；实测两个坑——tool-finished 无 tool_name（在 output.name）、task 委派的输出是 LangGraph Command（内容在 update.messages 末条）而非 ToolMessage，translator 均已兼容。
+- 验证：递归 typecheck 全绿；测试 194 全绿（rag 175 + api 19：translator golden ×3、/agui 路由 ×6 含断开续跑与 cancel 幂等）；真实冒烟（"什么是langchain"）：完整事件序列、SUBAGENT_STARTED/FINISHED 严格配对（23/23）、断开 SSE 后 run 存活（同 thread 409）、cancel 终态 cancelled。
+
+**待实施**：P2 持久化与断线续传（Redis 事件日志 + checkpointer + threads REST + `GET /threads/:id/events` 回放尾随）→ P3 加固（trace CUSTOM 事件、日志压缩、鉴权）。
 
 ---
 

@@ -18,7 +18,7 @@ pnpm（`pnpm@10.7.0`）monorepo，TypeScript ESM（`"type": "module"`）。基�
 # 根目录
 pnpm install              # 安装依赖
 pnpm typecheck            # 递归 tsc --noEmit
-pnpm test                 # 递归 vitest run（当前 185 个用例，必须全绿）
+pnpm test                 # 递归 vitest run（当前 194 个用例，必须全绿）
 pnpm rag                  # 启动 RAG agent（交互问答）
 pnpm rag:index            # 仅构建/更新向量索引
 pnpm serve                # 启动 API 服务（packages/api，默认 :3000，/health /ready）
