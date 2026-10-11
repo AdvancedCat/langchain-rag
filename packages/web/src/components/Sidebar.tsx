@@ -45,7 +45,7 @@ export function Sidebar({
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">R</span>
                 <div className="min-w-0">
                     <div className="text-sm font-semibold text-zinc-800">文档问答</div>
-                    <div className="text-[11px] text-zinc-400">LangChain RAG Agent</div>
+                    <div className="text-[11px] text-zinc-400">RAG Agent</div>
                 </div>
             </div>
 

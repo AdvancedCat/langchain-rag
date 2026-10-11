@@ -4,11 +4,7 @@ import type { ThreadController } from '../lib/threadController';
 import { TurnView } from './Turn';
 import { Composer } from './Composer';
 
-const EXAMPLE_QUESTIONS = [
-    'LangChain 的 LCEL 是什么？',
-    '如何用 LangGraph 构建多代理系统？',
-    'hybrid retrieval（混合检索）怎么配置？',
-];
+const EXAMPLE_QUESTIONS = ['这个知识库里有哪些内容？', '帮我概括知识库的主要主题', '讲讲你回答问题的流程'];
 
 /**
  * 聊天主区：状态分发（error/loading/empty/ready）+ Turn 列表 + 输入区。
@@ -87,8 +83,8 @@ export function ChatView({
                 <div className="flex flex-1 flex-col items-center justify-center gap-5 px-6">
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 text-lg font-bold text-white">R</div>
                     <div className="text-center">
-                        <h2 className="text-lg font-semibold text-zinc-800">LangChain 文档问答</h2>
-                        <p className="mt-1 text-sm text-zinc-400">基于向量 + BM25 混合检索与多代理分析，回答附完整过程</p>
+                        <h2 className="text-lg font-semibold text-zinc-800">知识库问答</h2>
+                        <p className="mt-1 text-sm text-zinc-400">基于已接入的知识库检索与多代理分析生成，回答附完整过程</p>
                     </div>
                     <div className="flex max-w-lg flex-wrap justify-center gap-2">
                         {EXAMPLE_QUESTIONS.map((question) => (
