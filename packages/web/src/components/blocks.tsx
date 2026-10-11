@@ -90,9 +90,9 @@ export function ReasoningBlockView({ block }: { block: Extract<ChatBlock, { kind
     );
 }
 
-/** 子代理组（chunk-analyst 等）：卡片内嵌套其内部工具/文本 */
+/** 子代理组（chunk-analyst 等）：卡片内嵌套其内部工具/文本，默认折叠 */
 export function SubagentGroup({ block }: { block: SubagentBlock }) {
-    const [open, setOpen] = useState(true);
+    const [open, setOpen] = useState(false);
     return (
         <div className="rounded-lg border border-indigo-200 bg-indigo-50/40 text-sm">
             <button
