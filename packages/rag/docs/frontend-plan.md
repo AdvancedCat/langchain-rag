@@ -56,7 +56,7 @@ M9-P0~P2 已交付完整后端：`POST /agui`（AG-UI v1.0 SSE）、`GET /thread
 | F4 | 样式用 Tailwind CSS v4（`@tailwindcss/vite` 插件）+ 手写组件 | 仓库零样式基建，原子类快速搭聊天 UI；依赖仅两个包 | shadcn/ui（初始化重）；纯 CSS（工作量）；若 v4 插件与 Vite 8 不兼容则降级手写 CSS token，不影响其余结构 |
 | F5 | `MESSAGES_SNAPSHOT` 仅用于**回填用户消息**（每轮 run 恰有一条新 user 消息），不替换渲染 | snapshot 把 tool_calls 的 assistant 压平为空文本，替换会丢工具卡片与思考结构；事件归约本身已完整还原 assistant 侧 | snapshot 全量替换（渲染退化） |
 | F6 | 通道互斥为主、eventId 去重兜底 | 空闲线程发消息时 GET 通道已被服务端关闭（回放终态即关流），POST 通道独占；打开/续传走 GET 通道；异常时序下两通道并存按 `id:` 去重（幂等 reducer） | 双通道常开（无谓双倍流量） |
-| F7 | Markdown 渲染 `react-markdown` + `remark-gfm`，不做代码高亮 | 答案是 LangChain 文档问答，GFM 表格/代码块刚需；高亮可后补 | 全量 MDX/内容渲染栈（过重） |
+| F7 | Markdown 渲染 `react-markdown` + `remark-gfm` + `rehype-highlight`（highlight.js github-dark 主题，2026-10-11 联调补充） | 答案是 LangChain 文档问答，GFM 表格/代码块刚需；代码无高亮阅读体验差（联调反馈），rehype-highlight 常用语言子集覆盖 JS/TS/Python/Bash/JSON 且流式重渲染成本低 | 全量 MDX/内容渲染栈（过重）；shiki（TextMate 语法全量高亮，流式场景过重） |
 
 ## 5. 状态模型与归约（chatStore）
 
