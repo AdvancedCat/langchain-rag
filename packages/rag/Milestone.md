@@ -148,7 +148,7 @@
 
 **交付**：
 
-- **基础问答**：多会话管理（列表/删除/新对话/运行中徽标/服务状态点）；流式渲染思考过程（折叠）、工具调用卡片（参数/结果）、chunk-analyst 子代理嵌套组、Markdown 最终答案（GFM）；停止（显式 cancel，断开≠取消）。
+- **基础问答**：多会话管理（列表/删除/新对话/运行中徽标/服务状态点）；流式渲染思考过程（折叠）、工具调用卡片（参数/结果）、chunk-analyst 子代理嵌套组、Markdown 最终答案（GFM）；停止（显式 cancel，断开≠取消）。**执行过程聚合块（2026-10-11 UX 迭代）**：Turn 内思考/工具/子代理折叠为单个默认收起区块（标题带「思考 ×a · 工具 ×b · 子代理 ×c」计数与运行状态），正文与答案始终可见——实测 66 个过程卡片的会话折叠后答案首屏直达。
 - **断线续传**：打开线程一律 `afterEventId=0` 全量回放重建（规避缺省语义歧义与 mid-run 游标缺口）；写通道（POST /agui）异常早断 → 读通道（GET /threads/:id/events）按最后游标指数退避（1s→2s→…≤15s）续传；`visibilitychange`/`online` 重同步；409 run_already_active → 跟随模式；服务重启 → 回放消费补发的 `RUN_ERROR{server_restart}`。
 - **核心设计**（详见方案 §4 决策表）：自研 ~150 行 fetch-SSE 读取器统一双通道（不引入 `@ag-ui/client`——attach 游标/去重/409 降级为自有扩展）；`useReducer` 纯函数事件归约（chatStore：Turn/Block 视图模型、eventId 幂等去重、MESSAGES_SNAPSHOT 仅回填用户消息——snapshot 会压平 tool_calls 不能替换渲染）；零额外状态库（hash 路由 20 行、无 react-router/zustand/react-query）。
 

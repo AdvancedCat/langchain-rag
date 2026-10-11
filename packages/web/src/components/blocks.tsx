@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ChatBlock, SubagentBlock, ToolCallBlock } from '../lib/chatStore';
+import { summarizeActivity } from '../lib/turnView';
 import { Markdown } from './Markdown';
 import { IconBot, IconBrain, IconCheck, IconChevron, IconSpinner, IconWrench } from './icons';
 
@@ -135,6 +136,44 @@ export function BlockList({ blocks }: { blocks: ChatBlock[] }) {
                         return <SubagentGroup key={`sub-${block.subagentRunId}`} block={block} />;
                 }
             })}
+        </div>
+    );
+}
+
+/**
+ * 执行过程聚合区块（默认收起）：一个 Turn 的思考/工具调用/子代理折叠为单个
+ * 可展开区块，标题带步骤计数与运行状态，避免中间过程占据篇幅、答案首屏可见。
+ */
+export function ActivitySection({ blocks }: { blocks: ChatBlock[] }) {
+    const [open, setOpen] = useState(false);
+    const summary = summarizeActivity(blocks);
+    const parts = [
+        summary.reasoning > 0 && `思考 ×${summary.reasoning}`,
+        summary.tools > 0 && `工具 ×${summary.tools}`,
+        summary.subagents > 0 && `子代理 ×${summary.subagents}`,
+    ].filter(Boolean);
+    return (
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50/60">
+            <button
+                type="button"
+                onClick={() => setOpen((value) => !value)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-500 hover:bg-zinc-100/60"
+            >
+                <IconChevron open={open} />
+                <span className="text-zinc-400">
+                    <IconBrain />
+                </span>
+                <span className="font-medium">思考与工具调用</span>
+                <span className="text-xs text-zinc-400">{parts.join(' · ')}</span>
+                <span className="ml-auto">
+                    {summary.allDone ? <IconCheck /> : <IconSpinner />}
+                </span>
+            </button>
+            {open && (
+                <div className="border-t border-zinc-200/70 px-3 py-2">
+                    <BlockList blocks={blocks} />
+                </div>
+            )}
         </div>
     );
 }

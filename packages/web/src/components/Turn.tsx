@@ -1,5 +1,6 @@
 import type { Turn } from '../lib/chatStore';
-import { BlockList } from './blocks';
+import { partitionTurnBlocks } from '../lib/turnView';
+import { ActivitySection, BlockList } from './blocks';
 import { IconSpinner } from './icons';
 
 /** RUN_ERROR code → 中文提示（cancelled 已在 reducer 归为非错误状态） */
@@ -14,10 +15,11 @@ export function errorText(error: { code?: string; message: string }): string {
 }
 
 /**
- * 一个 Turn = 一次问答：用户气泡 + 助手区块流（思考/工具/子代理/正文）+ 状态条。
+ * 一个 Turn = 一次问答：用户气泡 + 执行过程聚合块（默认收起）+ 正文（含答案）+ 状态条。
  */
 export function TurnView({ turn, canRetry, onRetry }: { turn: Turn; canRetry: boolean; onRetry: (text: string) => void }) {
     const streaming = turn.status === 'streaming';
+    const { activity, texts } = partitionTurnBlocks(turn.blocks);
     return (
         <div className="space-y-3">
             {turn.userText !== null ? (
@@ -41,11 +43,14 @@ export function TurnView({ turn, canRetry, onRetry }: { turn: Turn; canRetry: bo
                         思考中…
                     </div>
                 ) : (
-                    <BlockList blocks={turn.blocks} />
+                    <>
+                        {activity.length > 0 && <ActivitySection blocks={activity} />}
+                        {texts.length > 0 && <BlockList blocks={texts} />}
+                    </>
                 )}
             </div>
 
-            {streaming && turn.blocks.length > 0 && (
+            {streaming && activity.length > 0 && (
                 <div className="flex items-center gap-2 text-xs text-zinc-400">
                     <IconSpinner />
                     生成中…
