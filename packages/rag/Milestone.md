@@ -18,6 +18,8 @@
 | M6 | 2026-08-17 | 工程加固：参数化 + 单元测试 + 配置收敛 | `3aa743e`、`7d4178a`、`f35bae4` | ✅ 171 测试全绿 |
 | M7 | 2026-08-18 | 切分管道：类型识别 + Splitter 插件化 + 统一 Chunk 契约 | `d4cee6a`、`e34694e` | ✅ A/B 通过，md-header-v2 成为默认 |
 | M8 | 2026-09-22 | Rerank 弃答闸门：abstention 信号从 dense cosine 切换为 cross-encoder | — | ✅ 误杀 19/37 → 0/37，成为生产默认 |
+| M9 | 2026-10-10 ~ | API 服务化：Koa + AG-UI 事件流 + Redis 断线续传（独立包 `packages/api`） | — | 🚧 P0-P2 完成（断线续传可用），P3 进行中 |
+| M10 | 2026-10-10 | 前端问答界面：React + Vite + AG-UI 双通道断线续传（独立包 `packages/web`） | — | ✅ 浏览器联调验收通过 |
 
 **当前生产配置**：hybrid-rewrite 检索策略（M4）+ `md-header-v2` 切分（M7，collection `langchain_docs_mdheader`）+ rerank 弃答闸门（M8，`qwen3-rerank` @0.52，排序不变）。
 
@@ -103,6 +105,60 @@
 - 验证：typecheck + 175 测试全绿（+4 配置用例）。已知边界：q043/q039 级深度混淆（rerank 0.92/0.89）为 score 闸门天花板，Abstention → 100% 需 LLM judge。详见 [docs/rerank-abstention-gate-plan.md](./docs/rerank-abstention-gate-plan.md)。
 - **附带修复（重要）**：冒烟暴露 `rewriteQuery`/`generateMultiQueries` 用 `content.toString()` 提取 LLM 响应——agent 进程内共享 ChatOpenAI 实例返回多段 content block 数组时退化为 `"[object Object]"` 垃圾查询，导致在线检索 query 无关（dense 恒 0.5518）。新增 `extractTextContent()` 兼容两种形态，闸门决策日志（`🚪 Gate:`）常驻便于观测。
 - **评审加固（2026-09-25，ocr 评审）**：① rerank 200 但空结果的退化响应原先会令 bestScore=0 恒弃答，现按 API 失败走 dense 回退；② gate 与 MMR 增设 config 互斥守卫——MMR 只返回 topK 多样性筛选结果，会饿死 fetchK 闸门候选池；③ `extractTextContent` 对未识别 content 形态告警，防静默降级重演；④ 融合 rerank 与闸门同开时同一候选池双调用为已知成本（pipeline 打分用改写后 query、闸门用原始 query，信号不同不可复用），以启动日志与计划文档 §4.2 记录。
+
+---
+
+## M9（2026-10-10 ~，进行中）API 服务化：Koa + AG-UI + Redis 断线续传
+
+**技术方案**：[docs/api-service-plan.md](./docs/api-service-plan.md)（事件映射、API 契约、持久化模型、P0-P3 分阶段计划）。本条目随各阶段落地滚动更新，全部完成后终稿。
+
+**P0 基座（2026-10-10 完成）**：
+
+- 新增独立包 `packages/api`（`@langchain-rag/api`）：Koa 骨架 + CORS + 统一错误体 + `/health` `/ready` 探针 + 优雅停机；agent 进程内单例（构建失败不缓存、探针触发重建）；Redis 懒连接客户端（compose 新增 `redis:7-alpine`）。依赖单向 `api → rag`（`workspace:*` + rag `exports` 直指 TS 源，no-build）。
+- rag 侧最小改动两处：新增库入口 `src/index.ts`（barrel：`createRagAgent` / `RagAgent` / `getRetrievalConfig`）；`createRagAgent` 参数化（`{forceRebuild?, checkpointer?}`，checkpointer 为 M9-P2 预留，CLI 不传行为零变化）。显式依赖 `@langchain/langgraph-checkpoint`（checkpointer 类型引入）。
+- env 级联：api 先读自身 `.env`，再以不覆盖方式补读 `packages/rag/.env`（冒烟验证 28 项注入）。
+- 验证：递归 typecheck 全绿；测试 185 全绿（rag 175 不变 + api 10 新增）；冒烟 `pnpm serve` → `/ready` 200（agent 单例 + BM25 热启动 + Redis）；CLI 回归（`pnpm rag "什么是langchain"`）完整问答链路不变。
+- 检索/切分/评测路径零改动，无需 A/B（变更纪律 §1-3 不触发）。
+
+**P1 AG-UI 事件流（2026-10-10 完成）**：
+
+- `POST /agui`（AG-UI v1.0 HTTP+SSE binding，HttpAgent 可直连）+ `POST /threads/:threadId/runs/:runId/cancel`；SSE 帧（`@ag-ui/encoder`）、心跳、**断开 ≠ 取消**（连接关闭仅退订，run 继续执行）。
+- translator（`packages/api/src/agui/translator.ts`）：消费 deepagents v3 的**单一全局有序 ProtocolEvent 流**，映射 TEXT/REASONING/TOOL_CALL/SUBAGENT/MESSAGES_SNAPSHOT/RUN_* 事件；归属规则按 namespace 深度区分主代理/子代理/工具内部 LLM（query rewrite 不映射，P3 转 retrieval.trace）。golden 单测锁定序列。
+- RunManager：run 状态机、每 thread 单活跃 run（409）、进程级并发闸门（429 + Retry-After）、超时 abort、显式取消（RUN_ERROR{code:cancelled}）、优雅停机 waitIdle。
+- **风险 1 前置验证闭环**（探针 `scripts/probe-v3-stream.ts`）：`deepseek-v4-flash` 确认输出 reasoning_content（REASONING_MESSAGE_* 有真实内容）；实测两个坑——tool-finished 无 tool_name（在 output.name）、task 委派的输出是 LangGraph Command（内容在 update.messages 末条）而非 ToolMessage，translator 均已兼容。
+- 验证：递归 typecheck 全绿；测试 194 全绿（rag 175 + api 19：translator golden ×3、/agui 路由 ×6 含断开续跑与 cancel 幂等）；真实冒烟（"什么是langchain"）：完整事件序列、SUBAGENT_STARTED/FINISHED 严格配对（23/23）、断开 SSE 后 run 存活（同 thread 409）、cancel 终态 cancelled。
+
+**P2 持久化与断线续传（2026-10-10 完成）**：
+
+- **事件日志**（`persistence/`：types 契约 + memory（测试 fake）+ redis 实现）：`rag:thread:{id}:events`（Stream，entry id 即续传游标）、`rag:thread:{id}:meta`（Hash）、`rag:run:{runId}`（TTL 24h）、`rag:index:threads`（ZSet）。RunManager 改为 **XADD 先行再扇出**——SSE `id:` 帧即游标，持久化失败降级内存直发。
+- **断线续传端点** `GET /threads/:id/events?afterEventId=`：先订阅（防回放丢事件）→ XRANGE 回放 → 按 eventId 去重 → 实时尾随至终态关流；无活跃 run 发完即关。
+- **threads REST**：POST /threads（显式建档）、GET 列表（activeRun/status）、GET 详情、GET /messages（最近 MESSAGES_SNAPSHOT）、DELETE（含 checkpoint 清理，ShallowRedisSaver 自带 deleteThread）；POST /agui 自动建档 + title 回填首问摘要。
+- **checkpointer**：ShallowRedisSaver 挂入 createRagAgent，invoke 传 `configurable.thread_id`；初始化失败降级为无持久化单轮模式（启动日志可见）。
+- **重启语义**：启动扫描 `rag:run:*` running → interrupted + SETNX 幂等补发 `RUN_ERROR{code:"server_restart"}`。
+- **实施发现（重要）**：`@langchain/langgraph-checkpoint-redis` 依赖 **RedisJSON**（JSON.GET/SET）——标准 Redis 7 报 `unknown command 'JSON.GET'`，compose 镜像升级为 `redis:8-alpine`（开源版已内置 JSON 模块）后解决。
+- 验证：测试 206 全绿（rag 175 + api 31，含真实 Redis 集成 4 例、回放/尾随/两轮对话/删除等 12 新例）；真实验收——刷新回放（断开时 1729 事件 → 重连回放+尾随至 FINISHED、id 零重复）、两轮对话（第二轮复述首问 + 首轮 `/retrieved/` 文件跨轮可读，风险 3 闭环）、kill -9 重启（interrupted 标记 + server_restart 补发 + 同 thread 可续问）。
+
+**待实施**：P3 加固（retrieval.trace CUSTOM 事件、长会话日志压缩、鉴权挂载、**子代理异常进程级崩溃修复**——见 M10 联调发现）。
+
+---
+
+## M10（2026-10-10）前端问答界面：React + Vite + AG-UI 双通道断线续传
+
+**技术方案**：[docs/frontend-plan.md](./docs/frontend-plan.md)（契约摘要、状态模型、通道编排、验收回填）。独立包 `packages/web`（`@langchain-rag/web`），React 19 + Vite 8 + Tailwind CSS v4 + react-markdown，界面中文。
+
+**交付**：
+
+- **基础问答**：多会话管理（列表/删除/新对话/运行中徽标/服务状态点）；流式渲染思考过程（折叠）、工具调用卡片（参数/结果）、chunk-analyst 子代理嵌套组、Markdown 最终答案（GFM + 代码语法高亮）；停止（显式 cancel，断开≠取消）。**执行过程聚合块（2026-10-11 UX 迭代）**：Turn 内思考/工具/子代理与过程叙述折叠为单个默认收起区块（标题带「思考 ×a · 工具 ×b · 子代理 ×c」计数与运行状态），正文只保留最终答案——实测 66 个过程卡片的会话折叠后答案首屏直达。
+- **断线续传**：打开线程一律 `afterEventId=0` 全量回放重建（规避缺省语义歧义与 mid-run 游标缺口）；写通道（POST /agui）异常早断 → 读通道（GET /threads/:id/events）按最后游标指数退避（1s→2s→…≤15s）续传；`visibilitychange`/`online` 重同步；409 run_already_active → 跟随模式；服务重启 → 回放消费补发的 `RUN_ERROR{server_restart}`。
+- **核心设计**（详见方案 §4 决策表）：自研 ~150 行 fetch-SSE 读取器统一双通道（不引入 `@ag-ui/client`——attach 游标/去重/409 降级为自有扩展）；`useReducer` 纯函数事件归约（chatStore：Turn/Block 视图模型、eventId 幂等去重、MESSAGES_SNAPSHOT 仅回填用户消息——snapshot 会压平 tool_calls 不能替换渲染）；零额外状态库（hash 路由 20 行、无 react-router/zustand/react-query）。
+
+**验证**：验收清单 9 项中 8 项浏览器实测通过（刷新续传恢复、停止、双标签页跟随、删除收敛、服务崩溃重启恢复等，见方案 §9 回填表）；429 映射由单测覆盖。测试 246 全绿（rag 175 + api 31 + web 40：SSE 解析器半包/心跳/CRLF、归约器流式/回放/去重/快照/错误码/子代理挂靠、controller 全通道编排、REST 错误映射、hash 路由）；递归 typecheck 全绿。
+
+**联调发现**：
+
+- **TOOL_CALL_ARGS 快照叠加 bug（已修，双层）**：LangChain v3 流对 deepseek 返回的 `tool_call_chunk.args` 是「完整快照」而非增量（抓帧实测：每帧恒以前帧为前缀），translator 原样透传为 AG-UI `delta` 导致前端拼接出 `{{"query{"query":…` 前缀串。修复：translator 按 toolCallId 归一为增量（快照发后缀、增量原样透传，单测锁定）；前端 chatStore 前缀判别兼容旧帧。复抓一整轮真实 run（90+ 工具调用）验证全部为真增量。
+- **`packages/api` 进程级崩溃（已加兜底，系统性治理留 M9-P3）**：StreamMux 内部微任务链的失败（子代理失败、DeepSeek 思考模式 400 等）以 unhandledRejection 逃逸，不经 execute 的 try/catch，默认炸进程（联调实测三种触发源）。已在 `index.ts` 挂 `unhandledRejection` 兜底（记录后保活，受影响 run 由超时收口）；run 级异常归一 RUN_ERROR{server_error} 的完整加固仍列 P3。
+- 恢复顺序须「先回放后 meta 裁决」、重连横幅并行竞态残留——两处前端缺陷已在联调中发现并修复（单测锁定：server_restart 回放用例、resolveStaleRun 横幅复位）。
 
 ---
 

@@ -1,6 +1,6 @@
 # langchain-rag
 
-> 基于 LangChain Deep Agents 的**生产级 RAG Agent** — 混合检索（Dense + BM25）、Query Rewrite、Markdown 结构化切分（`md-header-v2`），并内置完整的离线评测体系（Cross-encoder Rerank 框架已就绪，实验性、默认关闭）。
+> 基于 LangChain Deep Agents 的**生产级 RAG 问答系统**（pnpm monorepo）— 混合检索（Dense + BM25）、Query Rewrite、Markdown 结构化切分（`md-header-v2`），内置完整的离线评测体系，并提供 **Koa API 服务**（AG-UI 流式事件 + Redis 断线续传）与 **React Web 前端**（多会话聊天界面）。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-7.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -33,10 +33,12 @@
 - **🧩 结构化切分管道** — `Loader → TypeDetector → SplitterRegistry → Splitter → ChunkValidator` 插件化管道；统一 Chunk 契约（zod 校验，确定性 id / contentHash）；自研 Markdown header 切分核 `md-header-v2`（默认 h1-h2，超长 section 字符级二级切分），`sectionPath` 上下文在 embedding / BM25 / rerank 消费侧统一注入。
 - **🎯 Cross-encoder Rerank（实验性，默认关闭）** — 两阶段检索架构：Bi-encoder 粗筛（~2900 → 20），Cross-encoder 精排（20 → 4）。通用 `Reranker` 接口，已接入 DashScope `qwen3-rerank`；A/B 验证未带来净增益，保留框架待更优模型。
 - **🧠 Deep Agents 架构** — 实现 **Retrieve → Offload → Delegate** 三步工作流：检索到的 chunks offload 到 StateBackend 文件系统，由并行子 Agent（chunk-analyst）独立分析，避免主 Agent 上下文膨胀。
+- **🔌 API 服务** — Koa + AG-UI 协议（v1.0 HTTP+SSE binding）暴露流式问答事件（正文/Reasoning/工具调用/子代理进度）；Redis Stream 事件日志支持断线续传（`GET /threads/:id/events?afterEventId=` 回放+续流），LangGraph checkpoint 按 thread 持久化多轮会话；run 状态机（每 thread 单活跃 run、进程级并发闸门、超时/取消、优雅停机）。
+- **🖥️ Web 前端** — React 19 + Vite 聊天界面：多会话管理、流式渲染思考/工具调用/子代理过程（默认折叠的聚合区块）、Markdown 答案（GFM + 代码高亮 + 来源徽标）、写通道异常自动转读通道的双通道断线续传。零路由/状态库依赖（自研 hash 路由 + 纯函数事件归约）。
 - **🚫 Abstention（拒答）** — 基于 cosine score 阈值（默认 0.78，`RETRIEVAL_ABSTENTION_THRESHOLD` 可配）识别无答案问题，避免"自信地犯错"。生产配置下 7/7 unanswerable query 全部正确拒答。
 - **🧪 内置离线评测** — Retrieval（Hit@K / MRR / NDCG / Precision / Keyword Recall / Duplicate Ratio）与 Generation（Faithfulness + Relevance）双维度评测，支持 baseline 冻结与 A/B 对比。
 - **🇨🇳 中英文混合场景** — 中文 Query over English Docs，Python 文档作为 cross-language hard negative，专门评测检索策略的抗噪与消歧能力。
-- **⚙️ 严格工程规范** — TypeScript `strict: true`、环境变量边界校验、Vitest 单元测试（171 用例，纯函数全覆盖）、Makefile 命令封装、docker-compose 一键启动基础设施。
+- **⚙️ 严格工程规范** — TypeScript `strict: true`、环境变量边界校验、Vitest 单元测试（265 用例：rag 175 / api 33 / web 57，全绿）、Makefile 命令封装、docker-compose 一键启动基础设施。
 
 ---
 
@@ -89,6 +91,18 @@ Loader（抓取 58 篇文档）
                     │
                     ▼
   主 Agent 综合回答（含来源引用）
+```
+
+**服务化链路**（CLI 之外的第二种使用方式）：
+
+```
+packages/web（React，:5173）
+   │  写通道：POST /agui（AG-UI SSE）        读通道：GET /threads/:id/events（断线续传）
+   ▼
+packages/api（Koa，:3000）
+   │  translator：deepagents v3 流 → AG-UI 事件    RunManager：并发闸门 / 超时 / 取消
+   ▼
+Redis（事件日志 Stream + checkpoint）  ←→  packages/rag（createRagAgent 单例，上述检索链路）
 ```
 
 ---
@@ -180,9 +194,9 @@ make eval-gen LIMIT=5 SAVE=my-baseline.json
 
 ### 环境要求
 
-- Node.js ≥ 18
+- Node.js ≥ 20.19（Vite 8 前端 dev server 要求；核心 rag/api 包 ≥ 18 即可，建议 LTS 22+）
 - pnpm ≥ 10
-- Docker（用于启动 Qdrant）
+- Docker（用于启动 Qdrant / Redis）
 - DeepSeek API Key（Chat 模型）
 - DashScope API Key（Embedding + Rerank）
 
@@ -207,7 +221,7 @@ cp .env.example .env
 - `DEEPSEEK_API_KEY` — [DeepSeek](https://platform.deepseek.com/) Chat 模型 API Key
 - `DASHSCOPE_API_KEY` — [阿里云 DashScope](https://platform.qianwenai.com/home/api-keys) Embedding API Key
 
-### 3. 启动 Qdrant 向量数据库
+### 3. 启动基础设施（Qdrant + Redis）
 
 ```bash
 # 在 packages/rag 目录下
@@ -215,7 +229,7 @@ make infra-up
 # 或 docker compose up -d
 ```
 
-Qdrant 会监听在 `http://localhost:6333`。
+Qdrant 监听 `http://localhost:6333`（向量库），Redis 监听 `localhost:6379`（API 服务的事件日志与 checkpoint，仅 `packages/api` 使用；**必须 Redis ≥ 8**——checkpoint 依赖 RedisJSON 模块，镜像已用 `redis:8-alpine`）。
 
 ### 4. 索引文档 + 启动问答
 
@@ -229,6 +243,30 @@ pnpm run rag         # 启动交互式问答
 
 > **语料来源与版权**：文档语料在运行时从 [docs.langchain.com](https://docs.langchain.com/) 按需抓取，版权归 LangChain 所有，本仓库不随包分发语料原文。`evals/baselines/` 评测结果文件中因复现需要嵌入了少量检索命中的文档片段（chunk），仅用于指标归因分析。
 
+### 5.（可选）启动 API 服务
+
+```bash
+pnpm run serve        # packages/api，默认 http://localhost:3000
+curl localhost:3000/ready   # agent 单例 + Redis 就绪探针
+```
+
+API 服务基于 Koa + AG-UI 协议向前端暴露流式问答事件（流式正文/Reasoning/工具调用/子代理进度），支持断线续传（Redis Stream 事件日志：页面刷新后 `GET /threads/:id/events?afterEventId=<游标>` 回放+续流）与多轮会话（LangGraph checkpoint 按 thread 持久化）。技术方案与实施进度见 [packages/rag/docs/api-service-plan.md](packages/rag/docs/api-service-plan.md)（M9，实施中——P0-P2 已完成，P3 加固待做）。
+
+```bash
+# 触发一次问答（AG-UI v1.0 SSE binding）
+curl -N -X POST localhost:3000/agui -H 'Content-Type: application/json' \
+  -d '{"threadId":"t1","runId":"'"$(uuidgen)"'","messages":[{"id":"u0","role":"user","content":"什么是langchain"}]}'
+```
+
+### 6.（可选）启动 Web 前端
+
+```bash
+# 仓库根目录；前置：pnpm serve 已启动
+pnpm dev   # packages/web，http://localhost:5173
+```
+
+多会话聊天界面（hash 路由 `#/t/<threadId>`，链接可分享、刷新可恢复）。API 地址默认 `http://localhost:3000`，可用 `VITE_API_BASE_URL` 覆盖。浏览器实测验收项（刷新续传恢复、停止、双标签页跟随、服务崩溃重启恢复等）见 [packages/rag/docs/frontend-plan.md](packages/rag/docs/frontend-plan.md) §9。
+
 ---
 
 ## 项目结构
@@ -238,9 +276,10 @@ Monorepo 使用 pnpm workspace 管理：
 ```
 langchain-rag/
 ├── packages/
-│   ├── rag/                        # 📦 核心 RAG Agent 包
+│   ├── rag/                        # 📦 核心 RAG Agent 包（检索/切分/评测基座）
 │   │   ├── src/
-│   │   │   ├── agent.ts            # 主入口：CLI + 流式事件渲染
+│   │   │   ├── index.ts            # 库入口（barrel）：createRagAgent 等，供 api 包导入
+│   │   │   ├── agent.ts            # CLI 入口：交互问答 / --index-only 索引
 │   │   │   ├── config.ts           # 环境变量解析与边界校验
 │   │   │   ├── embeddings.ts       # 千问 Embedding 工厂
 │   │   │   ├── vectorStore.ts      # Qdrant 向量存储（连接/索引/热启动守卫）
@@ -254,7 +293,7 @@ langchain-rag/
 │   │   │   ├── ingestion/          # 📥 离线索引链路
 │   │   │   │   └── index.ts        #   文档抓取 → 切分 → Embedding → 索引
 │   │   │   └── retrieval/          # 🔍 在线召回链路
-│   │   │       ├── index.ts        #   RAG Agent 构建
+│   │   │       ├── index.ts        #   RAG Agent 构建（可选 checkpointer）
 │   │   │       ├── pipeline.ts     #   检索管线编排（融合/截断）
 │   │   │       ├── retrievers/     #   Dense / BM25 / Hybrid 检索器
 │   │   │       ├── transformers/   #   Query Rewrite / Multi-Query
@@ -268,10 +307,36 @@ langchain-rag/
 │   │   ├── docs/                   # 设计文档（计划 + 回填结果）
 │   │   ├── Milestone.md            # 里程碑记录（重要特性变更同步维护）
 │   │   ├── Makefile                # 开发/评测命令入口
-│   │   ├── docker-compose.yml      # 本地 Qdrant
+│   │   ├── docker-compose.yml      # 本地基础设施：Qdrant + Redis
 │   │   └── .env.example
+│   ├── api/                        # 📦 API 服务包（@langchain-rag/api，M9 P0-P2 完成、P3 加固待做）
+│   │   ├── src/
+│   │   │   ├── index.ts            # 服务入口：env 级联 → Koa 监听 → agent 预热
+│   │   │   ├── app.ts              # 应用装配（CORS / 错误体 / 路由）
+│   │   │   ├── config.ts           # 服务配置（PORT / REDIS_URL / 并发闸门…）
+│   │   │   ├── env.ts              # .env 级联加载（自身 + rag）
+│   │   │   ├── agentService.ts     # agent 进程内单例
+│   │   │   ├── runManager.ts       # run 状态机：并发闸门/超时/取消/事件扇出
+│   │   │   ├── agui/translator.ts  # deepagents v3 流 → AG-UI 事件（纯函数）
+│   │   │   ├── sse.ts              # SSE 帧/心跳（断开≠取消）
+│   │   │   ├── redis.ts            # Redis 客户端（懒连接）
+│   │   │   ├── persistence/        # 事件日志：types 契约 + redis（Stream/Hash/ZSet）+ memory fake
+│   │   │   └── routes/             # health/ready、POST /agui（AG-UI SSE）、threads（回放/列表/删除）、cancel
+│   │   └── .env.example
+│   ├── web/                        # 🖥️ 前端问答界面包（@langchain-rag/web，M10 已交付）
+│   │   ├── src/
+│   │   │   ├── components/         #   Sidebar / ChatView / Turn（过程聚合区块）/ Markdown（高亮+来源徽标）
+│   │   │   ├── lib/
+│   │   │   │   ├── threadController.ts  # 每线程控制器：写/读双 SSE 通道编排、重连、去重
+│   │   │   │   ├── chatStore.ts         # AG-UI 事件 → 视图模型的纯函数归约（eventId 幂等）
+│   │   │   │   └── sse.ts / api.ts      # SSE 流解析 / REST 客户端
+│   │   │   ├── hooks.ts            # useChat / useHashRoute 等 React 绑定
+│   │   │   └── env.ts              # VITE_API_BASE_URL 解析
+│   │   ├── index.html
+│   │   └── vite.config.ts
 │   └── libs/                       # 📦 跨包共享工具
 │       └── llm-provider.ts         #   统一 LLM 工厂
+├── design-system/                  # 前端设计系统规范（docs-rag-chat/MASTER.md，极简瑞士风 + 双主题）
 ├── AGENTS.md                       # AI 编码代理指南
 ├── LICENSE
 ├── package.json
@@ -303,7 +368,7 @@ langchain-rag/
 | `INGESTION_MAX_HEADER_DEPTH` | `2` | Markdown header 切分深度（h1-h2） |
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | `1000` / `200` | 超长 section 的二级字符切分参数 |
 
-完整配置见 [packages/rag/.env.example](packages/rag/.env.example) 和 [packages/rag/src/config.ts](packages/rag/src/config.ts)。
+完整配置见 [packages/rag/.env.example](packages/rag/.env.example) 和 [packages/rag/src/config.ts](packages/rag/src/config.ts)。API 服务另有 `PORT` / `REDIS_URL` / `RAG_MAX_CONCURRENT_RUNS` 等服务配置（见 [packages/api/.env.example](packages/api/.env.example)，检索/LLM 配置自动级联自 rag 的 `.env`）。
 
 ---
 
@@ -313,13 +378,15 @@ langchain-rag/
 |----|------|
 | Agent 框架 | [deepagents](https://www.npmjs.com/package/deepagents) v1.x + LangChain 1.x |
 | 编排运行时 | LangGraph（subagent streaming / StateBackend） |
+| API 服务 | Koa + [AG-UI 协议](https://docs.ag-ui.com)（流式事件 / Redis 断线续传，M9 P0-P2 已完成） |
+| 前端 | React 19 + Vite 8 + Tailwind CSS v4 + react-markdown（自研 hash 路由与事件归约，不引入路由/状态库） |
 | 向量存储 | [Qdrant](https://qdrant.tech/)（本地 Docker 部署，[选型报告](packages/rag/docs/vector-db-selection-report.md)） |
 | Embedding | 千问 `qwen3.7-text-embedding`（DashScope OpenAI 兼容模式，1024 维） |
 | Chat 模型 | DeepSeek `deepseek-v4-flash`（OpenAI 兼容 API） |
 | Rerank | DashScope `qwen3-rerank`（Cross-encoder，可插拔，实验性） |
 | 稀疏检索 | 纯内存 BM25（中文 unigram + 英文驼峰/连字符拆分） |
 | 文档切分 | 插件化切分管道（TypeDetector + ChunkValidator）；自研 Markdown header 切分核 `md-header-v2`（h1-h2 + 超长 section 字符级二级切分） |
-| 测试 | Vitest（171 用例，覆盖 chunking / BM25 / fusion / MMR / metrics） |
+| 测试 | Vitest（265 用例：rag 175 / api 33 / web 57，覆盖 chunking / BM25 / fusion / MMR / metrics、AG-UI 翻译与路由、Redis 持久化集成、SSE 解析 / 事件归约 / 双通道编排） |
 | 运行时 | Node.js + tsx（TypeScript native ESM） |
 | 包管理 | pnpm workspace |
 
@@ -338,6 +405,9 @@ langchain-rag/
 | 08-16 | Phase 3：Cross-encoder Rerank | ⚠️ 实验性，默认关闭 |
 | 08-17 | 工程加固：参数化 + Vitest + 配置收敛 | ✅ |
 | 08-18 | 切分管道：类型识别 + Splitter 插件化 + Chunk 契约 | ✅ md-header-v2 成为默认 |
+| 09-22 | Rerank 弃答闸门（abstention 信号切换为 cross-encoder） | ✅ 误杀 19/37 → 0/37 |
+| 10-10 | API 服务化：Koa + AG-UI + Redis 断线续传（M9） | 🚧 P0-P2 完成，P3 加固待做 |
+| 10-10~11 | 前端问答界面：React + Vite + AG-UI 双通道断线续传（M10） | ✅ 已交付（含过程聚合区块、来源徽标、语法高亮等 UX 迭代） |
 
 各阶段设计文档（含计划与回填的评测结果）见 [packages/rag/docs/](packages/rag/docs/)。
 
@@ -345,6 +415,8 @@ langchain-rag/
 
 ## Roadmap
 
+- [ ] **API 服务加固（M9-P3）** — `retrieval.trace` CUSTOM 事件、长会话事件日志压缩、鉴权挂载、子代理异常 run 级收口（当前已有 unhandledRejection 进程兜底）
+- [ ] **前端体验深化** — 按 [design-system](design-system/docs-rag-chat/MASTER.md) 规范推进组件化与双主题打磨
 - [ ] **Metadata 路由** — 基于 `language` / `module` 元数据预过滤，解决跨语言与跨包混淆问题
 - [ ] **Reranker 模型升级** — 接入 bge-reranker-v2-m3 或中文微调 reranker，替换当前效果未达预期的 qwen3-rerank
 - [ ] **BM25 索引优化** — 流式增量构建 / 紧凑数据结构，支持 100k+ chunks 无 OOM；长期迁移至 Qdrant native sparse vectors

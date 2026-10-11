@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { tool } from '@langchain/core/tools';
+import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 import { createDeepAgent, StateBackend, type SubAgent } from 'deepagents';
 import { getLLM } from '../../../libs/llm-provider.js';
 import { buildVectorStore } from '../ingestion/index.js';
@@ -36,7 +37,19 @@ When delegating:
 - Limit concurrent delegations to {max_concurrent_analysts} to avoid rate limits.
 - After all analysts return, synthesize their findings with citations to the source URLs.`;
 
-export async function createRagAgent(forceRebuild = false) {
+export interface CreateRagAgentOptions {
+    /** 强制重建向量索引（--rebuild 守卫，见 vectorStore.ts） */
+    forceRebuild?: boolean;
+    /**
+     * LangGraph checkpointer：传入后 agent 状态（messages、/retrieved/ 文件、todos）
+     * 按 configurable.thread_id 持久化，支撑 API 服务的多轮会话与断线恢复
+     * （docs/api-service-plan.md §7.3）。CLI 不传，行为不变。
+     */
+    checkpointer?: BaseCheckpointSaver;
+}
+
+export async function createRagAgent(opts: CreateRagAgentOptions = {}) {
+    const { forceRebuild = false, checkpointer } = opts;
     const retrievalConfig = getRetrievalConfig();
     const vectorStore = await buildVectorStore(forceRebuild);
     const bm25Retriever = getGlobalBM25Retriever();
@@ -196,6 +209,7 @@ export async function createRagAgent(forceRebuild = false) {
         subagents: [chunkAnalyst],
         systemPrompt,
         backend,
+        checkpointer,
     });
 
     return agent;

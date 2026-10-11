@@ -4,6 +4,8 @@
 
 当前生产配置：**hybrid-rewrite**（Dense + BM25 Boost Fusion + Query Rewrite）+ **md-header-v2** 结构化切分。演进历史见 [Milestone.md](./Milestone.md)。
 
+本包有两种消费方式：CLI 交互问答（`src/agent.ts`）与库导入（barrel 入口 `src/index.ts`，供 `packages/api` 以 `docs-rag-agent` 复用；no-build 工作区约定，`exports` 直指 TS 源）。CLI 与评测不经 barrel。
+
 ## 架构概览
 
 ```
@@ -33,7 +35,7 @@ chunk-analyst × N（并行子 Agent 分析）
 | 文档切分 | 插件化管道 + 自研 Markdown header 切分核 `md-header-v2`（h1-h2，超长 section 字符级二级切分） |
 | Embedding | 千问 `qwen3.7-text-embedding`（DashScope OpenAI 兼容模式） |
 | Chat 模型 | 通过 `libs/llm-provider` 统一提供（DeepSeek） |
-| 测试 | Vitest（171 用例） |
+| 测试 | Vitest（切分/检索/评测纯函数单测为主） |
 
 ## 快速开始
 
@@ -118,6 +120,7 @@ pnpm run test
 rag/
 ├── src/
 │   ├── agent.ts              # 主入口：CLI 参数解析 + 流式事件渲染
+│   ├── index.ts              # 库入口（barrel）：供 packages/api 导入 createRagAgent
 │   ├── config.ts             # 共享配置常量、RetrievalConfig / IngestionConfig 解析
 │   ├── embeddings.ts         # 千问 Embedding 工厂
 │   ├── vectorStore.ts        # Qdrant 向量存储（连接/校验/索引/热启动守卫）
@@ -157,6 +160,7 @@ rag/
 
 | 模块 | 职责 | 关键导出 |
 |-----|------|---------|
+| `index.ts` | 库入口（barrel），workspace 内包导入 | `createRagAgent`, `RagAgent` |
 | `config.ts` | 常量与配置解析 | `DOC_PATHS`, `RetrievalConfig`, `IngestionConfig` |
 | `embeddings.ts` | 千问 Embedding 工厂 | `getEmbeddingConfig()`, `createEmbeddings()` |
 | `vectorStore.ts` | Qdrant 向量存储 | `ensureQdrantRunning()`, `loadVectorStore()`, `createVectorStoreFromDocuments()` |
