@@ -9,6 +9,11 @@
 import { getLLM } from "../../../libs/llm-provider.js";
 
 const agent = createDeepAgent({ model: getLLM(), /* ... */ });
+
+// 可选：注入实例级回调（CozeLoop 观测用——工具内部直调的 llm.invoke
+// 不在 graph config 传播链上，只有实例级回调能捕获）
+import { getLangChainTracingCallbacks } from "../src/observability/index.js";
+const llm = getLLM({ callbacks: getLangChainTracingCallbacks() });
 ```
 
 模块顶层执行 `import "dotenv/config"`，导入即加载进程工作目录下的 `.env`。

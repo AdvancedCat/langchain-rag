@@ -20,6 +20,7 @@
 | M8 | 2026-09-22 | Rerank 弃答闸门：abstention 信号从 dense cosine 切换为 cross-encoder | — | ✅ 误杀 19/37 → 0/37，成为生产默认 |
 | M9 | 2026-10-10 ~ | API 服务化：Koa + AG-UI 事件流 + Redis 断线续传（独立包 `packages/api`） | — | 🚧 P0-P2 完成（断线续传可用），P3 进行中 |
 | M10 | 2026-10-10 | 前端问答界面：React + Vite + AG-UI 双通道断线续传（独立包 `packages/web`） | — | ✅ 浏览器联调验收通过 |
+| M11 | 2026-10-13 | 可观测性：CozeLoop（扣子罗盘）tracing 全链路接入 | — | ✅ 314 测试全绿；真实冒烟已执行，subagent 层级 / model_name / token 用量已修（§7.2） |
 
 **当前生产配置**：hybrid-rewrite 检索策略（M4）+ `md-header-v2` 切分（M7，collection `langchain_docs_mdheader`）+ rerank 弃答闸门（M8，`qwen3-rerank` @0.52，排序不变）。
 
@@ -159,6 +160,29 @@
 - **TOOL_CALL_ARGS 快照叠加 bug（已修，双层）**：LangChain v3 流对 deepseek 返回的 `tool_call_chunk.args` 是「完整快照」而非增量（抓帧实测：每帧恒以前帧为前缀），translator 原样透传为 AG-UI `delta` 导致前端拼接出 `{{"query{"query":…` 前缀串。修复：translator 按 toolCallId 归一为增量（快照发后缀、增量原样透传，单测锁定）；前端 chatStore 前缀判别兼容旧帧。复抓一整轮真实 run（90+ 工具调用）验证全部为真增量。
 - **`packages/api` 进程级崩溃（已加兜底，系统性治理留 M9-P3）**：StreamMux 内部微任务链的失败（子代理失败、DeepSeek 思考模式 400 等）以 unhandledRejection 逃逸，不经 execute 的 try/catch，默认炸进程（联调实测三种触发源）。已在 `index.ts` 挂 `unhandledRejection` 兜底（记录后保活，受影响 run 由超时收口）；run 级异常归一 RUN_ERROR{server_error} 的完整加固仍列 P3。
 - 恢复顺序须「先回放后 meta 裁决」、重连横幅并行竞态残留——两处前端缺陷已在联调中发现并修复（单测锁定：server_restart 回放用例、resolveStaleRun 横幅复位）。
+
+---
+
+## M11（2026-10-13）可观测性：CozeLoop（扣子罗盘）tracing 全链路接入
+
+**技术方案**：[docs/cozeloop-observability-plan.md](./docs/cozeloop-observability-plan.md)（SDK 调研、span 树设计、开关降级、实施回填）。
+
+**交付**：
+
+- **SDK 与初始化**：`@cozeloop/ai@0.0.11`（基于 OpenTelemetry）+ axios peer；新增 `src/observability/`（cozeloop.ts 初始化 gate / spans.ts 包装器与脱敏 / langchain-handler.ts LLM 回调）。`COZELOOP_API_TOKEN + COZELOOP_WORKSPACE_ID` 齐备自动启用，缺省完全 no-op（评测批跑零影响）；`COZELOOP_ENABLED` 显式覆盖（true 缺凭据 fail-fast）。
+- **span 树**：run 根 span（api `RunManager.execute` 携带 thread_id/run_id baggage；CLI 每问一条）→ LLM model span（实例级回调捕获工具内部 rewrite/multiQuery；run_id 幂等去重双注册；token/TTFT/流式业务标签）→ `search_documentation` tool span → retrieval 全阶段（transform_queries/dense/bm25+boost/rerank+RRF/mmr）与弃答闸门决策 span（decision/best_rerank_score/top_doc_path，取代纯 console 归因）。
+- **退出安全**：api 优雅停机与 CLI 退出均 `shutdownCozeLoop()` 强制刷盘；上报失败 SDK 内部吞错不影响业务。
+- **关键约束**：OTel 单例语义——全工程仅经 `observability/` 单出口使用 SDK（宿主不得直接依赖 `@opentelemetry/api`，双实例 context 不互通）。
+
+**验证**：`pnpm typecheck` 递归 0 错误；`pnpm test` 全绿（P0 时 298；§7.2 后 **314**：rag 220 / api 34 / web 60，其中 observability 45 例）；tsx 冒烟确认禁用路径零 SDK 触碰。真实上报冒烟（控制台建 workspace + PAT → 罗盘 Trace 页看树）已执行并据其修复三项（见下）。
+
+**真实冒烟修复（2026-10-13，方案 §7.2）**：
+
+- **子代理 LLM 调用层级缺失**：deepagents `task` 工具在工具体内部 `await subagent.invoke()`，执行期间无 active span，subagent（chunk-analyst）的 LLM span 只能挂根 span、与主模型平铺。修复：langchain v1 middleware（`wrapToolCall`）包住 task 工具执行建立 active context（`observability/subagent-span.ts`），ALS 沿整条 await 链传播，子代理全部 LLM span 嵌套至 `task.<subagent_type>` tool span 之下；离线冒烟（假模型 + dummy 凭据真实 SDK + OTel 探针）实证传播链路。
+- **model span 的 model_name 显示 unknown**：`@langchain/openai` 1.x 已不写 `llmOutput.model_name`（0.x 旧字段），LLM_MODEL env 又未设置。修复：回调 handler 在 Start 从序列化 kwargs（`toJSON().kwargs.model`）提取配置模型名，上报优先级 `kwargs.model > response_metadata.model_name（服务端回显）> llmOutput.model_name > LLM_MODEL env`。
+- **token 用量标签从未上报（连带发现）**：handler 读取的 `llmOutput.token_usage` 同为 0.x 形态，1.x 实际是 `message.usage_metadata`（流式）与 `llmOutput.tokenUsage`（camelCase）。修复：`readTokenUsage` 三形态逐级回退。
+
+**遗留（P1+）**：embedding/ingestion 埋点、web→api 跨端 trace 透传（`X-Cozeloop-Traceparent`，2026-10-13 已先交付 traceId 展示：`CUSTOM cozeloop.trace` 事件 + 前端 Turn 底部复制芯片，见方案 §7.1）、`retrieval.trace` AG-UI CUSTOM 事件（M9-P3，与 spans 互补）、评测批跑上报隔离。
 
 ---
 

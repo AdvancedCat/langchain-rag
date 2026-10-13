@@ -1,5 +1,5 @@
 {
-  "name": "docs-rag-agent",
+  "name": "@langchain-rag/rag",
   "version": "1.0.0",
   "description": "Deep Agents RAG documentation Q&A agent (indexes LangChain docs, offloads chunks, delegates analysis to subagents)",
   "main": "src/agent.ts",
@@ -26,6 +26,7 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
+    "@cozeloop/ai": "^0.0.11",
     "@langchain/classic": "^1.0.41",
     "@langchain/core": "^1.2.5",
     "@langchain/langgraph-checkpoint": "^1.1.6",
@@ -33,6 +34,7 @@
     "@langchain/qdrant": "^1.0.3",
     "@langchain/textsplitters": "^1.0.1",
     "@qdrant/js-client-rest": "^1.19.0",
+    "axios": "^1.7.1",
     "deepagents": "^1.12.2",
     "dotenv": "^17.4.2",
     "langchain": "^1.5.5",

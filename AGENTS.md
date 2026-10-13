@@ -8,7 +8,7 @@ pnpm（`pnpm@10.7.0`）monorepo，TypeScript ESM（`"type": "module"`）。基�
 
 | 目录 | 包名 | 说明 |
 |---|---|---|
-| `packages/rag` | `docs-rag-agent` | 主应用：文档索引 + 混合检索 + 评测工具链（库入口 `src/index.ts`，供 api 包导入） |
+| `packages/rag` | `@langchain-rag/rag` | 主应用：文档索引 + 混合检索 + 评测工具链（库入口 `src/index.ts`，供 api 包导入） |
 | `packages/api` | `@langchain-rag/api` | API 服务：Koa + AG-UI 事件流 + 断线续传（方案与实施状态见 `packages/rag/docs/api-service-plan.md`，M9） |
 | `packages/web` | `@langchain-rag/web` | 前端问答界面：React + Vite，AG-UI 双通道断线续传（方案见 `packages/rag/docs/frontend-plan.md`，M10） |
 | `packages/libs` | `@langchain-rag/shared` | 跨包共享的 LLM provider 工厂（`llm-provider.ts`） |

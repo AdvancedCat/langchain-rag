@@ -4,7 +4,7 @@
 
 当前生产配置：**hybrid-rewrite**（Dense + BM25 Boost Fusion + Query Rewrite）+ **md-header-v2** 结构化切分。演进历史见 [Milestone.md](./Milestone.md)。
 
-本包有两种消费方式：CLI 交互问答（`src/agent.ts`）与库导入（barrel 入口 `src/index.ts`，供 `packages/api` 以 `docs-rag-agent` 复用；no-build 工作区约定，`exports` 直指 TS 源）。CLI 与评测不经 barrel。
+本包有两种消费方式：CLI 交互问答（`src/agent.ts`）与库导入（barrel 入口 `src/index.ts`，供 `packages/api` 以 `@langchain-rag/rag` 复用；no-build 工作区约定，`exports` 直指 TS 源）。CLI 与评测不经 barrel。
 
 ## 架构概览
 

@@ -16,6 +16,13 @@ import { EventType, type Event as AguiEvent } from '@ag-ui/core';
 import { getAgent } from './agentService.js';
 import { translateRun, type TranslatableRunStream } from './agui/translator.js';
 import type { Persistence } from './persistence/types.js';
+import {
+    withCozeLoopSpan,
+    setSpanInput,
+    setSpanOutput,
+    getLangChainTracingCallbacks,
+    type Span,
+} from '@langchain-rag/rag';
 
 export type RunStatus = 'running' | 'finished' | 'error' | 'cancelled' | 'timeout';
 
@@ -181,6 +188,41 @@ export class RunManager {
     }
 
     private async execute(run: ActiveRun, query: string): Promise<void> {
+        // CozeLoop 根 span（自定义类型 'run'）：baggages 把 thread_id/run_id 透传到
+        // 全部子 span（LLM/工具/检索阶段，方案 cozeloop-observability-plan.md §3.3）。
+        // 禁用时直通原逻辑。
+        await withCozeLoopSpan(
+            'rag-agent',
+            'run',
+            async (span) => {
+                setSpanInput(span, { query, threadId: run.threadId, runId: run.runId });
+                await this.executeRun(run, query, span);
+            },
+            {
+                baggages: { thread_id: run.threadId, run_id: run.runId },
+            },
+        );
+    }
+
+    /**
+     * XADD 先行：拿到 eventId 再扇出，SSE id: 帧与回放游标一致；
+     * 持久化失败降级为内存直发（eventId=''，断线回放将缺失该事件——故障态可接受）
+     */
+    private async persistAndFanout(run: ActiveRun, event: AguiEvent): Promise<void> {
+        let eventId = '';
+        try {
+            eventId = await this.deps.persistence.appendEvent(run.threadId, event);
+        } catch (error) {
+            console.warn(`[run] appendEvent failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        this.fanout(run, event, eventId);
+    }
+
+    private async executeRun(run: ActiveRun, query: string, span: Span | null): Promise<void> {
+        // CozeLoop 根 span 的 traceId：随 CUSTOM cozeloop.trace 事件透出给前端，
+        // 用户可复制到罗盘后台按 trace 检索；禁用时 span 为 null，不发射
+        const cozeloopTraceId = span?.spanContext().traceId;
+        let traceEventSent = false;
         const timeout = setTimeout(() => {
             run.cancelReason = 'timeout';
             run.controller.abort();
@@ -196,24 +238,29 @@ export class RunManager {
                     signal: run.controller.signal,
                     // thread_id 让 checkpointer 按 thread 恢复多轮上下文（方案 §7.3）
                     configurable: { thread_id: run.threadId },
+                    // CozeLoop：config 级回调兜底（与 LLM 实例级回调同一 handler，run_id 幂等去重）
+                    callbacks: getLangChainTracingCallbacks(),
                 },
             );
             for await (const event of translateRun(stream as unknown as TranslatableRunStream, {
                 threadId: run.threadId,
                 runId: run.runId,
             })) {
-                // XADD 先行：拿到 eventId 再扇出，SSE id: 帧与回放游标一致；
-                // 持久化失败降级为内存直发（eventId=''，断线回放将缺失该事件——故障态可接受）
-                let eventId = '';
-                try {
-                    eventId = await this.deps.persistence.appendEvent(run.threadId, event);
-                } catch (error) {
-                    console.warn(`[run] appendEvent failed: ${error instanceof Error ? error.message : String(error)}`);
-                }
                 if (event.type === EventType.MESSAGES_SNAPSHOT) {
                     lastSnapshotCount = (event as unknown as { messages: unknown[] }).messages.length;
                 }
-                this.fanout(run, event, eventId);
+                await this.persistAndFanout(run, event);
+                // 紧跟 RUN_STARTED 发 traceId：必须在该事件之后，前端归约按当前 turn 落位
+                if (!traceEventSent && cozeloopTraceId && event.type === EventType.RUN_STARTED) {
+                    traceEventSent = true;
+                    console.log(`🔭 [run] cozeloop trace ${cozeloopTraceId} (thread=${run.threadId} run=${run.runId})`);
+                    await this.persistAndFanout(run, {
+                        type: EventType.CUSTOM,
+                        name: 'cozeloop.trace',
+                        value: { traceId: cozeloopTraceId, runId: run.runId },
+                        timestamp: Date.now(),
+                    } as AguiEvent);
+                }
             }
             run.status = 'finished';
         } catch (error) {
@@ -226,13 +273,7 @@ export class RunManager {
                 code,
                 timestamp: Date.now(),
             };
-            let eventId = '';
-            try {
-                eventId = await this.deps.persistence.appendEvent(run.threadId, terminalEvent);
-            } catch {
-                // 持久化已故障，warn 已在 appendEvent 内或此处降级
-            }
-            this.fanout(run, terminalEvent, eventId);
+            await this.persistAndFanout(run, terminalEvent);
         } finally {
             clearTimeout(timeout);
             run.endedAt = Date.now();
@@ -251,5 +292,8 @@ export class RunManager {
                     .catch(() => undefined);
             }
         }
+
+        // 根 span 收口：终态与错误信息（traceable 在 fn 返回时自动 end span）
+        setSpanOutput(span, { status: run.status, error: run.error });
     }
 }

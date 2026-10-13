@@ -10,6 +10,15 @@ import { rewriteQuery } from './transformers/rewrite.js';
 import { generateMultiQueries } from './transformers/multiQuery.js';
 import { composeSearchText } from '../chunking/compose.js';
 import type { Reranker } from './rerankers/index.js';
+import {
+    SpanKind,
+    withCozeLoopSpan,
+    setSpanOutput,
+    failCozeLoopSpan,
+    summarizeScoredChunks,
+    truncateForSpan,
+} from '../observability/index.js';
+import { COZELOOP_TRACE_BUSINESS_TAGS } from '@cozeloop/ai';
 
 export interface RetrieveDeps {
     vectorStore: VectorStore;
@@ -23,6 +32,39 @@ export async function retrieve(
     query: string,
     config: RetrievalConfig,
 ): Promise<ScoredChunk[]> {
+    return withCozeLoopSpan(
+        'retrieval',
+        SpanKind.Retriever,
+        async (span) => {
+            span?.setAttribute(COZELOOP_TRACE_BUSINESS_TAGS.RETRIEVER_PROVIDER, 'qdrant');
+            const result = await retrievePipeline(deps, query, config);
+            setSpanOutput(span, { query: truncateForSpan(query), top: summarizeScoredChunks(result) });
+            return result;
+        },
+        { attributes: buildRetrievalSpanAttributes(config) },
+    );
+}
+
+/** 各阶段 span 汇总的管线配置（CozeLoop attributes；禁用时不会被消费） */
+function buildRetrievalSpanAttributes(config: RetrievalConfig): Record<string, string | number | boolean> {
+    return {
+        top_k: config.topK,
+        fetch_k: config.fetchK,
+        hybrid: config.hybrid.enabled,
+        query_rewrite: config.queryTransform.rewrite,
+        multi_query: config.queryTransform.multiQuery,
+        rerank: config.rerank.enabled,
+        rerank_gate: config.rerankGate.enabled,
+        mmr: config.mmr.enabled,
+        score_threshold: config.scoreThreshold ?? 'off',
+    };
+}
+
+async function retrievePipeline(
+    deps: RetrieveDeps,
+    query: string,
+    config: RetrievalConfig,
+): Promise<ScoredChunk[]> {
     const { vectorStore, bm25Retriever, llm, reranker } = deps;
 
     const queries = await transformQueries(query, llm, config);
@@ -31,7 +73,18 @@ export async function retrieve(
     const allDenseResults: ScoredChunk[][] = [];
 
     for (const q of queries) {
-        allDenseResults.push(await retrieveDense(vectorStore, q, denseK));
+        allDenseResults.push(
+            await withCozeLoopSpan(
+                'retrieval.dense',
+                SpanKind.Retriever,
+                async (span) => {
+                    const results = await retrieveDense(vectorStore, q, denseK);
+                    setSpanOutput(span, { hits: results.length });
+                    return results;
+                },
+                { attributes: { query: truncateForSpan(q), k: denseK } },
+            ),
+        );
     }
 
     const candidates = deduplicateMerge(allDenseResults);
@@ -42,13 +95,25 @@ export async function retrieve(
     let finalCandidates: ScoredChunk[];
 
     if (bm25Available) {
-        const sparseK = config.hybrid.sparseTopK;
-        const allSparseResults: ScoredChunk[][] = [];
-        for (const q of queries) {
-            allSparseResults.push(bm25Retriever.retrieve(q, sparseK));
-        }
-        const boostWeight = config.hybrid.sparseWeight / (config.hybrid.denseWeight + config.hybrid.sparseWeight);
-        finalCandidates = applyBM25Boost(candidates, allSparseResults.flat(), boostWeight);
+        finalCandidates = await withCozeLoopSpan(
+            'retrieval.bm25',
+            SpanKind.Retriever,
+            async (span) => {
+                const sparseK = config.hybrid.sparseTopK;
+                const allSparseResults: ScoredChunk[][] = [];
+                for (const q of queries) {
+                    allSparseResults.push(bm25Retriever.retrieve(q, sparseK));
+                }
+                const boostWeight = config.hybrid.sparseWeight / (config.hybrid.denseWeight + config.hybrid.sparseWeight);
+                const boosted = applyBM25Boost(candidates, allSparseResults.flat(), boostWeight);
+                setSpanOutput(span, {
+                    hits: allSparseResults.reduce((sum, results) => sum + results.length, 0),
+                    boost_weight: Number(boostWeight.toFixed(4)),
+                });
+                return boosted;
+            },
+            { attributes: { sparse_top_k: config.hybrid.sparseTopK } },
+        );
     } else {
         finalCandidates = candidates;
     }
@@ -65,48 +130,57 @@ export async function retrieve(
         );
         const primaryQuery = queries[0];
         const rerankCount = Math.min(documents.length, config.fetchK);
-        const RRF_K = 60;
-        const BI_ENCODER_WEIGHT = 3.0;
-        const RERANK_WEIGHT = 0.15;
 
-        try {
-            const rerankResults = await reranker.rank(primaryQuery, documents, rerankCount);
-            const biEncoderRank = new Map<string, number>();
-            fetchCandidates.forEach((c, i) => {
-                biEncoderRank.set(getChunkId(c), i + 1);
-            });
+        rerankedCandidates = await withCozeLoopSpan(
+            'retrieval.rerank',
+            SpanKind.Retriever,
+            async (span) => {
+                const RRF_K = 60;
+                const BI_ENCODER_WEIGHT = 3.0;
+                const RERANK_WEIGHT = 0.15;
+                try {
+                    const rerankResults = await reranker!.rank(primaryQuery, documents, rerankCount);
+                    const biEncoderRank = new Map<string, number>();
+                    fetchCandidates.forEach((c, i) => {
+                        biEncoderRank.set(getChunkId(c), i + 1);
+                    });
 
-            const rerankRank = new Map<string, number>();
-            rerankResults.forEach((r, i) => {
-                const id = getChunkId(fetchCandidates[r.index]);
-                rerankRank.set(id, i + 1);
-            });
+                    const rerankRank = new Map<string, number>();
+                    rerankResults.forEach((r, i) => {
+                        const id = getChunkId(fetchCandidates[r.index]);
+                        rerankRank.set(id, i + 1);
+                    });
 
-            const scored = fetchCandidates.map((chunk) => {
-                const id = getChunkId(chunk);
-                const rank1 = biEncoderRank.get(id) ?? fetchCandidates.length + 1;
-                const rank2 = rerankRank.get(id) ?? fetchCandidates.length + 1;
-                const rrfScore =
-                    (BI_ENCODER_WEIGHT / (RRF_K + rank1)) +
-                    (RERANK_WEIGHT / (RRF_K + rank2));
-                const rerankEntry = rerankResults.find((r) => getChunkId(fetchCandidates[r.index]) === id);
-                return {
-                    ...chunk,
-                    score: rrfScore,
-                    rerankScore: rerankEntry?.relevanceScore ?? 0,
-                };
-            });
+                    const scored = fetchCandidates.map((chunk) => {
+                        const id = getChunkId(chunk);
+                        const rank1 = biEncoderRank.get(id) ?? fetchCandidates.length + 1;
+                        const rank2 = rerankRank.get(id) ?? fetchCandidates.length + 1;
+                        const rrfScore =
+                            (BI_ENCODER_WEIGHT / (RRF_K + rank1)) +
+                            (RERANK_WEIGHT / (RRF_K + rank2));
+                        const rerankEntry = rerankResults.find((r) => getChunkId(fetchCandidates[r.index]) === id);
+                        return {
+                            ...chunk,
+                            score: rrfScore,
+                            rerankScore: rerankEntry?.relevanceScore ?? 0,
+                        };
+                    });
 
-            scored.sort((a, b) => b.score - a.score);
+                    scored.sort((a, b) => b.score - a.score);
+                    setSpanOutput(span, { top: summarizeScoredChunks(scored.slice(0, 5)) });
 
-            const tail = finalCandidates.slice(config.fetchK);
-            rerankedCandidates = [...scored, ...tail];
-        } catch (error) {
-            console.warn(
-                `[Rerank] API failed, falling back to fusion order: ${error instanceof Error ? error.message : String(error)}`,
-            );
-            rerankedCandidates = finalCandidates;
-        }
+                    const tail = finalCandidates.slice(config.fetchK);
+                    return [...scored, ...tail];
+                } catch (error) {
+                    console.warn(
+                        `[Rerank] API failed, falling back to fusion order: ${error instanceof Error ? error.message : String(error)}`,
+                    );
+                    failCozeLoopSpan(span, error, { fallback: 'fusion-order' });
+                    return finalCandidates;
+                }
+            },
+            { attributes: { model: config.rerank.model, top_n: config.rerank.topN, candidates: documents.length } },
+        );
     } else {
         rerankedCandidates = finalCandidates;
     }
@@ -120,24 +194,37 @@ export async function retrieve(
     }
 
     if (config.mmr.enabled) {
-        const queryEmbedding = await vectorStore.embeddings.embedQuery(queries[0]);
-        const candidateEmbeddings = await vectorStore.embeddings.embedDocuments(
-            rerankedCandidates.map(({ document }) =>
-                composeSearchText(document.pageContent, document.metadata),
-            ),
+        return await withCozeLoopSpan(
+            'retrieval.mmr',
+            SpanKind.Retriever,
+            async (span) => {
+                const queryEmbedding = await vectorStore.embeddings.embedQuery(queries[0]);
+                const candidateEmbeddings = await vectorStore.embeddings.embedDocuments(
+                    rerankedCandidates.map(({ document }) =>
+                        composeSearchText(document.pageContent, document.metadata),
+                    ),
+                );
+
+                const relevanceScores = rerankedCandidates.map((c) => c.denseScore ?? c.score);
+
+                const selectedIndexes = maximalMarginalRelevanceCustom(
+                    queryEmbedding,
+                    candidateEmbeddings,
+                    relevanceScores,
+                    config.mmr.lambda,
+                    config.topK,
+                );
+
+                const selected = selectedIndexes.map((index) => rerankedCandidates[index]);
+                setSpanOutput(span, {
+                    lambda: config.mmr.lambda,
+                    selected: selected.length,
+                    from: rerankedCandidates.length,
+                });
+                return selected;
+            },
+            { attributes: { lambda: config.mmr.lambda, top_k: config.topK } },
         );
-
-        const relevanceScores = rerankedCandidates.map((c) => c.denseScore ?? c.score);
-
-        const selectedIndexes = maximalMarginalRelevanceCustom(
-            queryEmbedding,
-            candidateEmbeddings,
-            relevanceScores,
-            config.mmr.lambda,
-            config.topK,
-        );
-
-        return selectedIndexes.map((index) => rerankedCandidates[index]);
     }
 
     return rerankedCandidates;
@@ -215,23 +302,37 @@ async function transformQueries(
     llm: BaseChatModel,
     config: RetrievalConfig,
 ): Promise<string[]> {
-    let workingQuery = query;
+    return withCozeLoopSpan(
+        'retrieval.transform_queries',
+        SpanKind.Retriever,
+        async (span) => {
+            let workingQuery = query;
 
-    if (config.queryTransform.rewrite) {
-        workingQuery = await rewriteQuery(query, llm);
-    }
+            if (config.queryTransform.rewrite) {
+                workingQuery = await rewriteQuery(query, llm);
+            }
 
-    if (config.queryTransform.multiQuery) {
-        const multi = await generateMultiQueries(
-            workingQuery,
-            config.queryTransform.multiQueryCount,
-            llm,
-        );
-        const unique = Array.from(new Set(multi));
-        return unique.length > 0 ? unique : [workingQuery];
-    }
+            let queries = [workingQuery];
+            if (config.queryTransform.multiQuery) {
+                const multi = await generateMultiQueries(
+                    workingQuery,
+                    config.queryTransform.multiQueryCount,
+                    llm,
+                );
+                const unique = Array.from(new Set(multi));
+                if (unique.length > 0) queries = unique;
+            }
 
-    return [workingQuery];
+            setSpanOutput(span, { queries });
+            return queries;
+        },
+        {
+            attributes: {
+                rewrite: config.queryTransform.rewrite,
+                multi_query: config.queryTransform.multiQuery,
+            },
+        },
+    );
 }
 
 export function maximalMarginalRelevanceCustom(

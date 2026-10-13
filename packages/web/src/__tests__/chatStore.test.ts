@@ -223,6 +223,40 @@ describe('applyEvents 流式归约', () => {
         ]);
         expect(state.turns[0]!.trace).toMatchObject({ gate: { decision: 'PASS' } });
     });
+
+    it('CUSTOM cozeloop.trace 记录 traceId 到当前 Turn（run 进行中即可见）', () => {
+        const state = applyEvents(initialChatState('ready'), [
+            RUN_STARTED('r2'),
+            ev({
+                type: 'CUSTOM',
+                name: 'cozeloop.trace',
+                value: { traceId: '559e036504609eeef09ddf420ab055fc', runId: 'r2' },
+            }),
+        ]);
+        expect(state.turns[0]!.traceId).toBe('559e036504609eeef09ddf420ab055fc');
+    });
+
+    it('回放顺序（RUN_STARTED 之后）保证 traceId 落在本轮 Turn', () => {
+        let state = applyEvents(initialChatState('ready'), [
+            RUN_STARTED('r1'),
+            RUN_FINISHED('r1'),
+            RUN_STARTED('r2'),
+            ev({ type: 'CUSTOM', name: 'cozeloop.trace', value: { traceId: 'aaaa1111bbbb2222cccc3333dddd4444' } }),
+            RUN_FINISHED('r2'),
+        ]);
+        expect(state.turns[0]!.traceId).toBeUndefined();
+        expect(state.turns[1]!.traceId).toBe('aaaa1111bbbb2222cccc3333dddd4444');
+    });
+
+    it('未知 CUSTOM name 与缺失 traceId 的载荷被忽略', () => {
+        const state = applyEvents(initialChatState('ready'), [
+            RUN_STARTED('r1'),
+            ev({ type: 'CUSTOM', name: 'something.else', value: { traceId: 'x' } }),
+            ev({ type: 'CUSTOM', name: 'cozeloop.trace', value: {} }),
+            RUN_FINISHED('r1'),
+        ]);
+        expect(state.turns[0]!.traceId).toBeUndefined();
+    });
 });
 
 describe('createChatStore', () => {
