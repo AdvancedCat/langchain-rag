@@ -1,5 +1,6 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { HumanMessage } from '@langchain/core/messages';
+import { cozeloopParentMetadata } from '../../observability/spans.js';
 
 const REWRITE_PROMPT = `你是一个专业的搜索查询优化器。你的任务是将用户的原始问题改写为适合技术文档检索的精确查询。
 
@@ -58,6 +59,7 @@ export async function rewriteQuery(
     try {
         const response = await llm.invoke([new HumanMessage(prompt)], {
             temperature: 0.1,
+            ...cozeloopParentMetadata(),
         } as Parameters<typeof llm.invoke>[1]);
 
         const text = extractTextContent(response.content).trim();

@@ -167,6 +167,23 @@ rag-agent-cli.run (custom, root)                               ← packages/rag 
 - 单测 +12：middleware 6 例 + handler model name / token 用量多形态来源 6 例（kwargs 提取、优先级、model_name 键、usage_metadata、tokenUsage、response_metadata 回显）；全仓 typecheck 0 错误、用例全绿（§8 追记：314）。
 - 待用户重跑真实 query：罗盘树上子代理 LLM 应嵌套在 `task.chunk-analyst` 之下，model span 不再显示 unknown，且 token 三标签有值。
 
+## 7.3 增量（2026-10-13）：rewrite/multiQuery model span 层级修正（并发 tool 下 ALS 断链）
+
+用户复盘真实 trace（`39a8366d…`，53.97s）发现：3 个 `search_documentation` 工具之后平铺着 3 个 llm span，观感像"生成检索 query 的 LLM 晚于工具执行"。经 CozeLoop API 拉取全量 107 span 证伪：这些 llm 是各工具体**内部** `retrieval.transform_queries` 里 rewriteQuery 发出的调用（时间窗完整落在对应工具窗内，llm 结束时刻与其 transform_queries span 结束时刻毫秒级相等），显示顺序颠倒纯系**挂根层级 + 罗盘同层按 started_at 排序**（工具比各自 rewrite llm 早 1-6ms 启动）的观感问题。
+
+**根因**（与 §7.2 subagent 泄漏同机理、不同路径）：本 trace 中 `task.chunk-analyst` 内层 llm 已正确嵌套（wrapToolCall 生效），泄漏的只有工具体内直调 `llm.invoke` 的 rewrite/multiQuery（10 个：批次1×4 + 批次2×6，另 2 个 rewrite 命中进程内缓存未发）。`handleLLMStart` 建 span 不带显式 parent、取回调分发瞬间的 ALS ambient；并行 tool 执行下 LangChain 实例级回调的分发续体脱离 AsyncLocalStorage store，ambient 只剩 run 根。同管线的 dense/bm25 等 traceable span 不受影响——`traceable` 在入口一次性捕获 context 并显式传给 `startActiveSpan`，ALS 只需活到 span 创建那一刻。
+
+**修复**：绕开 ALS、改引用传递——
+
+- `spans.ts`：新增 `cozeloopParentMetadata()`，把 `context.active()` 装进 `config.metadata`（键 `cozeloop.parent_context`）供 invoke 侧展开；`startCozeLoopSpan` 支持 `options.parent` 显式指定父级（未指定保持二参调用，行为不变）。
+- `rewrite.ts` / `multiQuery.ts`：invoke config 展开 `cozeloopParentMetadata()`。
+- `langchain-handler.ts`：`handleLLMStart` 第 7 参（LangChain 回传的 config.metadata，`manager.cjs` 原样透传）读取后三参 `startSpan` 显式指定父级；未携带时回退 ambient，主模型/子代理路径行为不变。
+
+**验证**：
+
+- 单测 +8：handler metadata 透传/回退 2 例、spans 显式 parent 与 `cozeloopParentMetadata` 2 例、transformers invoke config 透传 3 例（含禁用空对象路径）；全仓 typecheck 0 错误、**322 用例全绿**（rag 228 / web 60 / api 34）。
+- 真实调用端到端：临时用例经真实 DeepSeek invoke + 真实导出（trace `55ec8551…`：run→tool→transform 三层 spanId 已记录），llm span 应挂 `e2e-transform` 之下；服务端入库有索引延迟，最终以罗盘树嵌套为准（同冒烟路径复核）。
+
 ## 8. 实施回填（2026-10-13，P0 完成）
 
 **交付**：

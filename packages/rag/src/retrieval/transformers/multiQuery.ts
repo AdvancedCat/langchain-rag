@@ -1,6 +1,7 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { HumanMessage } from '@langchain/core/messages';
 import { extractTextContent } from './rewrite.js';
+import { cozeloopParentMetadata } from '../../observability/spans.js';
 
 const MULTI_QUERY_PROMPT = `你是一个搜索专家。对于下面的技术问题，生成 {count} 个不同角度的检索查询，以覆盖技术文档库中可能相关的内容。
 
@@ -53,7 +54,10 @@ export async function generateMultiQueries(
         .replace('{query}', query);
 
     try {
-        const response = await llm.invoke([new HumanMessage(prompt)]);
+        const response = await llm.invoke(
+            [new HumanMessage(prompt)],
+            cozeloopParentMetadata() as Parameters<typeof llm.invoke>[1],
+        );
         const text = extractTextContent(response.content).trim();
         const queries = parseQueryArray(text, count);
 

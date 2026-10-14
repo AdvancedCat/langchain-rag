@@ -24,7 +24,8 @@ const mocks = vi.hoisted(() => {
         }
         return span;
     });
-    return { makeFakeSpan, startSpan };
+    const fakeParentContext = { marker: 'parent-context' };
+    return { makeFakeSpan, startSpan, fakeParentContext };
 });
 
 vi.mock('@cozeloop/ai', () => ({
@@ -65,6 +66,7 @@ vi.mock('@cozeloop/ai', () => ({
         STREAM: 'stream',
         RETRIEVER_PROVIDER: 'retriever_provider',
     },
+    context: { active: () => mocks.fakeParentContext },
 }));
 
 vi.mock('../cozeloop.js', () => ({
@@ -72,6 +74,7 @@ vi.mock('../cozeloop.js', () => ({
 }));
 
 import { isCozeLoopEnabled } from '../cozeloop.js';
+import { COZELOOP_PARENT_CONTEXT_METADATA } from '../spans.js';
 import { CozeLoopLangChainCallbackHandler, getLangChainTracingCallbacks } from '../langchain-handler.js';
 
 /** 造一个假 LLMResult（DeepSeek/OpenAI 兼容形态） */
@@ -101,6 +104,32 @@ describe('CozeLoopLangChainCallbackHandler', () => {
         expect(span.attributes['cozeloop_span_input']).toEqual({
             messages: [{ role: 'user', content: 'Q1\n\nQ2' }],
         });
+    });
+
+    it('metadata 携带显式父 context 时透传给 tracer 三参 startSpan（并行 tool 下 rewrite/multiQuery 层级修正）', () => {
+        const handler = new CozeLoopLangChainCallbackHandler();
+        handler.handleLLMStart(
+            {} as never,
+            ['q'],
+            'run-meta',
+            undefined,
+            undefined,
+            undefined,
+            { [COZELOOP_PARENT_CONTEXT_METADATA]: mocks.fakeParentContext },
+            'llm',
+        );
+        expect(mocks.startSpan).toHaveBeenCalledWith(
+            'llm.model',
+            expect.anything(),
+            mocks.fakeParentContext,
+        );
+    });
+
+    it('metadata 未携带父 context 时保持二参调用（父级 = ambient，主模型/子代理路径不受影响）', () => {
+        const handler = new CozeLoopLangChainCallbackHandler();
+        handler.handleLLMStart({} as never, ['q'], 'run-ambient', undefined, undefined, undefined, { other: 1 });
+        expect(mocks.startSpan).toHaveBeenCalledTimes(1);
+        expect(mocks.startSpan.mock.calls[0]).toHaveLength(2);
     });
 
     it('超长 prompt 截断（不带全文进 span）', () => {

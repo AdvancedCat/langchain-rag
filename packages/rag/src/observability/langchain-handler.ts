@@ -18,9 +18,11 @@ import type { Serialized } from '@langchain/core/load/serializable';
 import type { LLMResult } from '@langchain/core/outputs';
 import {
     COZELOOP_TRACE_BUSINESS_TAGS,
+    context,
 } from '@cozeloop/ai';
 import { isCozeLoopEnabled } from './cozeloop.js';
 import {
+    COZELOOP_PARENT_CONTEXT_METADATA,
     startCozeLoopSpan,
     setSpanInput,
     setSpanOutput,
@@ -28,6 +30,9 @@ import {
     truncateForSpan,
     type Span,
 } from './spans.js';
+
+/** OTel Context（经 @cozeloop/ai 再导出的全局单例，宿主不得直依赖 @opentelemetry/api） */
+type OtelContext = ReturnType<typeof context.active>;
 
 const MODEL_SPAN_TYPE = 'model';
 
@@ -48,11 +53,15 @@ export class CozeLoopLangChainCallbackHandler extends BaseCallbackHandler {
         _parentRunId?: string,
         _extraParams?: Record<string, unknown>,
         _tags?: string[],
-        _metadata?: Record<string, unknown>,
+        metadata?: Record<string, unknown>,
         runName?: string,
     ): void {
         if (!isCozeLoopEnabled() || this.spans.has(runId)) return;
-        const span = startCozeLoopSpan(runName ?? 'llm', MODEL_SPAN_TYPE);
+        // 工具体内直调的 llm.invoke（rewrite/multiQuery）在回调分发时 ambient 只剩
+        // run 根（ALS 断链），invoke 侧经 config.metadata 显式携带父 context 修正层级；
+        // 未携带时（主模型/子代理调用）回退 ambient，行为与现状一致
+        const parentContext = metadata?.[COZELOOP_PARENT_CONTEXT_METADATA] as OtelContext | undefined;
+        const span = startCozeLoopSpan(runName ?? 'llm', MODEL_SPAN_TYPE, { parent: parentContext });
         if (!span) return;
         this.spans.set(runId, span);
         // ChatOpenAI 的流式路径 llmOutput 不带 model_name（罗盘上显示 unknown 的

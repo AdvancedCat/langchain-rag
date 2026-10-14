@@ -25,7 +25,8 @@ const mocks = vi.hoisted(() => {
         }
         return span;
     });
-    return { makeFakeSpan, startSpan };
+    const fakeActiveContext = { marker: 'active-context' };
+    return { makeFakeSpan, startSpan, fakeActiveContext };
 });
 
 vi.mock('@cozeloop/ai', () => ({
@@ -58,6 +59,7 @@ vi.mock('@cozeloop/ai', () => ({
         SPAN_OUTPUT: 'cozeloop_span_output',
     },
     COZELOOP_TRACE_BUSINESS_TAGS: {},
+    context: { active: () => mocks.fakeActiveContext },
 }));
 
 vi.mock('../cozeloop.js', () => ({
@@ -76,6 +78,8 @@ import {
     truncateForSpan,
     summarizeScoredChunks,
     MAX_SPAN_TEXT_CHARS,
+    COZELOOP_PARENT_CONTEXT_METADATA,
+    cozeloopParentMetadata,
 } from '../spans.js';
 
 beforeEach(() => {
@@ -155,6 +159,30 @@ describe('手动 span 生命周期', () => {
             }),
         });
         expect(span.attributes['cozeloop_span_name']).toBe('retrieval.gate');
+    });
+
+    it('未显式指定 parent 时保持二参调用（父级 = ambient）', () => {
+        vi.mocked(isCozeLoopEnabled).mockReturnValue(true);
+        startCozeLoopSpan('retrieval.gate', 'retriever');
+        expect(mocks.startSpan.mock.calls[0]).toHaveLength(2);
+    });
+
+    it('显式 parent 时以三参调用透传给 tracer（并行 tool 下 model span 层级修正的底层通道）', () => {
+        vi.mocked(isCozeLoopEnabled).mockReturnValue(true);
+        startCozeLoopSpan('llm', 'model', { parent: mocks.fakeActiveContext as never });
+        expect(mocks.startSpan).toHaveBeenCalledWith(
+            'llm.model',
+            expect.anything(),
+            mocks.fakeActiveContext,
+        );
+    });
+
+    it('cozeloopParentMetadata 禁用返回空对象；启用时把 active context 装进 metadata', () => {
+        expect(cozeloopParentMetadata()).toEqual({});
+        vi.mocked(isCozeLoopEnabled).mockReturnValue(true);
+        expect(cozeloopParentMetadata()).toEqual({
+            metadata: { [COZELOOP_PARENT_CONTEXT_METADATA]: mocks.fakeActiveContext },
+        });
     });
 
     it('setSpanInput/Output/Error 对 null 安全；对 span 写属性', () => {

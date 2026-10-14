@@ -182,6 +182,8 @@
 - **model span 的 model_name 显示 unknown**：`@langchain/openai` 1.x 已不写 `llmOutput.model_name`（0.x 旧字段），LLM_MODEL env 又未设置。修复：回调 handler 在 Start 从序列化 kwargs（`toJSON().kwargs.model`）提取配置模型名，上报优先级 `kwargs.model > response_metadata.model_name（服务端回显）> llmOutput.model_name > LLM_MODEL env`。
 - **token 用量标签从未上报（连带发现）**：handler 读取的 `llmOutput.token_usage` 同为 0.x 形态，1.x 实际是 `message.usage_metadata`（流式）与 `llmOutput.tokenUsage`（camelCase）。修复：`readTokenUsage` 三形态逐级回退。
 
+**层级修正续（2026-10-13，方案 §7.3）**：真实 trace 复盘发现工具体内直调的 rewrite/multiQuery LLM span 在并行 tool 执行下泄漏到 run 根（LangChain 实例级回调分发脱离 AsyncLocalStorage，ambient 只剩根；§7.2 的 wrapToolCall 只覆盖了子代理路径）。罗盘同层按 started_at 排序，工具比各自 rewrite llm 早 1-6ms 启动，平铺后观感像"生成检索 query 的 LLM 晚于工具执行"——实为挂根层级的显示问题，span 时间窗本身完全正常。修复：`cozeloopParentMetadata()` 把 active context 经 LangChain `config.metadata` 引用传递（不经 ALS，天然免疫断链），`handleLLMStart` 读取后显式三参 `startSpan` 指定父级；未携带时回退 ambient，主模型/子代理路径行为不变。验证：+8 单测、全仓 322 用例全绿（rag 228 / web 60 / api 34）、真实 DeepSeek 调用导出冒烟（trace `55ec8551…`）。
+
 **遗留（P1+）**：embedding/ingestion 埋点、web→api 跨端 trace 透传（`X-Cozeloop-Traceparent`，2026-10-13 已先交付 traceId 展示：`CUSTOM cozeloop.trace` 事件 + 前端 Turn 底部复制芯片，见方案 §7.1）、`retrieval.trace` AG-UI CUSTOM 事件（M9-P3，与 spans 互补）、评测批跑上报隔离。
 
 ---
