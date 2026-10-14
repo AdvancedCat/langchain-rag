@@ -184,6 +184,12 @@ rag-agent-cli.run (custom, root)                               ← packages/rag 
 - 单测 +8：handler metadata 透传/回退 2 例、spans 显式 parent 与 `cozeloopParentMetadata` 2 例、transformers invoke config 透传 3 例（含禁用空对象路径）；全仓 typecheck 0 错误、**322 用例全绿**（rag 228 / web 60 / api 34）。
 - 真实调用端到端：临时用例经真实 DeepSeek invoke + 真实导出（trace `55ec8551…`：run→tool→transform 三层 spanId 已记录），llm span 应挂 `e2e-transform` 之下；服务端入库有索引延迟，最终以罗盘树嵌套为准（同冒烟路径复核）。
 
+## 7.4 增量（2026-10-14）：run 根 span output 记录最终回答
+
+API 路径的 run 根 span output 原为 `{status, error?}`（§3.3 约定，避免序列化 ActiveRun 内部结构），最终回答只有 CLI 路径记录（`{answer}` 截断）——罗盘上看 API run 的 trace 时无法直接读到答案。对齐：`runManager.executeRun` 循环内累积 `TEXT_MESSAGE_CONTENT` delta 为 `answerText`，span 收口改写 `{status, error?, answer: truncateForSpan(answerText)}`（无回答时省略 answer 键，如流未启动即失败）。
+
+**累积口径（首版踩坑修正）**：不能拼全部正文 delta——一次 run 里有 45 段正文（3 段主代理轮次 + 42 段 chunk-analyst 子代理报告，共 38811 字符），从头截 2000 字符全是中间产物，最终回答反而被截掉（真实 trace `c8bb863e…` 复盘确认）。最终口径：**只累积主代理（事件无 `subagentRunId`）的正文，且主代理每开一条新消息（`TEXT_MESSAGE_START`）即重置**——留下的就是最后一轮正文，即最终回答；REASONING_MESSAGE_*（思考流）本就单独成事件，天然不进。验证：api +2 用例（单轮流三键断言；多轮+子代理流断言 output 只含最终轮），全仓 324 用例全绿。
+
 ## 8. 实施回填（2026-10-13，P0 完成）
 
 **交付**：

@@ -20,6 +20,7 @@ import {
     withCozeLoopSpan,
     setSpanInput,
     setSpanOutput,
+    truncateForSpan,
     getLangChainTracingCallbacks,
     type Span,
 } from '@langchain-rag/rag';
@@ -228,6 +229,12 @@ export class RunManager {
             run.controller.abort();
         }, this.deps.config.runTimeoutMs);
         let lastSnapshotCount: number | undefined;
+        // 流式回答累积：只保留主代理（无 subagentRunId）的正文——中间轮文本与
+        // chunk-analyst 子代理报告不进 output；主代理每开一条新消息即重置，
+        // 最终留下的就是最后一轮（即最终回答），罗盘上免点开末个 llm span 即可读
+        let answerText = '';
+        const isMainAgentText = (event: AguiEvent): boolean =>
+            !(event as unknown as { subagentRunId?: string }).subagentRunId;
 
         try {
             const agent = getAgent();
@@ -248,6 +255,10 @@ export class RunManager {
             })) {
                 if (event.type === EventType.MESSAGES_SNAPSHOT) {
                     lastSnapshotCount = (event as unknown as { messages: unknown[] }).messages.length;
+                } else if (event.type === EventType.TEXT_MESSAGE_START && isMainAgentText(event)) {
+                    answerText = '';
+                } else if (event.type === EventType.TEXT_MESSAGE_CONTENT && isMainAgentText(event)) {
+                    answerText += (event as unknown as { delta?: string }).delta ?? '';
                 }
                 await this.persistAndFanout(run, event);
                 // 紧跟 RUN_STARTED 发 traceId：必须在该事件之后，前端归约按当前 turn 落位
@@ -293,7 +304,12 @@ export class RunManager {
             }
         }
 
-        // 根 span 收口：终态与错误信息（traceable 在 fn 返回时自动 end span）
-        setSpanOutput(span, { status: run.status, error: run.error });
+        // 根 span 收口：终态、错误信息与最终回答（截断，与 CLI 路径对齐；
+        // traceable 在 fn 返回时自动 end span）
+        setSpanOutput(span, {
+            status: run.status,
+            error: run.error,
+            ...(answerText ? { answer: truncateForSpan(answerText) } : {}),
+        });
     }
 }
