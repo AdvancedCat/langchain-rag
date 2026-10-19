@@ -71,6 +71,8 @@ async function answerQuery(
         green: '\x1b[32m',
     };
 
+    // v3 的 messages 流会依次吐出中间轮次与子代理报告，与 API 路径口径对齐：
+    // 只保留最后一段非空文本作为最终回答，避免根 span 记录整场转录
     let finalAnswer = '';
     let answerStarted = false;
 
@@ -80,10 +82,12 @@ async function answerQuery(
             console.log(`${COLORS.green}💬 Answer:${COLORS.reset}`);
             answerStarted = true;
         }
+        let current = '';
         for await (const token of msg.text) {
             process.stdout.write(token);
-            finalAnswer += token;
+            current += token;
         }
+        if (current) finalAnswer = current;
     }
 
     console.log();
@@ -92,9 +96,13 @@ async function answerQuery(
     const state = await run.output;
     const finalMessage = state.messages.at(-1);
     if (!finalAnswer && finalMessage) {
-        console.log(
-            finalMessage.text ?? finalMessage.content ?? '(no response)',
-        );
+        const fallbackText = finalMessage.text ?? finalMessage.content;
+        if (fallbackText != null) {
+            console.log(fallbackText);
+            finalAnswer = String(fallbackText);
+        } else {
+            console.log('(no response)');
+        }
     }
     setSpanOutput(span, { answer: truncateForSpan(finalAnswer) });
 }

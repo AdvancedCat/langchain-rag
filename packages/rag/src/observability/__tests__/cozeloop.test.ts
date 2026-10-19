@@ -1,5 +1,6 @@
 // ============================================================================
-// initCozeLoop gate 行为：未配置 no-op、auto 启用、显式覆盖、幂等、shutdown 刷盘
+// initCozeLoop gate 行为：未配置 no-op、auto 启用、显式覆盖、初始化失败降级禁用、
+// 幂等、shutdown 刷盘
 //（方案 §3.2；@cozeloop/ai 全 mock，不触真实服务）
 // ============================================================================
 
@@ -121,6 +122,19 @@ describe('initCozeLoop', () => {
         process.env.COZELOOP_ENABLED = 'yes';
         const mod = await loadModule();
         expect(() => mod.initCozeLoop()).toThrow(/COZELOOP_ENABLED/);
+    });
+
+    it('initialize 抛错时保持禁用且视为已初始化（业务无感，重试不反复半初始化）', async () => {
+        process.env.COZELOOP_API_TOKEN = 'pat';
+        process.env.COZELOOP_WORKSPACE_ID = 'ws';
+        vi.mocked(cozeLoopTracer.initialize).mockImplementationOnce(() => {
+            throw new Error('PropertyUnprovidedError: workspaceId');
+        });
+        const mod = await loadModule();
+        expect(() => mod.initCozeLoop()).not.toThrow();
+        expect(mod.initCozeLoop()).toBe(false);
+        expect(mod.isCozeLoopEnabled()).toBe(false);
+        expect(cozeLoopTracer.initialize).toHaveBeenCalledTimes(1);
     });
 
     it('重复调用幂等：initialize 只触发一次', async () => {

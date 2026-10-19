@@ -14,7 +14,7 @@ import {
     SpanKind,
     withCozeLoopSpan,
     setSpanOutput,
-    failCozeLoopSpan,
+    setSpanError,
     summarizeScoredChunks,
     truncateForSpan,
 } from '../observability/index.js';
@@ -175,7 +175,10 @@ async function retrievePipeline(
                     console.warn(
                         `[Rerank] API failed, falling back to fusion order: ${error instanceof Error ? error.message : String(error)}`,
                     );
-                    failCozeLoopSpan(span, error, { fallback: 'fusion-order' });
+                    // span 归 withCozeLoopSpan 所有：只记错误与降级标记，end 由包装器负责
+                    // （failCozeLoopSpan 会自行 end，在这里用会导致双重 end + error 状态被覆盖）
+                    setSpanError(span, error);
+                    setSpanOutput(span, { fallback: 'fusion-order' });
                     return finalCandidates;
                 }
             },

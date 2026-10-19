@@ -67,6 +67,16 @@ interface ActiveRun {
     cancelReason?: 'cancelled' | 'timeout';
 }
 
+/** 观测记账兜底：单个 span 操作失败只 warn，绝不打断 run 生命周期 */
+function safeSpanRecord(span: Span | null, op: string, fn: (span: Span) => void): void {
+    if (!span) return;
+    try {
+        fn(span);
+    } catch (error) {
+        console.warn(`[run] span ${op} failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
+
 export class RunManager {
     private readonly active = new Map<string, ActiveRun>();
     /** thread 级订阅（GET /events 回放尾随用；run 级订阅给 POST /agui 的响应流） */
@@ -126,7 +136,11 @@ export class RunManager {
     start(runId: string, query: string): void {
         const run = this.active.get(runId);
         if (!run || run.status !== 'running') return;
-        void this.execute(run, query);
+        // execute() 自身永不 reject，此 catch 只是防线：未来 execute 里若新增
+        // try 之外的代码，未处理拒绝会崩掉进程
+        void this.execute(run, query).catch((error) => {
+            console.error(`[run] execute rejected: ${error instanceof Error ? error.message : String(error)}`);
+        });
     }
 
     /** 显式取消（幂等：已终态返回终态） */
@@ -191,18 +205,49 @@ export class RunManager {
     private async execute(run: ActiveRun, query: string): Promise<void> {
         // CozeLoop 根 span（自定义类型 'run'）：baggages 把 thread_id/run_id 透传到
         // 全部子 span（LLM/工具/检索阶段，方案 cozeloop-observability-plan.md §3.3）。
-        // 禁用时直通原逻辑。
-        await withCozeLoopSpan(
-            'rag-agent',
-            'run',
-            async (span) => {
-                setSpanInput(span, { query, threadId: run.threadId, runId: run.runId });
-                await this.executeRun(run, query, span);
-            },
-            {
-                baggages: { thread_id: run.threadId, run_id: run.runId },
-            },
-        );
+        // 禁用时直通原逻辑。观测层与业务强隔离（上报失败本应 SDK 内部吞错，这里
+        // 再兜一层）：包装器/记账抛错只 warn；若抛出发生在 executeRun 启动之前，
+        // 其 finally 不会执行，由 abandonRun 兜底收尾，否则 ActiveRun 残留会把
+        // thread 永久卡在 409、waitIdle 关机挂起。
+        try {
+            await withCozeLoopSpan(
+                'rag-agent',
+                'run',
+                async (span) => {
+                    safeSpanRecord(span, 'input', (s) =>
+                        setSpanInput(s, { query, threadId: run.threadId, runId: run.runId }),
+                    );
+                    await this.executeRun(run, query, span);
+                },
+                {
+                    baggages: { thread_id: run.threadId, run_id: run.runId },
+                },
+            );
+        } catch (error) {
+            console.warn(`[run] cozeloop span failed: ${error instanceof Error ? error.message : String(error)}`);
+            await this.abandonRun(run, error);
+        }
+    }
+
+    /** executeRun 未及启动时的兜底收尾：清理槽位、落终态、给订阅者终态事件 */
+    private async abandonRun(run: ActiveRun, error: unknown): Promise<void> {
+        if (this.active.get(run.runId) !== run) return; // executeRun 已自行收尾
+        run.status = 'error';
+        run.error = error instanceof Error ? error.message : String(error);
+        run.endedAt = Date.now();
+        this.active.delete(run.runId);
+        this.finished.set(run.runId, this.snapshot(run));
+        void this.deps.persistence.finishRun(run.runId, run.status, run.error).catch(() => undefined);
+        try {
+            await this.persistAndFanout(run, {
+                type: EventType.RUN_ERROR,
+                message: run.error,
+                code: 'server_error',
+                timestamp: Date.now(),
+            });
+        } catch (fanoutError) {
+            console.warn(`[run] abandon fanout failed: ${fanoutError instanceof Error ? fanoutError.message : String(fanoutError)}`);
+        }
     }
 
     /**
@@ -305,11 +350,14 @@ export class RunManager {
         }
 
         // 根 span 收口：终态、错误信息与最终回答（截断，与 CLI 路径对齐；
-        // traceable 在 fn 返回时自动 end span）
-        setSpanOutput(span, {
-            status: run.status,
-            error: run.error,
-            ...(answerText ? { answer: truncateForSpan(answerText) } : {}),
-        });
+        // traceable 在 fn 返回时自动 end span）。此处已在 finally 之后，
+        // 记账抛错不得外泄为 unhandled rejection
+        safeSpanRecord(span, 'output', (s) =>
+            setSpanOutput(s, {
+                status: run.status,
+                error: run.error,
+                ...(answerText ? { answer: truncateForSpan(answerText) } : {}),
+            }),
+        );
     }
 }
