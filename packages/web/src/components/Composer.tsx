@@ -35,14 +35,14 @@ export function Composer({
     };
 
     return (
-        <div className="border-t border-zinc-200 bg-white px-4 py-3">
+        <div className="border-t border-line bg-canvas px-4 py-3">
             <div className="mx-auto flex max-w-3xl items-end gap-2">
                 <textarea
                     ref={textareaRef}
                     rows={1}
                     value={draft}
                     placeholder="向知识库提问…"
-                    className="thin-scrollbar max-h-[200px] min-h-[44px] flex-1 resize-none rounded-xl border border-zinc-300 px-3.5 py-2.5 text-[0.9375rem] leading-relaxed text-zinc-800 placeholder:text-zinc-600 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                    className="thin-scrollbar max-h-[200px] min-h-[44px] flex-1 resize-none rounded-xl border border-line px-3.5 py-2.5 text-[0.9375rem] leading-relaxed text-content placeholder:text-content-secondary focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20"
                     onChange={(event) => onDraftChange(event.target.value)}
                     onKeyDown={(event) => {
                         if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -55,7 +55,7 @@ export function Composer({
                     <button
                         type="button"
                         onClick={onStop}
-                        className="flex h-[44px] shrink-0 items-center gap-1.5 rounded-xl bg-zinc-800 px-4 text-sm font-medium text-white hover:bg-zinc-700"
+                        className="flex h-[44px] shrink-0 items-center gap-1.5 rounded-xl bg-content px-4 text-sm font-medium text-canvas transition hover:bg-content/85"
                     >
                         <IconStop />
                         停止
@@ -65,14 +65,14 @@ export function Composer({
                         type="button"
                         onClick={submit}
                         disabled={!draft.trim()}
-                        className="flex h-[44px] shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-4 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-zinc-300"
+                        className="flex h-[44px] shrink-0 items-center gap-1.5 rounded-xl bg-accent px-4 text-sm font-medium text-accent-fg transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong"
                     >
                         <IconSend />
                         发送
                     </button>
                 )}
             </div>
-            <p className="mx-auto mt-2 max-w-3xl text-xs text-zinc-600">
+            <p className="mx-auto mt-2 max-w-3xl text-xs text-content-secondary">
                 Enter 发送 · Shift+Enter 换行 · 回答基于已接入的知识库生成
             </p>
         </div>

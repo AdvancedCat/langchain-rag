@@ -49,42 +49,42 @@ export function ChatView({
     };
 
     return (
-        <main className="flex h-full min-w-0 flex-1 flex-col bg-white">
-            <header className="flex h-13 items-center border-b border-zinc-200 px-5 py-3">
-                <h1 className="truncate text-sm font-semibold text-zinc-700">{title}</h1>
+        <main className="flex h-full min-w-0 flex-1 flex-col bg-canvas">
+            <header className="flex h-13 items-center border-b border-line px-5 py-3">
+                <h1 className="truncate text-sm font-semibold text-content">{title}</h1>
                 {state.activeRunId !== null && (
-                    <span className="ml-3 flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                        <span className="h-1.5 w-1.5 motion-safe:animate-pulse rounded-full bg-emerald-500" />
+                    <span className="ml-3 flex items-center gap-1.5 rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-medium text-success-fg">
+                        <span className="h-1.5 w-1.5 motion-safe:animate-pulse rounded-full bg-success" />
                         回答生成中
                     </span>
                 )}
             </header>
 
             {state.channel.state === 'reconnecting' && (
-                <div className="border-b border-amber-200 bg-amber-50 px-5 py-1.5 text-center text-xs text-amber-700">
+                <div className="border-b border-warning/30 bg-warning-soft px-5 py-1.5 text-center text-xs text-warning-fg">
                     连接中断，正在重连…（第 {state.channel.attempt} 次）
                 </div>
             )}
 
             {state.phase === 'error' ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-                    <p className="text-sm text-red-700">{state.loadError?.message ?? '会话加载失败'}</p>
+                    <p className="text-sm text-danger-fg">{state.loadError?.message ?? '会话加载失败'}</p>
                     <button
                         type="button"
                         onClick={() => void controller.open(threadId)}
-                        className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
+                        className="rounded-lg border border-line-strong px-3 py-1.5 text-sm text-content hover:bg-surface"
                     >
                         重新加载
                     </button>
                 </div>
             ) : state.phase === 'loading' ? (
-                <div className="flex flex-1 items-center justify-center text-sm text-zinc-600">正在恢复会话…</div>
+                <div className="flex flex-1 items-center justify-center text-sm text-content-secondary">正在恢复会话…</div>
             ) : state.turns.length === 0 ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-5 px-6">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 text-lg font-bold text-white">R</div>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-lg font-bold text-accent-fg">R</div>
                     <div className="text-center">
-                        <h2 className="text-lg font-semibold text-zinc-800">知识库问答</h2>
-                        <p className="mt-1 text-sm text-zinc-600">基于已接入的知识库检索与多代理分析生成，回答附完整过程</p>
+                        <h2 className="text-lg font-semibold text-content">知识库问答</h2>
+                        <p className="mt-1 text-sm text-content-secondary">基于已接入的知识库检索与多代理分析生成，回答附完整过程</p>
                     </div>
                     <div className="flex max-w-lg flex-wrap justify-center gap-2">
                         {EXAMPLE_QUESTIONS.map((question) => (
@@ -92,7 +92,7 @@ export function ChatView({
                                 key={question}
                                 type="button"
                                 onClick={() => send(question)}
-                                className="rounded-full border border-zinc-200 bg-white px-3.5 py-1.5 text-xs text-zinc-600 shadow-sm transition hover:border-indigo-300 hover:text-indigo-600"
+                                className="rounded-full border border-line bg-canvas px-3.5 py-1.5 text-xs text-content-secondary transition hover:border-accent hover:text-accent"
                             >
                                 {question}
                             </button>

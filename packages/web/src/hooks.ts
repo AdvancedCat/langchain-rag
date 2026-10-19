@@ -86,6 +86,39 @@ export function useThreads(api: ThreadsApi) {
 
 export type ServiceStatus = 'checking' | 'ready' | 'degraded' | 'down';
 
+/** 主题选择：深色模式按 html.dark 类切换（MASTER §2），手动选择存 localStorage */
+export type ThemeChoice = 'light' | 'dark';
+
+const THEME_STORAGE_KEY = 'theme';
+
+function resolveTheme(): ThemeChoice {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === 'light' || stored === 'dark') return stored;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+/** 默认跟随 prefers-color-scheme；手动选择后系统变化不再跟随 */
+export function useTheme(): [ThemeChoice, (theme: ThemeChoice) => void] {
+    const [theme, setTheme] = useState<ThemeChoice>(resolveTheme);
+    useEffect(() => {
+        const media = window.matchMedia('(prefers-color-scheme: dark)');
+        const onChange = () => {
+            if (localStorage.getItem(THEME_STORAGE_KEY) !== null) return;
+            const next = resolveTheme();
+            document.documentElement.classList.toggle('dark', next === 'dark');
+            setTheme(next);
+        };
+        media.addEventListener('change', onChange);
+        return () => media.removeEventListener('change', onChange);
+    }, []);
+    const apply = (next: ThemeChoice) => {
+        localStorage.setItem(THEME_STORAGE_KEY, next);
+        document.documentElement.classList.toggle('dark', next === 'dark');
+        setTheme(next);
+    };
+    return [theme, apply];
+}
+
 /** 服务状态点：/health + /ready 双探针，30s 轮询 */
 export function useServiceStatus(api: ThreadsApi): ServiceStatus {
     const [status, setStatus] = useState<ServiceStatus>('checking');

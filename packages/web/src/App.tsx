@@ -1,13 +1,14 @@
 import { useEffect, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ChatView } from './components/ChatView';
-import { navigateToThread, useChat, useHashRoute, useServiceStatus, useThreads, useThreadsApi } from './hooks';
+import { navigateToThread, useChat, useHashRoute, useServiceStatus, useTheme, useThreads, useThreadsApi } from './hooks';
 
 export function App() {
     const threadId = useHashRoute();
     const api = useThreadsApi();
     const { threads, refresh } = useThreads(api);
     const serviceStatus = useServiceStatus(api);
+    const [theme, setTheme] = useTheme();
     const { state, controller } = useChat(threadId, (created) => {
         // 首次发送自建线程 → URL 同步（#/t/<id>），刷新可恢复
         navigateToThread(created);
@@ -40,9 +41,11 @@ export function App() {
                 currentThreadId={threadId}
                 localActiveRun={state.activeRunId !== null}
                 serviceStatus={serviceStatus}
+                theme={theme}
                 onSelect={navigateToThread}
                 onNew={() => navigateToThread(null)}
                 onDelete={(id) => void handleDelete(id)}
+                onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             />
             <ChatView state={state} controller={controller} title={title} threadId={threadId} />
         </div>

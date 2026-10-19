@@ -27,34 +27,34 @@ export function ToolCallCard({ block }: { block: ToolCallBlock }) {
     const running = !block.done;
     const label = TOOL_LABELS[block.name] ?? block.name;
     return (
-        <div className="rounded-lg border border-zinc-200 bg-white text-sm">
+        <div className="rounded-lg border border-line bg-canvas text-sm">
             <button
                 type="button"
                 aria-expanded={open}
                 onClick={() => setOpen((value) => !value)}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-zinc-600 hover:bg-zinc-50"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-content-secondary hover:bg-surface"
             >
                 <IconChevron open={open} />
-                <span className="text-zinc-400">
+                <span className="text-content-muted">
                     <IconWrench />
                 </span>
                 <span className="font-medium">{label}</span>
                 {running ? <IconSpinner /> : <IconCheck />}
             </button>
             {open && (
-                <div className="space-y-2 border-t border-zinc-100 px-3 py-2">
+                <div className="space-y-2 border-t border-line px-3 py-2">
                     {block.args && (
                         <div>
-                            <div className="mb-1 text-xs font-medium text-zinc-600">参数</div>
-                          <pre className="thin-scrollbar max-h-40 overflow-auto rounded bg-zinc-50 p-2 text-xs text-zinc-700">
+                            <div className="mb-1 text-xs font-medium text-content-secondary">参数</div>
+                          <pre className="thin-scrollbar max-h-40 overflow-auto rounded bg-inset p-2 text-xs text-content-secondary">
                                 {prettyJson(block.args)}
                             </pre>
                         </div>
                     )}
                     {block.result !== null && (
                         <div>
-                            <div className="mb-1 text-xs font-medium text-zinc-600">结果</div>
-                            <pre className="thin-scrollbar max-h-60 overflow-auto whitespace-pre-wrap rounded bg-zinc-50 p-2 text-xs text-zinc-700">
+                            <div className="mb-1 text-xs font-medium text-content-secondary">结果</div>
+                            <pre className="thin-scrollbar max-h-60 overflow-auto whitespace-pre-wrap rounded bg-inset p-2 text-xs text-content-secondary">
                                 {block.result || '（空）'}
                             </pre>
                         </div>
@@ -69,22 +69,22 @@ export function ToolCallCard({ block }: { block: ToolCallBlock }) {
 export function ReasoningBlockView({ block }: { block: Extract<ChatBlock, { kind: 'reasoning' }> }) {
     const [open, setOpen] = useState(false);
     return (
-        <div className="rounded-lg border border-zinc-200 bg-zinc-50/60 text-sm">
+        <div className="rounded-lg border border-line bg-surface/60 text-sm">
             <button
                 type="button"
                 aria-expanded={open}
                 onClick={() => setOpen((value) => !value)}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-zinc-600 hover:bg-zinc-100/60"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-content-secondary hover:bg-inset/60"
             >
                 <IconChevron open={open} />
-                <span className="text-zinc-400">
+                <span className="text-content-muted">
                     <IconBrain />
                 </span>
                 <span className="font-medium">思考过程</span>
                 {!block.done && <IconSpinner />}
             </button>
             {open && (
-                <pre className="thin-scrollbar max-h-72 overflow-auto whitespace-pre-wrap border-t border-zinc-200/70 px-3 py-2 text-xs leading-relaxed text-zinc-600">
+                <pre className="thin-scrollbar max-h-72 overflow-auto whitespace-pre-wrap border-t border-line/70 px-3 py-2 text-xs leading-relaxed text-content-secondary">
                     {block.content}
                 </pre>
             )}
@@ -96,22 +96,22 @@ export function ReasoningBlockView({ block }: { block: Extract<ChatBlock, { kind
 export function SubagentGroup({ block }: { block: SubagentBlock }) {
     const [open, setOpen] = useState(false);
     return (
-        <div className="rounded-lg border border-indigo-200 bg-indigo-50/40 text-sm">
+        <div className="rounded-lg border border-accent/30 bg-accent-soft/40 text-sm">
             <button
                 type="button"
                 aria-expanded={open}
                 onClick={() => setOpen((value) => !value)}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-indigo-700 hover:bg-indigo-50"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-accent hover:bg-accent-soft/70"
             >
                 <IconChevron open={open} />
-                <span className="text-indigo-400">
+                <span className="text-accent/70">
                     <IconBot />
                 </span>
                 <span className="font-medium">子代理 · {block.name}</span>
                 {block.finished ? <IconCheck /> : <IconSpinner />}
             </button>
             {open && (
-                <div className="space-y-2 border-t border-indigo-100 px-3 py-2">
+                <div className="space-y-2 border-t border-accent/20 px-3 py-2">
                     <BlockList blocks={block.blocks} />
                 </div>
             )}
@@ -156,25 +156,25 @@ export function ActivitySection({ blocks }: { blocks: ChatBlock[] }) {
         summary.subagents > 0 && `子代理 ×${summary.subagents}`,
     ].filter(Boolean);
     return (
-        <div className="rounded-lg border border-zinc-200 bg-zinc-50/60">
+        <div className="rounded-lg border border-line bg-surface/60">
             <button
                 type="button"
                 aria-expanded={open}
                 onClick={() => setOpen((value) => !value)}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-600 hover:bg-zinc-100/60"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-content-secondary hover:bg-inset/60"
             >
                 <IconChevron open={open} />
-                <span className="text-zinc-400">
+                <span className="text-content-muted">
                     <IconBrain />
                 </span>
                 <span className="font-medium">思考与工具调用</span>
-                <span className="text-xs text-zinc-600">{parts.join(' · ')}</span>
+                <span className="text-xs text-content-secondary">{parts.join(' · ')}</span>
                 <span className="ml-auto">
                     {summary.allDone ? <IconCheck /> : <IconSpinner />}
                 </span>
             </button>
             {open && (
-                <div className="border-t border-zinc-200/70 px-3 py-2">
+                <div className="border-t border-line/70 px-3 py-2">
                     <BlockList blocks={blocks} />
                 </div>
             )}

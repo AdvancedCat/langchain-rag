@@ -5,7 +5,7 @@
 >
 > **Project:** Docs RAG Chat（`packages/web`，React 19 + Tailwind CSS v4）
 > **Generated:** 2026-10-11（ui-ux-pro-max 检索 + 现状审查，方向经确认）
-> **Updated:** 2026-10-19（纳入 PR #2 新增的 TraceChip：元信息 chip 族、复制反馈模式、P0/P2 清单增量）
+> **Updated:** 2026-10-19（纳入 PR #2 TraceChip 规范修订；P1 实施：§2 增补 `--accent-hover` 与状态色 `-fg`/`-soft` 衍生 token 以落地 §3.2/§7，duration 经 `@theme static` 发射）
 > **Style:** Minimalism & Swiss（极简瑞士风）· 开发者工具 · 双主题（浅色默认 + 深色）
 
 ---
@@ -47,11 +47,18 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
     --content-secondary: var(--color-zinc-600);  /* 次级/有信息量的弱文本 */
     --content-muted: var(--color-zinc-400);      /* 仅装饰性文本 */
     --accent: var(--color-indigo-600);
+    --accent-hover: var(--color-indigo-500);     /* accent 悬停态（P1 增补） */
     --accent-fg: #ffffff;
     --accent-soft: var(--color-indigo-50);
     --success: var(--color-emerald-600);
+    --success-fg: var(--color-emerald-700);      /* §3.2 状态文本（P1 增补） */
+    --success-soft: var(--color-emerald-50);     /* §3.2 状态底色（P1 增补） */
     --warning: var(--color-amber-500);
+    --warning-fg: var(--color-amber-700);
+    --warning-soft: var(--color-amber-50);
     --danger: var(--color-red-600);
+    --danger-fg: var(--color-red-700);
+    --danger-soft: var(--color-red-50);
     --ring: var(--color-indigo-600);
 }
 .dark {
@@ -64,14 +71,22 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
     --content-secondary: var(--color-zinc-400);
     --content-muted: var(--color-zinc-500);      /* 仅装饰性文本 */
     --accent: var(--color-indigo-500);
+    --accent-hover: var(--color-indigo-400);
     --accent-fg: #ffffff;
     --accent-soft: color-mix(in oklab, var(--color-indigo-500) 12%, transparent);
     --success: var(--color-emerald-500);
+    --success-fg: var(--color-emerald-400);
+    --success-soft: color-mix(in oklab, var(--color-emerald-500) 12%, transparent);
     --warning: var(--color-amber-500);
+    --warning-fg: var(--color-amber-400);
+    --warning-soft: color-mix(in oklab, var(--color-amber-500) 12%, transparent);
     --danger: var(--color-red-500);
+    --danger-fg: var(--color-red-400);
+    --danger-soft: color-mix(in oklab, var(--color-red-500) 12%, transparent);
     --ring: var(--color-indigo-500);
 }
 
+/* 颜色走 inline：工具类直接引用语义变量，.dark 切换即时生效 */
 @theme inline {
     --color-canvas: var(--canvas);
     --color-surface: var(--surface);
@@ -82,12 +97,23 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
     --color-content-secondary: var(--content-secondary);
     --color-content-muted: var(--content-muted);
     --color-accent: var(--accent);
+    --color-accent-hover: var(--accent-hover);
     --color-accent-fg: var(--accent-fg);
     --color-accent-soft: var(--accent-soft);
     --color-success: var(--success);
+    --color-success-fg: var(--success-fg);
+    --color-success-soft: var(--success-soft);
     --color-warning: var(--warning);
+    --color-warning-fg: var(--warning-fg);
+    --color-warning-soft: var(--warning-soft);
     --color-danger: var(--danger);
+    --color-danger-fg: var(--danger-fg);
+    --color-danger-soft: var(--danger-soft);
     --color-ring: var(--ring);
+}
+
+/* 字体与动效时长不随主题切换；static 强制发射（Tailwind v4 默认 tree-shake 未引用变量） */
+@theme static {
     --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system,
         "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
     --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -97,7 +123,7 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
 }
 ```
 
-深色模式机制：`html.dark` 类切换；默认跟随 `prefers-color-scheme`，手动选择存 localStorage。
+深色模式机制：`html.dark` 类切换（`@custom-variant dark`）；默认跟随 `prefers-color-scheme`，手动选择存 localStorage（`theme` 键），index.html 内联脚本在首帧前落类防闪白，切换按钮在侧栏底部。
 
 ---
 
