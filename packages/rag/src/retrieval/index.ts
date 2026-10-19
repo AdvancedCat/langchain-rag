@@ -11,6 +11,18 @@ import { getGlobalBM25Retriever } from './retrievers/bm25.js';
 import { getMaxDenseScore } from './types.js';
 import { extractSectionPath, composeSearchText } from '../chunking/compose.js';
 import { createDashScopeReranker, type Reranker } from './rerankers/index.js';
+import {
+    SpanKind,
+    initCozeLoop,
+    getLangChainTracingCallbacks,
+    withCozeLoopSpan,
+    startCozeLoopSpan,
+    endCozeLoopSpan,
+    failCozeLoopSpan,
+    setSpanInput,
+    truncateForSpan,
+    createSubagentSpanMiddleware,
+} from '../observability/index.js';
 
 const ABSTENTION_MESSAGE =
     'No documentation chunks passed the retrieval filters. You may reformulate the query and call search_documentation again (at most 2 retries). If retries keep failing, state that the documentation does not contain the answer instead of answering from prior knowledge.';
@@ -50,11 +62,14 @@ export interface CreateRagAgentOptions {
 
 export async function createRagAgent(opts: CreateRagAgentOptions = {}) {
     const { forceRebuild = false, checkpointer } = opts;
+    // CozeLoop：CLI 与 api 两条入口都经此构建 agent，这里统一初始化（幂等）。
+    // 必须先于 getLLM——实例级回调取决于 enabled 状态（方案 §3.1）。
+    initCozeLoop();
     const retrievalConfig = getRetrievalConfig();
     const vectorStore = await buildVectorStore(forceRebuild);
     const bm25Retriever = getGlobalBM25Retriever();
     const backend = new StateBackend();
-    const llm = getLLM();
+    const llm = getLLM({ callbacks: getLangChainTracingCallbacks() });
 
     let reranker: Reranker | undefined;
     if (retrievalConfig.rerank.enabled || retrievalConfig.rerankGate.enabled) {
@@ -84,88 +99,111 @@ export async function createRagAgent(opts: CreateRagAgentOptions = {}) {
     }
 
     const searchDocumentation = tool(
-        async ({ query }) => {
-            const allCandidates = await retrieve(
-                { vectorStore, bm25Retriever, llm, reranker },
-                query,
-                retrievalConfig,
-            );
+        async ({ query }) =>
+            // CozeLoop tool span：包住整个工具执行，内部的 retrieval/gate/LLM span
+            // （query rewrite）自动挂为其子 span；recordOutputs 打开——工具返回值
+            // （保存路径清单/弃答话术）即 span output。
+            withCozeLoopSpan(
+                'search_documentation',
+                SpanKind.Tool,
+                async (span) => {
+                    setSpanInput(span, { query: truncateForSpan(query) });
 
-            const retrievedChunks = allCandidates.slice(0, retrievalConfig.topK);
-            if (retrievedChunks.length === 0) {
-                return ABSTENTION_MESSAGE;
-            }
+                    const allCandidates = await retrieve(
+                        { vectorStore, bm25Retriever, llm, reranker },
+                        query,
+                        retrievalConfig,
+                    );
 
-            const maxDenseScore = getMaxDenseScore(allCandidates);
-            const denseAbstain = maxDenseScore < retrievalConfig.abstentionThreshold;
-
-            if (reranker && retrievalConfig.rerankGate.enabled) {
-                // 闸门信号：cross-encoder 对 top-fetchK 候选打分（输入文本与 embedding/BM25 同构，决策 D3）。
-                // 排序不变；API 失败或退化响应回退 dense cosine 阈值。
-                try {
-                    const gatePool = allCandidates.slice(0, retrievalConfig.fetchK);
-                    const documents = gatePool.map((c) =>
-                        composeSearchText(c.document.pageContent, c.document.metadata),
-                    );
-                    const results = await reranker.rank(query, documents, documents.length);
-                    if (results.length === 0) {
-                        // 200 但缺 output.results 的退化响应会让 bestScore 归零 → 恒弃答，必须按失败处理
-                        throw new Error('rerank API returned no results for the candidate pool');
-                    }
-                    const bestRerankScore = results.reduce(
-                        (max, r) => Math.max(max, r.relevanceScore),
-                        0,
-                    );
-                    const topDocPath = (
-                        gatePool[0]?.document.metadata as Record<string, unknown> | undefined
-                    )?.docPath;
-                    const decision =
-                        bestRerankScore < retrievalConfig.rerankGate.threshold ? 'ABSTAIN' : 'PASS';
-                    console.log(
-                        `🚪 Gate: rerank=${bestRerankScore.toFixed(4)} ` +
-                            `threshold=${retrievalConfig.rerankGate.threshold} ` +
-                            `dense=${maxDenseScore.toFixed(4)} candidates=${allCandidates.length} ` +
-                            `top=${String(topDocPath ?? '?')} query="${query}" → ${decision}`,
-                    );
-                    if (bestRerankScore < retrievalConfig.rerankGate.threshold) {
+                    const retrievedChunks = allCandidates.slice(0, retrievalConfig.topK);
+                    if (retrievedChunks.length === 0) {
                         return ABSTENTION_MESSAGE;
                     }
-                } catch (error) {
-                    console.warn(
-                        `[RerankGate] API failed, falling back to dense threshold: ${error instanceof Error ? error.message : String(error)}`,
-                    );
-                    if (denseAbstain) {
+
+                    const maxDenseScore = getMaxDenseScore(allCandidates);
+                    const denseAbstain = maxDenseScore < retrievalConfig.abstentionThreshold;
+
+                    if (reranker && retrievalConfig.rerankGate.enabled) {
+                        // 闸门信号：cross-encoder 对 top-fetchK 候选打分（输入文本与 embedding/BM25 同构，决策 D3）。
+                        // 排序不变；API 失败或退化响应回退 dense cosine 阈值。
+                        // CozeLoop：决策多早退 return，用 start/end 手动 span 记录（方案 §3.3）。
+                        const gateSpan = startCozeLoopSpan('retrieval.gate', SpanKind.Retriever, {
+                            attributes: { threshold: retrievalConfig.rerankGate.threshold },
+                        });
+                        try {
+                            const gatePool = allCandidates.slice(0, retrievalConfig.fetchK);
+                            const documents = gatePool.map((c) =>
+                                composeSearchText(c.document.pageContent, c.document.metadata),
+                            );
+                            const results = await reranker.rank(query, documents, documents.length);
+                            if (results.length === 0) {
+                                // 200 但缺 output.results 的退化响应会让 bestScore 归零 → 恒弃答，必须按失败处理
+                                throw new Error('rerank API returned no results for the candidate pool');
+                            }
+                            const bestRerankScore = results.reduce(
+                                (max, r) => Math.max(max, r.relevanceScore),
+                                0,
+                            );
+                            const topDocPath = (
+                                gatePool[0]?.document.metadata as Record<string, unknown> | undefined
+                            )?.docPath;
+                            const decision =
+                                bestRerankScore < retrievalConfig.rerankGate.threshold ? 'ABSTAIN' : 'PASS';
+                            endCozeLoopSpan(gateSpan, {
+                                decision,
+                                best_rerank_score: Number(bestRerankScore.toFixed(4)),
+                                max_dense_score: Number(maxDenseScore.toFixed(4)),
+                                top_doc_path: topDocPath ?? null,
+                                candidates: allCandidates.length,
+                            });
+                            console.log(
+                                `🚪 Gate: rerank=${bestRerankScore.toFixed(4)} ` +
+                                    `threshold=${retrievalConfig.rerankGate.threshold} ` +
+                                    `dense=${maxDenseScore.toFixed(4)} candidates=${allCandidates.length} ` +
+                                    `top=${String(topDocPath ?? '?')} query="${query}" → ${decision}`,
+                            );
+                            if (bestRerankScore < retrievalConfig.rerankGate.threshold) {
+                                return ABSTENTION_MESSAGE;
+                            }
+                        } catch (error) {
+                            failCozeLoopSpan(gateSpan, error, { decision: 'ERROR_FALLBACK_DENSE' });
+                            console.warn(
+                                `[RerankGate] API failed, falling back to dense threshold: ${error instanceof Error ? error.message : String(error)}`,
+                            );
+                            if (denseAbstain) {
+                                return ABSTENTION_MESSAGE;
+                            }
+                        }
+                    } else if (denseAbstain) {
                         return ABSTENTION_MESSAGE;
                     }
-                }
-            } else if (denseAbstain) {
-                return ABSTENTION_MESSAGE;
-            }
 
-            const batchId = randomUUID().slice(0, 8);
-            const uploads: Array<[string, Uint8Array]> = [];
-            const savedPaths: string[] = [];
+                    const batchId = randomUUID().slice(0, 8);
+                    const uploads: Array<[string, Uint8Array]> = [];
+                    const savedPaths: string[] = [];
 
-            retrievedChunks.forEach(({ document, score }, index) => {
-                const path = `/retrieved/${batchId}/chunk_${index + 1}.md`;
-                const displayScore = score.toFixed(4);
-                const sectionPath = extractSectionPath(document.metadata);
-                const sectionLine =
-                    sectionPath && sectionPath.length > 0
-                        ? `# Section: ${sectionPath.join(' > ')}\n`
-                        : '';
-                const content =
-                    `# Source: ${document.metadata?.source ?? 'unknown'}\n` +
-                    sectionLine +
-                    `# Retrieval score: ${displayScore}\n\n` +
-                    document.pageContent;
-                uploads.push([path, new TextEncoder().encode(content)]);
-                savedPaths.push(path);
-            });
+                    retrievedChunks.forEach(({ document, score }, index) => {
+                        const path = `/retrieved/${batchId}/chunk_${index + 1}.md`;
+                        const displayScore = score.toFixed(4);
+                        const sectionPath = extractSectionPath(document.metadata);
+                        const sectionLine =
+                            sectionPath && sectionPath.length > 0
+                                ? `# Section: ${sectionPath.join(' > ')}\n`
+                                : '';
+                        const content =
+                            `# Source: ${document.metadata?.source ?? 'unknown'}\n` +
+                            sectionLine +
+                            `# Retrieval score: ${displayScore}\n\n` +
+                            document.pageContent;
+                        uploads.push([path, new TextEncoder().encode(content)]);
+                        savedPaths.push(path);
+                    });
 
-            await backend.uploadFiles(uploads);
-            return `Saved ${savedPaths.length} documentation chunks:\n${savedPaths.join('\n')}`;
-        },
+                    await backend.uploadFiles(uploads);
+                    return `Saved ${savedPaths.length} documentation chunks:\n${savedPaths.join('\n')}`;
+                },
+                { recordOutputs: true },
+            ),
         {
             name: 'search_documentation',
             description:
@@ -210,6 +248,9 @@ export async function createRagAgent(opts: CreateRagAgentOptions = {}) {
         systemPrompt,
         backend,
         checkpointer,
+        // CozeLoop：包住 deepagents task 工具的执行，为子代理建 span——
+        // 其内部全部 LLM 调用借此挂到层级树上，而非平铺在根 span（方案 §3.3）
+        middleware: [createSubagentSpanMiddleware()],
     });
 
     return agent;

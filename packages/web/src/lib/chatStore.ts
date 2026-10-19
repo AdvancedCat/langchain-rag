@@ -75,6 +75,8 @@ export interface Turn {
     error?: { code?: string; message: string };
     /** CUSTOM retrieval.trace（M9-P3 项，当前通常为空） */
     trace?: RetrievalTrace;
+    /** CUSTOM cozeloop.trace：本轮 CozeLoop traceId（点击复制到罗盘后台检索） */
+    traceId?: string;
 }
 
 export type ChannelState = { state: 'ok' } | { state: 'reconnecting'; attempt: number };
@@ -402,9 +404,13 @@ function onRunError(state: ChatState, event: RunErrorEvent): ChatState {
 }
 
 function onCustom(state: ChatState, event: CustomEvent): ChatState {
-    if (event.name !== 'retrieval.trace' || !event.value) return state;
     const turnIndex = currentTurnIndex(state);
     if (turnIndex === -1) return state;
+    if (event.name === 'cozeloop.trace' && event.value && typeof event.value.traceId === 'string') {
+        const traceId = event.value.traceId;
+        return touchTurn(state, turnIndex, (turn) => ({ ...turn, traceId }));
+    }
+    if (event.name !== 'retrieval.trace' || !event.value) return state;
     return touchTurn(state, turnIndex, (turn) => ({ ...turn, trace: event.value as RetrievalTrace }));
 }
 

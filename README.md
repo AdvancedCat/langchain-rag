@@ -38,7 +38,7 @@
 - **🚫 Abstention（拒答）** — 基于 cosine score 阈值（默认 0.78，`RETRIEVAL_ABSTENTION_THRESHOLD` 可配）识别无答案问题，避免"自信地犯错"。生产配置下 7/7 unanswerable query 全部正确拒答。
 - **🧪 内置离线评测** — Retrieval（Hit@K / MRR / NDCG / Precision / Keyword Recall / Duplicate Ratio）与 Generation（Faithfulness + Relevance）双维度评测，支持 baseline 冻结与 A/B 对比。
 - **🇨🇳 中英文混合场景** — 中文 Query over English Docs，Python 文档作为 cross-language hard negative，专门评测检索策略的抗噪与消歧能力。
-- **⚙️ 严格工程规范** — TypeScript `strict: true`、环境变量边界校验、Vitest 单元测试（265 用例：rag 175 / api 33 / web 57，全绿）、Makefile 命令封装、docker-compose 一键启动基础设施。
+- **⚙️ 严格工程规范** — TypeScript `strict: true`、环境变量边界校验、Vitest 单元测试（302 用例：rag 208 / api 34 / web 60，全绿）、Makefile 命令封装、docker-compose 一键启动基础设施。
 
 ---
 
@@ -292,6 +292,11 @@ langchain-rag/
 │   │   │   │   └── compose.ts      #   消费侧 sectionPath 上下文组装
 │   │   │   ├── ingestion/          # 📥 离线索引链路
 │   │   │   │   └── index.ts        #   文档抓取 → 切分 → Embedding → 索引
+│   │   │   ├── observability/      # 🔭 CozeLoop（扣子罗盘）tracing
+│   │   │   │   ├── cozeloop.ts     #   初始化 gate / shutdown 刷盘
+│   │   │   │   ├── spans.ts        #   span 包装器与脱敏 helpers
+│   │   │   │   ├── langchain-handler.ts # LangChain LLM 回调 → model span
+│   │   │   │   └── subagent-span.ts #   task 工具 span 中间件（子代理层级）
 │   │   │   └── retrieval/          # 🔍 在线召回链路
 │   │   │       ├── index.ts        #   RAG Agent 构建（可选 checkpointer）
 │   │   │       ├── pipeline.ts     #   检索管线编排（融合/截断）
@@ -386,7 +391,7 @@ langchain-rag/
 | Rerank | DashScope `qwen3-rerank`（Cross-encoder，可插拔，实验性） |
 | 稀疏检索 | 纯内存 BM25（中文 unigram + 英文驼峰/连字符拆分） |
 | 文档切分 | 插件化切分管道（TypeDetector + ChunkValidator）；自研 Markdown header 切分核 `md-header-v2`（h1-h2 + 超长 section 字符级二级切分） |
-| 测试 | Vitest（265 用例：rag 175 / api 33 / web 57，覆盖 chunking / BM25 / fusion / MMR / metrics、AG-UI 翻译与路由、Redis 持久化集成、SSE 解析 / 事件归约 / 双通道编排） |
+| 测试 | Vitest（314 用例：rag 220 / api 34 / web 60，覆盖 chunking / BM25 / fusion / MMR / metrics、AG-UI 翻译与路由、Redis 持久化集成、SSE 解析 / 事件归约 / 双通道编排、CozeLoop tracing gate / LLM 回调 span / 子代理层级 span） |
 | 运行时 | Node.js + tsx（TypeScript native ESM） |
 | 包管理 | pnpm workspace |
 
@@ -422,7 +427,7 @@ langchain-rag/
 - [ ] **BM25 索引优化** — 流式增量构建 / 紧凑数据结构，支持 100k+ chunks 无 OOM；长期迁移至 Qdrant native sparse vectors
 - [ ] **Phase 4 高级优化（按需）** — HyDE、Parent-Child chunking、上下文压缩
 - [ ] **CI/CD** — GitHub Actions（typecheck / lint / test）
-- [ ] **可观测性** — LangSmith tracing 集成文档与最佳实践
+- [x] **可观测性** — CozeLoop（扣子罗盘）tracing 已接入：LLM（token/TTFT）+ 检索全阶段 + 弃答闸门 + 子代理（task 层级）span 树，`COZELOOP_*` 环境变量开关（[方案文档](packages/rag/docs/cozeloop-observability-plan.md)）
 
 ---
 

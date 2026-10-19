@@ -6,7 +6,7 @@
 // 支撑多轮会话与断线后继续）。构建失败不缓存失败态，下次 getAgent() 重试。
 // ============================================================================
 
-import { createRagAgent, type RagAgent } from 'docs-rag-agent';
+import { createRagAgent, type RagAgent } from '@langchain-rag/rag';
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 import { getApiServerConfig } from './config.js';
 

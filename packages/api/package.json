@@ -20,7 +20,7 @@
     "@langchain/core": "^1.2.5",
     "@langchain/langgraph-checkpoint": "^1.1.6",
     "@langchain/langgraph-checkpoint-redis": "^1.0.12",
-    "docs-rag-agent": "workspace:*",
+    "@langchain-rag/rag": "workspace:*",
     "dotenv": "^17.4.2",
     "ioredis": "^6.0.0",
     "koa": "^3.2.1",

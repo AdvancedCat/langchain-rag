@@ -5,8 +5,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "rag": "pnpm --filter docs-rag-agent run start",
-    "rag:index": "pnpm --filter docs-rag-agent run index",
+    "rag": "pnpm --filter @langchain-rag/rag run start",
+    "rag:index": "pnpm --filter @langchain-rag/rag run index",
     "serve": "pnpm --filter @langchain-rag/api run serve",
     "dev": "pnpm --filter @langchain-rag/web run dev",
     "typecheck": "pnpm -r run typecheck",

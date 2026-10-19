@@ -8,7 +8,7 @@ pnpm（`pnpm@10.7.0`）monorepo，TypeScript ESM（`"type": "module"`）。基�
 
 | 目录 | 包名 | 说明 |
 |---|---|---|
-| `packages/rag` | `docs-rag-agent` | 主应用：文档索引 + 混合检索 + 评测工具链（库入口 `src/index.ts`，供 api 包导入） |
+| `packages/rag` | `@langchain-rag/rag` | 主应用：文档索引 + 混合检索 + 评测工具链（库入口 `src/index.ts`，供 api 包导入） |
 | `packages/api` | `@langchain-rag/api` | API 服务：Koa + AG-UI 事件流 + 断线续传（方案与实施状态见 `packages/rag/docs/api-service-plan.md`，M9） |
 | `packages/web` | `@langchain-rag/web` | 前端问答界面：React + Vite，AG-UI 双通道断线续传（方案见 `packages/rag/docs/frontend-plan.md`，M10） |
 | `packages/libs` | `@langchain-rag/shared` | 跨包共享的 LLM provider 工厂（`llm-provider.ts`） |
@@ -19,7 +19,7 @@ pnpm（`pnpm@10.7.0`）monorepo，TypeScript ESM（`"type": "module"`）。基�
 # 根目录
 pnpm install              # 安装依赖
 pnpm typecheck            # 递归 tsc --noEmit
-pnpm test                 # 递归 vitest run（当前 246 个用例，必须全绿）
+pnpm test                 # 递归 vitest run（当前 325 个用例，必须全绿）
 pnpm rag                  # 启动 RAG agent（交互问答）
 pnpm rag:index            # 仅构建/更新向量索引
 pnpm serve                # 启动 API 服务（packages/api，默认 :3000，/health /ready）

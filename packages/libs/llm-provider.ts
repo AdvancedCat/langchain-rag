@@ -1,6 +1,7 @@
 import "dotenv/config";
 
 import { ChatOpenAI } from "@langchain/openai";
+import type { Callbacks } from "@langchain/core/callbacks/manager";
 
 // ============================================================================
 // DeepSeek chat model factory
@@ -17,7 +18,17 @@ import { ChatOpenAI } from "@langchain/openai";
 //               DEEPSEEK_BASE_URL, LLM_TEMPERATURE, LLM_MAX_TOKENS
 // ============================================================================
 
-export function getLLM(): ChatOpenAI {
+export interface GetLLMOptions {
+  /**
+   * Instance-level callbacks fired on EVERY invocation of the returned model —
+   * including direct `llm.invoke()` calls inside tool bodies (query rewrite,
+   * multi-query), which config-level callbacks (streamEvents options) cannot
+   * reach. Used to attach the CozeLoop observability handler.
+   */
+  callbacks?: Callbacks;
+}
+
+export function getLLM(options: GetLLMOptions = {}): ChatOpenAI {
   const modelName = process.env.LLM_MODEL ?? "deepseek-v4-flash";
   const apiKey = requireKey("DEEPSEEK_API_KEY");
   const temperature = readTemperature();
@@ -32,6 +43,7 @@ export function getLLM(): ChatOpenAI {
     temperature,
     maxTokens,
     timeout: 60000,
+    callbacks: options.callbacks,
   });
 }
 

@@ -16,6 +16,14 @@ import { EventType, type Event as AguiEvent } from '@ag-ui/core';
 import { getAgent } from './agentService.js';
 import { translateRun, type TranslatableRunStream } from './agui/translator.js';
 import type { Persistence } from './persistence/types.js';
+import {
+    withCozeLoopSpan,
+    setSpanInput,
+    setSpanOutput,
+    truncateForSpan,
+    getLangChainTracingCallbacks,
+    type Span,
+} from '@langchain-rag/rag';
 
 export type RunStatus = 'running' | 'finished' | 'error' | 'cancelled' | 'timeout';
 
@@ -57,6 +65,16 @@ interface ActiveRun {
     error?: string;
     /** cancel/timeout 的归因（abort 后 catch 分支读取） */
     cancelReason?: 'cancelled' | 'timeout';
+}
+
+/** 观测记账兜底：单个 span 操作失败只 warn，绝不打断 run 生命周期 */
+function safeSpanRecord(span: Span | null, op: string, fn: (span: Span) => void): void {
+    if (!span) return;
+    try {
+        fn(span);
+    } catch (error) {
+        console.warn(`[run] span ${op} failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
 }
 
 export class RunManager {
@@ -118,7 +136,11 @@ export class RunManager {
     start(runId: string, query: string): void {
         const run = this.active.get(runId);
         if (!run || run.status !== 'running') return;
-        void this.execute(run, query);
+        // execute() 自身永不 reject，此 catch 只是防线：未来 execute 里若新增
+        // try 之外的代码，未处理拒绝会崩掉进程
+        void this.execute(run, query).catch((error) => {
+            console.error(`[run] execute rejected: ${error instanceof Error ? error.message : String(error)}`);
+        });
     }
 
     /** 显式取消（幂等：已终态返回终态） */
@@ -181,11 +203,83 @@ export class RunManager {
     }
 
     private async execute(run: ActiveRun, query: string): Promise<void> {
+        // CozeLoop 根 span（自定义类型 'run'）：baggages 把 thread_id/run_id 透传到
+        // 全部子 span（LLM/工具/检索阶段，方案 cozeloop-observability-plan.md §3.3）。
+        // 禁用时直通原逻辑。观测层与业务强隔离（上报失败本应 SDK 内部吞错，这里
+        // 再兜一层）：包装器/记账抛错只 warn；若抛出发生在 executeRun 启动之前，
+        // 其 finally 不会执行，由 abandonRun 兜底收尾，否则 ActiveRun 残留会把
+        // thread 永久卡在 409、waitIdle 关机挂起。
+        try {
+            await withCozeLoopSpan(
+                'rag-agent',
+                'run',
+                async (span) => {
+                    safeSpanRecord(span, 'input', (s) =>
+                        setSpanInput(s, { query, threadId: run.threadId, runId: run.runId }),
+                    );
+                    await this.executeRun(run, query, span);
+                },
+                {
+                    baggages: { thread_id: run.threadId, run_id: run.runId },
+                },
+            );
+        } catch (error) {
+            console.warn(`[run] cozeloop span failed: ${error instanceof Error ? error.message : String(error)}`);
+            await this.abandonRun(run, error);
+        }
+    }
+
+    /** executeRun 未及启动时的兜底收尾：清理槽位、落终态、给订阅者终态事件 */
+    private async abandonRun(run: ActiveRun, error: unknown): Promise<void> {
+        if (this.active.get(run.runId) !== run) return; // executeRun 已自行收尾
+        run.status = 'error';
+        run.error = error instanceof Error ? error.message : String(error);
+        run.endedAt = Date.now();
+        this.active.delete(run.runId);
+        this.finished.set(run.runId, this.snapshot(run));
+        void this.deps.persistence.finishRun(run.runId, run.status, run.error).catch(() => undefined);
+        try {
+            await this.persistAndFanout(run, {
+                type: EventType.RUN_ERROR,
+                message: run.error,
+                code: 'server_error',
+                timestamp: Date.now(),
+            });
+        } catch (fanoutError) {
+            console.warn(`[run] abandon fanout failed: ${fanoutError instanceof Error ? fanoutError.message : String(fanoutError)}`);
+        }
+    }
+
+    /**
+     * XADD 先行：拿到 eventId 再扇出，SSE id: 帧与回放游标一致；
+     * 持久化失败降级为内存直发（eventId=''，断线回放将缺失该事件——故障态可接受）
+     */
+    private async persistAndFanout(run: ActiveRun, event: AguiEvent): Promise<void> {
+        let eventId = '';
+        try {
+            eventId = await this.deps.persistence.appendEvent(run.threadId, event);
+        } catch (error) {
+            console.warn(`[run] appendEvent failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        this.fanout(run, event, eventId);
+    }
+
+    private async executeRun(run: ActiveRun, query: string, span: Span | null): Promise<void> {
+        // CozeLoop 根 span 的 traceId：随 CUSTOM cozeloop.trace 事件透出给前端，
+        // 用户可复制到罗盘后台按 trace 检索；禁用时 span 为 null，不发射
+        const cozeloopTraceId = span?.spanContext().traceId;
+        let traceEventSent = false;
         const timeout = setTimeout(() => {
             run.cancelReason = 'timeout';
             run.controller.abort();
         }, this.deps.config.runTimeoutMs);
         let lastSnapshotCount: number | undefined;
+        // 流式回答累积：只保留主代理（无 subagentRunId）的正文——中间轮文本与
+        // chunk-analyst 子代理报告不进 output；主代理每开一条新消息即重置，
+        // 最终留下的就是最后一轮（即最终回答），罗盘上免点开末个 llm span 即可读
+        let answerText = '';
+        const isMainAgentText = (event: AguiEvent): boolean =>
+            !(event as unknown as { subagentRunId?: string }).subagentRunId;
 
         try {
             const agent = getAgent();
@@ -196,24 +290,33 @@ export class RunManager {
                     signal: run.controller.signal,
                     // thread_id 让 checkpointer 按 thread 恢复多轮上下文（方案 §7.3）
                     configurable: { thread_id: run.threadId },
+                    // CozeLoop：config 级回调兜底（与 LLM 实例级回调同一 handler，run_id 幂等去重）
+                    callbacks: getLangChainTracingCallbacks(),
                 },
             );
             for await (const event of translateRun(stream as unknown as TranslatableRunStream, {
                 threadId: run.threadId,
                 runId: run.runId,
             })) {
-                // XADD 先行：拿到 eventId 再扇出，SSE id: 帧与回放游标一致；
-                // 持久化失败降级为内存直发（eventId=''，断线回放将缺失该事件——故障态可接受）
-                let eventId = '';
-                try {
-                    eventId = await this.deps.persistence.appendEvent(run.threadId, event);
-                } catch (error) {
-                    console.warn(`[run] appendEvent failed: ${error instanceof Error ? error.message : String(error)}`);
-                }
                 if (event.type === EventType.MESSAGES_SNAPSHOT) {
                     lastSnapshotCount = (event as unknown as { messages: unknown[] }).messages.length;
+                } else if (event.type === EventType.TEXT_MESSAGE_START && isMainAgentText(event)) {
+                    answerText = '';
+                } else if (event.type === EventType.TEXT_MESSAGE_CONTENT && isMainAgentText(event)) {
+                    answerText += (event as unknown as { delta?: string }).delta ?? '';
                 }
-                this.fanout(run, event, eventId);
+                await this.persistAndFanout(run, event);
+                // 紧跟 RUN_STARTED 发 traceId：必须在该事件之后，前端归约按当前 turn 落位
+                if (!traceEventSent && cozeloopTraceId && event.type === EventType.RUN_STARTED) {
+                    traceEventSent = true;
+                    console.log(`🔭 [run] cozeloop trace ${cozeloopTraceId} (thread=${run.threadId} run=${run.runId})`);
+                    await this.persistAndFanout(run, {
+                        type: EventType.CUSTOM,
+                        name: 'cozeloop.trace',
+                        value: { traceId: cozeloopTraceId, runId: run.runId },
+                        timestamp: Date.now(),
+                    } as AguiEvent);
+                }
             }
             run.status = 'finished';
         } catch (error) {
@@ -226,13 +329,7 @@ export class RunManager {
                 code,
                 timestamp: Date.now(),
             };
-            let eventId = '';
-            try {
-                eventId = await this.deps.persistence.appendEvent(run.threadId, terminalEvent);
-            } catch {
-                // 持久化已故障，warn 已在 appendEvent 内或此处降级
-            }
-            this.fanout(run, terminalEvent, eventId);
+            await this.persistAndFanout(run, terminalEvent);
         } finally {
             clearTimeout(timeout);
             run.endedAt = Date.now();
@@ -251,5 +348,16 @@ export class RunManager {
                     .catch(() => undefined);
             }
         }
+
+        // 根 span 收口：终态、错误信息与最终回答（截断，与 CLI 路径对齐；
+        // traceable 在 fn 返回时自动 end span）。此处已在 finally 之后，
+        // 记账抛错不得外泄为 unhandled rejection
+        safeSpanRecord(span, 'output', (s) =>
+            setSpanOutput(s, {
+                status: run.status,
+                error: run.error,
+                ...(answerText ? { answer: truncateForSpan(answerText) } : {}),
+            }),
+        );
     }
 }

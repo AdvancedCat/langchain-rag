@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Turn } from '../lib/chatStore';
 import { partitionTurnBlocks } from '../lib/turnView';
 import { ActivitySection, BlockList } from './blocks';
@@ -12,6 +13,30 @@ const RUN_ERROR_TEXT: Record<string, string> = {
 
 export function errorText(error: { code?: string; message: string }): string {
     return RUN_ERROR_TEXT[error.code ?? ''] ?? error.message;
+}
+
+/** CozeLoop traceId 复制芯片：点击复制完整 32 位 hex，悬停 title 看全量 */
+function TraceChip({ traceId }: { traceId: string }) {
+    const [copied, setCopied] = useState(false);
+    const copy = () => {
+        void navigator.clipboard
+            ?.writeText(traceId)
+            .then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1600);
+            })
+            .catch(() => undefined);
+    };
+    return (
+        <button
+            type="button"
+            onClick={copy}
+            title={traceId}
+            className="inline-flex h-8 items-center rounded-md border border-zinc-200 px-2.5 font-mono text-[11px] tabular-nums text-zinc-500 transition-colors hover:border-indigo-300 hover:text-indigo-600 focus-visible:outline-2 focus-visible:outline-indigo-400"
+        >
+            {copied ? '已复制 ✓' : `trace ${traceId.slice(0, 8)}…`}
+        </button>
+    );
 }
 
 /**
@@ -74,6 +99,8 @@ export function TurnView({ turn, canRetry, onRetry }: { turn: Turn; canRetry: bo
                     )}
                 </div>
             )}
+
+            {turn.traceId && <TraceChip traceId={turn.traceId} />}
         </div>
     );
 }

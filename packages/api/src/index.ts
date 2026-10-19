@@ -9,6 +9,7 @@ import { EventType } from '@ag-ui/core';
 import { createApp } from './app.js';
 import { warmupAgent } from './agentService.js';
 import { closeRedis } from './redis.js';
+import { shutdownCozeLoop } from '@langchain-rag/rag';
 
 const { app, config, runManager, persistence } = createApp();
 
@@ -62,6 +63,9 @@ async function shutdown(signal: string) {
     console.log(`[api] runs ${idle ? 'all settled' : 'still active at deadline'}`);
     await persistence.close();
     await closeRedis();
+    // CozeLoop：run 全部收尾后强制上报缓冲中的 span（batch processor 定时批量）。
+    // shutdown 内部 await SDK flush 并自吞异常，此处不阻塞退出流程，兜底定时器保证 10s 内强退
+    void shutdownCozeLoop();
     // 兜底：close 回调迟迟不来（挂起的 keep-alive 连接）时强制退出
     setTimeout(() => process.exit(0), 10_000).unref();
 }

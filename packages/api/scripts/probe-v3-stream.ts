@@ -11,7 +11,7 @@
 import '../src/env.js';
 
 import { HumanMessage } from '@langchain/core/messages';
-import { createRagAgent } from 'docs-rag-agent';
+import { createRagAgent } from '@langchain-rag/rag';
 
 const query = process.argv[2] ?? '什么是langchain';
 

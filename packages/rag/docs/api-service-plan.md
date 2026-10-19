@@ -279,7 +279,7 @@ SIGTERM → 停止接受新 run（`POST /agui` 返回 503）→ 等待活跃 run
 
 ### 9.2 包结构与依赖（决策 D7）
 
-**职责边界**：`packages/rag`（`docs-rag-agent`）保持 agent/检索/切分/评测基座，不引入任何 HTTP 依赖；新增 `packages/api`（`@langchain-rag/api`）承载服务外壳，依赖单向 `api → rag`。
+**职责边界**：`packages/rag`（`@langchain-rag/rag`）保持 agent/检索/切分/评测基座，不引入任何 HTTP 依赖；新增 `packages/api`（`@langchain-rag/api`）承载服务外壳，依赖单向 `api → rag`。
 
 ```
 packages/api/                        # @langchain-rag/api（新包）
@@ -295,14 +295,14 @@ packages/api/                        # @langchain-rag/api（新包）
   package.json                       deps：koa@^3、@koa/router@^15、@ag-ui/core@^1、
                                      @ag-ui/encoder@^1、ioredis@^6、
                                      @langchain/langgraph-checkpoint-redis@^1、
-                                     docs-rag-agent(workspace:*)
+                                     @langchain-rag/rag(workspace:*)
                                      devDeps：tsx、typescript、vitest、@types/node
   .env.example                       API Server 段（§9.1）；检索/LLM 段经级联加载复用 rag 现有配置
   tsconfig.json                      与 rag 同构（ESM + moduleResolution: bundler + noEmit）
 ```
 
 - **rag 侧最小改动**（仅两处）：新增 `src/index.ts` barrel（导出 `createRagAgent`、`getRetrievalConfig`），`package.json` 增 `"exports": { ".": "./src/index.ts" }`——no-build 直指 TS 源，与 libs `main: llm-provider.ts` 同一模式的规范化；`createRagAgent` 增可选 `checkpointer` 参数（默认 undefined，CLI 行为零变化）。CLI 入口 `agent.ts`、evals 均不动；
-- **跨包装配**：`docs-rag-agent: workspace:*` 经 pnpm 符号链接解析到 rag TS 源，tsx 运行时直接执行、tsc `bundler` 解析可类型检查；rag 的传递依赖（deepagents、@langchain/*）从 `packages/rag/node_modules` 就近解析，无需在 api 重复声明；
+- **跨包装配**：`@langchain-rag/rag: workspace:*` 经 pnpm 符号链接解析到 rag TS 源，tsx 运行时直接执行、tsc `bundler` 解析可类型检查；rag 的传递依赖（deepagents、@langchain/*）从 `packages/rag/node_modules` 就近解析，无需在 api 重复声明；
 - **env 级联加载**：api 启动先加载自身 `.env`，再以不覆盖（override: false）方式加载 `../rag/.env` 补齐 LLM/Embedding/Qdrant/Retrieval 配置——现有 `.env` 不搬家，新增服务变量就近放 `packages/api/.env`；
 - **脚本**：api 增 `"serve": "tsx src/index.ts"`、`"typecheck"`、`"test"`；根 package.json 增 `"serve": "pnpm --filter @langchain-rag/api run serve"`（`pnpm typecheck`/`pnpm test` 根脚本本就递归，自然覆盖新包）；
 - **基础设施**：`docker-compose.yml` 仍在 `packages/rag`（共享数据设施定位不变），追加 **`redis:8-alpine`**（`6379`；≥8 为硬约束——checkpointer 依赖 RedisJSON；AOF 关闭——缓存语义，TTL 管生命周期）；

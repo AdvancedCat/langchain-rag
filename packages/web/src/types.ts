@@ -140,6 +140,13 @@ export interface RetrievalTrace {
     chunks?: Array<{ path: string; source?: string; sectionPath?: string[]; score?: number }>;
 }
 
+/** cozeloop.trace：本轮 run 的 CozeLoop traceId（复制到罗盘后台检索） */
+export interface CozeLoopTraceValue {
+    traceId: string;
+    runId?: string;
+}
+
+/** CUSTOM 载荷按 name 分派（retrieval.trace / cozeloop.trace），消费侧自行收窄 */
 export interface CustomEvent extends BaseEvent {
     type: 'CUSTOM';
     name: string;
