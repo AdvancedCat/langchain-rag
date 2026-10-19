@@ -75,15 +75,24 @@ export function initCozeLoop(): boolean {
 }
 
 /** 退出/优雅停机时强制刷盘（batch processor 定时上报，不 flush 会丢尾部 span） */
-export function shutdownCozeLoop(): void {
+export async function shutdownCozeLoop(): Promise<void> {
     // 以 enabled 为准：禁用路径（含 initCozeLoop 已调用但未启用）不触碰 SDK
     if (!enabled || shutdownDone) return;
     shutdownDone = true;
+    const warn = (op: string, error: unknown) =>
+        console.warn(`[cozeloop] ${op} failed: ${error instanceof Error ? error.message : String(error)}`);
+    // forceFlush/shutdown 返回 Promise：不 await 的话超时/网络 rejection 会以
+    // unhandledRejection 逃逸崩掉进程（真实复现：flush 30s Timeout 在答案输出
+    // 完、进程退出前炸 exit 1）；各自独立 catch，flush 失败也要走 shutdown
     try {
-        cozeLoopTracer.forceFlush();
-        cozeLoopTracer.shutdown();
+        await cozeLoopTracer.forceFlush();
     } catch (error) {
-        console.warn(`[cozeloop] shutdown failed: ${error instanceof Error ? error.message : String(error)}`);
+        warn('forceFlush', error);
+    }
+    try {
+        await cozeLoopTracer.shutdown();
+    } catch (error) {
+        warn('shutdown', error);
     }
 }
 

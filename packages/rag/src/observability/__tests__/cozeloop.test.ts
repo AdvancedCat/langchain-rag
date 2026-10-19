@@ -168,20 +168,19 @@ describe('shutdownCozeLoop', () => {
         process.env.COZELOOP_WORKSPACE_ID = 'ws';
         const mod = await loadModule();
         mod.initCozeLoop();
-        mod.shutdownCozeLoop();
-        mod.shutdownCozeLoop();
+        await mod.shutdownCozeLoop();
+        await mod.shutdownCozeLoop();
         expect(cozeLoopTracer.forceFlush).toHaveBeenCalledTimes(1);
         expect(cozeLoopTracer.shutdown).toHaveBeenCalledTimes(1);
     });
 
-    it('flush 抛错被吞掉（不影响退出流程）', async () => {
+    it('flush 异步失败被吞掉且 shutdown 仍执行（teardown 不跳过、不以 unhandledRejection 逃逸）', async () => {
         process.env.COZELOOP_API_TOKEN = 'pat';
         process.env.COZELOOP_WORKSPACE_ID = 'ws';
-        vi.mocked(cozeLoopTracer.forceFlush).mockImplementationOnce(() => {
-            throw new Error('flush boom');
-        });
+        vi.mocked(cozeLoopTracer.forceFlush).mockRejectedValueOnce(new Error('flush timeout'));
         const mod = await loadModule();
         mod.initCozeLoop();
-        expect(() => mod.shutdownCozeLoop()).not.toThrow();
+        await expect(mod.shutdownCozeLoop()).resolves.toBeUndefined();
+        expect(cozeLoopTracer.shutdown).toHaveBeenCalledTimes(1);
     });
 });

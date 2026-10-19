@@ -47,6 +47,8 @@ async function main() {
         'run',
         async (span) => {
             setSpanInput(span, { query });
+            // traceId 随日志透出，便于到罗盘按 trace 检索（与 API 路径对齐）
+            if (span) console.log(`🔭 [cli] cozeloop trace ${span.spanContext().traceId} (query=${query.slice(0, 40)})`);
             await answerQuery(agent, query, span);
         },
     );
@@ -112,7 +114,7 @@ main()
         console.error(error);
         process.exitCode = 1;
     })
-    .finally(() => {
+    .finally(async () => {
         // CozeLoop：CLI 一次性进程，退出前强制上报缓冲中的 span
-        shutdownCozeLoop();
+        await shutdownCozeLoop();
     });
