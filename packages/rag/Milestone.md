@@ -20,7 +20,7 @@
 | M8 | 2026-09-22 | Rerank 弃答闸门：abstention 信号从 dense cosine 切换为 cross-encoder | — | ✅ 误杀 19/37 → 0/37，成为生产默认 |
 | M9 | 2026-10-10 ~ | API 服务化：Koa + AG-UI 事件流 + Redis 断线续传（独立包 `packages/api`） | — | 🚧 P0-P2 完成（断线续传可用），P3 进行中 |
 | M10 | 2026-10-10 | 前端问答界面：React + Vite + AG-UI 双通道断线续传（独立包 `packages/web`） | — | ✅ 浏览器联调验收通过 |
-| M11 | 2026-10-13 | 可观测性：CozeLoop（扣子罗盘）tracing 全链路接入 | — | ✅ 314 测试全绿；真实冒烟已执行，subagent 层级 / model_name / token 用量已修（§7.2） |
+| M11 | 2026-10-13 | 可观测性：CozeLoop（扣子罗盘）tracing 全链路接入 | — | ✅ 325 测试全绿；真实冒烟已执行，层级 / model_name / token / run output 已修（§7.2-7.4）；ocr 评审 4 medium 已修（§7.5） |
 
 **当前生产配置**：hybrid-rewrite 检索策略（M4）+ `md-header-v2` 切分（M7，collection `langchain_docs_mdheader`）+ rerank 弃答闸门（M8，`qwen3-rerank` @0.52，排序不变）。
 
@@ -174,7 +174,7 @@
 - **退出安全**：api 优雅停机与 CLI 退出均 `shutdownCozeLoop()` 强制刷盘；上报失败 SDK 内部吞错不影响业务。
 - **关键约束**：OTel 单例语义——全工程仅经 `observability/` 单出口使用 SDK（宿主不得直接依赖 `@opentelemetry/api`，双实例 context 不互通）。
 
-**验证**：`pnpm typecheck` 递归 0 错误；`pnpm test` 全绿（P0 时 298；§7.2 后 **314**：rag 220 / api 34 / web 60，其中 observability 45 例）；tsx 冒烟确认禁用路径零 SDK 触碰。真实上报冒烟（控制台建 workspace + PAT → 罗盘 Trace 页看树）已执行并据其修复三项（见下）。
+**验证**：`pnpm typecheck` 递归 0 错误；`pnpm test` 全绿（P0 时 298；§7.2 后 **314**：rag 220 / api 34 / web 60，其中 observability 45 例；§7.5 后 **325**：rag 229 / api 36 / web 60）；tsx 冒烟确认禁用路径零 SDK 触碰。真实上报冒烟（控制台建 workspace + PAT → 罗盘 Trace 页看树）已执行并据其修复三项（见下）。
 
 **真实冒烟修复（2026-10-13，方案 §7.2）**：
 
@@ -184,7 +184,11 @@
 
 **层级修正续（2026-10-13，方案 §7.3）**：真实 trace 复盘发现工具体内直调的 rewrite/multiQuery LLM span 在并行 tool 执行下泄漏到 run 根（LangChain 实例级回调分发脱离 AsyncLocalStorage，ambient 只剩根；§7.2 的 wrapToolCall 只覆盖了子代理路径）。罗盘同层按 started_at 排序，工具比各自 rewrite llm 早 1-6ms 启动，平铺后观感像"生成检索 query 的 LLM 晚于工具执行"——实为挂根层级的显示问题，span 时间窗本身完全正常。修复：`cozeloopParentMetadata()` 把 active context 经 LangChain `config.metadata` 引用传递（不经 ALS，天然免疫断链），`handleLLMStart` 读取后显式三参 `startSpan` 指定父级；未携带时回退 ambient，主模型/子代理路径行为不变。验证：+8 单测、全仓 322 用例全绿（rag 228 / web 60 / api 34）、真实 DeepSeek 调用导出冒烟（trace `55ec8551…`）。
 
-**遗留（P1+）**：embedding/ingestion 埋点、web→api 跨端 trace 透传（`X-Cozeloop-Traceparent`，2026-10-13 已先交付 traceId 展示：`CUSTOM cozeloop.trace` 事件 + 前端 Turn 底部复制芯片，见方案 §7.1）、`retrieval.trace` AG-UI CUSTOM 事件（M9-P3，与 spans 互补）、评测批跑上报隔离。
+**run 根 span output 记录最终回答（2026-10-14，方案 §7.4）**：API 路径 run 根 span output 从 `{status, error?}` 对齐为含 `answer`（只累积主代理正文、每条新消息重置，留下的即最终回答）。CLI 路径同日经 ocr 评审发现仍累积全部轮次转录，随 §7.5 一并补齐（见下）。
+
+**ocr AI 评审修复（2026-10-19，方案 §7.5）**：OpenCodeReview（v1.12.9，glm-5.3）对 `main..HEAD` 全量评审 22 代码文件，16 条意见（4 medium / 11 low / 1 style）以 PR review 行级评论推送 PR #2；4 条 medium 人工核实全部属实并修复（`3fd7113`）：①CLI 根 span output 仍记全程转录（§7.4 只修了 API 侧）——补齐为只留最后一段非空文本，顺带修非流式兜底记空 answer；②api 观测调用脱离 try/catch——`safeSpanRecord` 记账兜底 + `execute` 整体 try/catch + `abandonRun` 清 ActiveRun（防线程永久 409 与 unhandled rejection 崩进程）+ `start` 最后防线 catch；③cozeloop `enabled` 先于 `initialize` 置 true 的半初始化态——成功才置 true，失败降级禁用视为已初始化（+1 回归测试）；④rerank 降级路径误用 `failCozeLoopSpan` 的双重 end——改 `setSpanError`/`setSpanOutput`。验证：325 用例全绿（rag 229 / api 36 / web 60）。其余 11 low + 1 style 留后续小批量跟进。
+
+**遗留（P1+）**：**已知缺陷**——并发 chunk-analyst 批次下个别子代理 model span 挂 trace 根（trace `ad54c34b…` 实锤 5 个，§7.2 wrapToolCall 未覆盖的并行子代理路径，async context 传播根因待查）、model span 的 Stream/LatencyFirstResp（TTFT）在罗盘显示 "-"（`handleLLMNewToken` 打点未在服务端生效，§3.4 设计目标未达成）；**功能缺口**——embedding/ingestion 埋点、web→api 跨端 trace 透传（`X-Cozeloop-Traceparent`，2026-10-13 已先交付 traceId 展示：`CUSTOM cozeloop.trace` 事件 + 前端 Turn 底部复制芯片，见方案 §7.1）、`retrieval.trace` AG-UI CUSTOM 事件（M9-P3，与 spans 互补）、评测批跑上报隔离。
 
 ---
 

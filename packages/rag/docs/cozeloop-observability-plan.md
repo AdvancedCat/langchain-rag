@@ -190,6 +190,19 @@ API 路径的 run 根 span output 原为 `{status, error?}`（§3.3 约定，避
 
 **累积口径（首版踩坑修正）**：不能拼全部正文 delta——一次 run 里有 45 段正文（3 段主代理轮次 + 42 段 chunk-analyst 子代理报告，共 38811 字符），从头截 2000 字符全是中间产物，最终回答反而被截掉（真实 trace `c8bb863e…` 复盘确认）。最终口径：**只累积主代理（事件无 `subagentRunId`）的正文，且主代理每开一条新消息（`TEXT_MESSAGE_START`）即重置**——留下的就是最后一轮正文，即最终回答；REASONING_MESSAGE_*（思考流）本就单独成事件，天然不进。验证：api +2 用例（单轮流三键断言；多轮+子代理流断言 output 只含最终轮），全仓 324 用例全绿。
 
+## 7.5 增量（2026-10-19）：ocr AI 评审修复——观测故障与业务强隔离
+
+OpenCodeReview（ocr v1.12.9，glm-5.3）对 `main..HEAD`（`b51243c..589163c`）全量评审：22 代码文件全覆盖（测试/文档/lockfile 按默认规则排除），16 条意见（4 medium / 11 low / 1 style），已作为 PR review（16 条行级评论）推送到 PR #2。4 条 medium 全部人工核实属实并修复（提交 `3fd7113`）：
+
+- **CLI 根 span output 记全程转录（§7.4 的另一半）**：§7.4 只修了 API 路径，CLI（agent.ts）的 `finalAnswer += token` 仍累积全部轮次 + chunk-analyst 子代理转录，`truncateForSpan` 截 2000 字符后最终回答被截掉。修复：按消息流重置累加、只留最后一段非空文本（与 API 口径对齐）。顺带修同点位 low：非流式兜底路径（`!finalAnswer && finalMessage`）此前 span 记 `{answer: ''}`，现兜底文本同步记入。
+- **api 观测调用脱离 try/catch**：M11 把根 span 记账挪进 `execute()` 时，`setSpanInput` 落在 `executeRun` 的 try 之前——抛错则 finally 不运行，ActiveRun 永不清理（线程永久 409 `run_already_active`、`waitIdle` 关机挂起）；`setSpanOutput` 在 finally 之后抛错成 unhandled rejection（Node ≥15 默认崩进程）。修复三层防御：模块级 `safeSpanRecord` 兜底 span 记账（单个操作失败只 warn，run 照常跑完）；`execute()` 整体 try/catch，包装器在 `executeRun` 启动前抛错时由新增 `abandonRun()` 兜底收尾（清槽位、落终态快照、persist finishRun、发 RUN_ERROR 让 SSE 不悬挂）；`start()` 的 `void execute` 加最后防线 `.catch`。
+- **cozeloop 半初始化态**：`enabled` 先于 `initialize()` 置 true，SDK 配置错误（如 `PropertyUnprovidedError`）抛出后留下 `enabled=true / SDK 未初始化`，业务路径 `getTracer()` 撞未就绪 SDK，且 agentService 重试时反复重跑半初始化。修复：`initialize()` 成功返回才置 `enabled = true`；失败 warn、保持禁用并视为已初始化（业务按「上报失败不影响业务」契约无感直通）。+1 回归测试锁定该失败模式。
+- **rerank 降级路径 span 双重 end**：`failCozeLoopSpan`（内部 `span.end()`）误用于 `withCozeLoopSpan` 回调内，包装器随后再 end 同一 span——OTel 重复 end 为未定义行为（每次 rerank fallback 触发 SDK diag 警告）且 error status 可能被覆盖。修复：改 `setSpanError` + `setSpanOutput`，end 交还包装器；`failCozeLoopSpan` 本身保留给生命周期分离场景（手动 `startCozeLoopSpan`）。
+
+验证：typecheck 递归 0 错误；全仓 **325 用例全绿**（rag 229 / api 36 / web 60，含新增 cozeloop 初始化失败回归用例）。其余 11 low + 1 style 属一致性与健壮性打磨，留后续小批量跟进。
+
+**已知残留（真实 trace 复盘发现，本轮评审未覆盖）**：①并发 chunk-analyst 批次下个别子代理 model span 仍挂 trace 根（trace `ad54c34b…` 实锤 5 个，§7.2 wrapToolCall 未覆盖的并行子代理路径，async context 传播根因待查）；②model span 的 Stream / LatencyFirstResp（TTFT）在罗盘显示 "-"，`handleLLMNewToken` 首帧打点未在服务端生效（§3.4 设计目标未达成）。两者已列入 Milestone M11 遗留。
+
 ## 8. 实施回填（2026-10-13，P0 完成）
 
 **交付**：
