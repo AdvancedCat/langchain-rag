@@ -15,6 +15,13 @@ import {
 } from './observability/index.js';
 
 async function main() {
+    // CozeLoop SDK 缺陷：导出 Promise 不向外传播（forceFlush 30s 超时等只以
+    // unhandledRejection 暴露，await 拿不到），一次性 CLI 进程以记录代替默认
+    // 崩溃——业务（问答）已完成，观测导出失败不应改变退出码（与 api 侧兜底同构）
+    process.on('unhandledRejection', (reason) => {
+        console.warn(`[cli] unhandledRejection (ignored): ${reason instanceof Error ? reason.message : String(reason)}`);
+    });
+
     const args = process.argv.slice(2);
     const isIndexOnly = args.includes('--index-only');
     const forceRebuild = args.includes('--rebuild');
