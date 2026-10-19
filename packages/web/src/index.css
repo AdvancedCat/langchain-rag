@@ -35,6 +35,15 @@
     --danger-fg: var(--color-red-700);
     --danger-soft: var(--color-red-50);
     --ring: var(--color-indigo-600);
+    /* 过程块类型色（MASTER §7）：思考 violet / 工具 line-strong / 子代理 accent */
+    --process-reasoning: var(--color-violet-400);
+    --process-tool: var(--line-strong);
+    --process-subagent: var(--accent);
+    /* 代码块「深岛」内容色（恒定 zinc-900 底，两主题共用） */
+    --code-bright: var(--color-zinc-100);
+    --code-muted: var(--color-zinc-400);
+    --code-chip: var(--color-zinc-800);
+    --code-chip-hover: var(--color-zinc-700);
 }
 .dark {
     color-scheme: dark;
@@ -85,6 +94,13 @@
     --color-danger-fg: var(--danger-fg);
     --color-danger-soft: var(--danger-soft);
     --color-ring: var(--ring);
+    --color-process-reasoning: var(--process-reasoning);
+    --color-process-tool: var(--process-tool);
+    --color-process-subagent: var(--process-subagent);
+    --color-code-bright: var(--code-bright);
+    --color-code-muted: var(--code-muted);
+    --color-code-chip: var(--code-chip);
+    --color-code-chip-hover: var(--code-chip-hover);
 }
 
 /* 字体与动效时长不随主题切换；static 强制发射（duration 暂无工具类消费，P2 微动效直接引用） */
@@ -107,6 +123,50 @@ body,
 :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* 过程块时间线（MASTER §7）：8px 类型色节点 + 2px line 连接线；        */
+/* 步骤内容带左 3px 类型色条，工具卡/思考块不再各自带边框              */
+/* ------------------------------------------------------------------ */
+.tl-step {
+    position: relative;
+    display: flex;
+    gap: 0.625rem;
+}
+.tl-step::before {
+    content: "";
+    position: absolute;
+    left: 3px;
+    top: 0.625rem;
+    bottom: -0.5rem;
+    width: 2px;
+    background: var(--line);
+}
+.tl-step:last-child::before {
+    content: none;
+}
+.tl-dot {
+    position: relative;
+    z-index: 1;
+    margin-top: 0.375rem;
+    height: 8px;
+    width: 8px;
+    flex-shrink: 0;
+    border-radius: 9999px;
+}
+
+/* 新消息/新块入场（MASTER §8）：opacity 0→1 + translateY(4px→0)，reduced-motion 关停 */
+@media (prefers-reduced-motion: no-preference) {
+    .enter-in {
+        animation: enter-in var(--duration-enter) ease-out both;
+    }
+}
+@keyframes enter-in {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
 }
 
 /* 细滚动条（消息区/侧栏） */

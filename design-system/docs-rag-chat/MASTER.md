@@ -5,7 +5,7 @@
 >
 > **Project:** Docs RAG Chat（`packages/web`，React 19 + Tailwind CSS v4）
 > **Generated:** 2026-10-11（ui-ux-pro-max 检索 + 现状审查，方向经确认）
-> **Updated:** 2026-10-19（纳入 PR #2 TraceChip 规范修订；P1 实施：§2 增补 `--accent-hover` 与状态色 `-fg`/`-soft` 衍生 token 以落地 §3.2/§7，duration 经 `@theme static` 发射）
+> **Updated:** 2026-10-19（纳入 PR #2 TraceChip 规范修订；P1 实施：§2 增补 `--accent-hover` 与状态色 `-fg`/`-soft` 衍生 token，duration 经 `@theme static` 发射；P2 实施：§2 增补过程块类型色与深岛前景 token，§6 完成 lucide 迁移与图标语义拆分）
 > **Style:** Minimalism & Swiss（极简瑞士风）· 开发者工具 · 双主题（浅色默认 + 深色）
 
 ---
@@ -60,6 +60,16 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
     --danger-fg: var(--color-red-700);
     --danger-soft: var(--color-red-50);
     --ring: var(--color-indigo-600);
+    /* 过程块类型色（§7，P2 增补）：思考 violet / 工具 line-strong / 子代理 accent；
+       -tool/-subagent 引用已主题化变量，html 上 :root/.dark 同元素级联即随主题切换 */
+    --process-reasoning: var(--color-violet-400);
+    --process-tool: var(--line-strong);
+    --process-subagent: var(--accent);
+    /* 代码块「深岛」前景/胶囊底（恒定 zinc-900 底，两主题共用，P2 增补） */
+    --code-bright: var(--color-zinc-100);
+    --code-muted: var(--color-zinc-400);
+    --code-chip: var(--color-zinc-800);
+    --code-chip-hover: var(--color-zinc-700);
 }
 .dark {
     --canvas: var(--color-zinc-950);
@@ -110,6 +120,13 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
     --color-danger-fg: var(--danger-fg);
     --color-danger-soft: var(--danger-soft);
     --color-ring: var(--ring);
+    --color-process-reasoning: var(--process-reasoning);
+    --color-process-tool: var(--process-tool);
+    --color-process-subagent: var(--process-subagent);
+    --color-code-bright: var(--code-bright);
+    --color-code-muted: var(--code-muted);
+    --color-code-chip: var(--code-chip);
+    --color-code-chip-hover: var(--code-chip-hover);
 }
 
 /* 字体与动效时长不随主题切换；static 强制发射（Tailwind v4 默认 tree-shake 未引用变量） */
@@ -181,8 +198,7 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
 ## 6. 图标
 
 - 16px 网格线性图标，**strokeWidth 统一 1.5**，`currentColor` 着色；尺寸：行内 14px（`h-3.5`）、按钮内 16px（`h-4`）。
-- 来源策略：迁移 **lucide-react**（与现有手绘 16px 线性风格同源，tree-shakable）；过渡期自绘图标必须满足同规格。
-- 语义规则：每类过程块一个专属图标，**禁止同一图标表达两种语义**（现状：聚合块与思考块同用 brain，需拆分）；正文旁装饰图标加 `aria-hidden="true"`。
+- 来源策略：**已迁移 lucide-react**（tree-shakable，P2 落地；自绘图标仅存于规范附录）；语义拆分已落地：思考 Brain / 工具 Wrench / 子代理 Bot / 聚合 Workflow 各一义，**禁止同一图标表达两种语义**；正文旁装饰图标加 `aria-hidden="true"`。
 
 ---
 

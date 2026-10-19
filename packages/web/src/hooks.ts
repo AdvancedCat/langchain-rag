@@ -119,6 +119,27 @@ export function useTheme(): [ThemeChoice, (theme: ThemeChoice) => void] {
     return [theme, apply];
 }
 
+/**
+ * 复制反馈（MASTER §7 通用交互模式）：点击复制后 copied 置 true，
+ * ≤1.6s 自动回退；调用方负责控件尺寸不变（无布局位移）。
+ */
+export function useCopy(): { copied: boolean; copy: (text: string) => void } {
+    const [copied, setCopied] = useState(false);
+    const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+    useEffect(() => () => clearTimeout(timerRef.current), []);
+    const copy = useCallback((text: string) => {
+        void navigator.clipboard
+            ?.writeText(text)
+            .then(() => {
+                setCopied(true);
+                clearTimeout(timerRef.current);
+                timerRef.current = setTimeout(() => setCopied(false), 1600);
+            })
+            .catch(() => undefined);
+    }, []);
+    return { copied, copy };
+}
+
 /** 服务状态点：/health + /ready 双探针，30s 轮询 */
 export function useServiceStatus(api: ThreadsApi): ServiceStatus {
     const [status, setStatus] = useState<ServiceStatus>('checking');

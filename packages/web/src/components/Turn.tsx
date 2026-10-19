@@ -1,8 +1,8 @@
-import { useState } from 'react';
 import type { Turn } from '../lib/chatStore';
 import { partitionTurnBlocks } from '../lib/turnView';
+import { useCopy } from '../hooks';
 import { ActivitySection, BlockList } from './blocks';
-import { IconSpinner } from './icons';
+import { IconCheck, IconSpinner } from './icons';
 
 /** RUN_ERROR code → 中文提示（cancelled 已在 reducer 归为非错误状态） */
 const RUN_ERROR_TEXT: Record<string, string> = {
@@ -15,26 +15,24 @@ export function errorText(error: { code?: string; message: string }): string {
     return RUN_ERROR_TEXT[error.code ?? ''] ?? error.message;
 }
 
-/** CozeLoop traceId 复制芯片：点击复制完整 32 位 hex，悬停 title 看全量 */
+/** CozeLoop traceId 复制芯片：点击复制完整 32 位 hex，悬停 title 看全量；复制反馈见 §7 通用模式 */
 function TraceChip({ traceId }: { traceId: string }) {
-    const [copied, setCopied] = useState(false);
-    const copy = () => {
-        void navigator.clipboard
-            ?.writeText(traceId)
-            .then(() => {
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1600);
-            })
-            .catch(() => undefined);
-    };
+    const { copied, copy } = useCopy();
     return (
         <button
             type="button"
-            onClick={copy}
+            onClick={() => copy(traceId)}
             title={traceId}
-            className="inline-flex h-8 items-center rounded-md border border-line px-2.5 font-mono text-[11px] tabular-nums text-content-secondary transition-colors hover:border-accent hover:text-accent"
+            className="inline-flex h-8 min-w-[124px] items-center justify-center gap-1 rounded-md border border-line px-2.5 font-mono text-[11px] tabular-nums text-content-secondary transition-colors hover:border-accent hover:text-accent"
         >
-            {copied ? '已复制 ✓' : `trace ${traceId.slice(0, 8)}…`}
+            {copied ? (
+                <>
+                    <IconCheck className="h-3 w-3 text-accent" />
+                    已复制
+                </>
+            ) : (
+                `trace ${traceId.slice(0, 8)}…`
+            )}
         </button>
     );
 }
@@ -47,7 +45,7 @@ export function TurnView({ turn, canRetry, onRetry }: { turn: Turn; canRetry: bo
     const streaming = turn.status === 'streaming';
     const { process, answer } = partitionTurnBlocks(turn.blocks);
     return (
-        <div className="space-y-3">
+        <div className="enter-in space-y-3">
             {turn.userText !== null ? (
                 <div className="flex justify-end">
                     <div className="max-w-[85%] rounded-2xl rounded-br-md bg-accent px-4 py-2.5 text-[0.9375rem] leading-relaxed whitespace-pre-wrap text-accent-fg">
