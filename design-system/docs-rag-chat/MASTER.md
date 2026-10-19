@@ -5,6 +5,7 @@
 >
 > **Project:** Docs RAG Chat（`packages/web`，React 19 + Tailwind CSS v4）
 > **Generated:** 2026-10-11（ui-ux-pro-max 检索 + 现状审查，方向经确认）
+> **Updated:** 2026-10-19（纳入 PR #2 新增的 TraceChip：元信息 chip 族、复制反馈模式、P0/P2 清单增量）
 > **Style:** Minimalism & Swiss（极简瑞士风）· 开发者工具 · 双主题（浅色默认 + 深色）
 
 ---
@@ -112,7 +113,7 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
 | `accent-fg` on `accent` | ~6.3:1 | ~4.5:1 | ✓ 按钮文本 |
 | `accent` on `accent-soft` | ~5.6:1 | — | ✓ 激活态文本 |
 
-**硬规则：有信息量的文本（时间戳、计数、空态副标题、输入提示、底部说明、错误详情）最低 `text-content-secondary`，禁止 `text-content-muted`。** 现状中 `Sidebar.tsx` 时间戳、`ChatView.tsx` 空态副标题、`Composer.tsx` 底部提示、`blocks.tsx` 参数/结果小标题均需按此上调。
+**硬规则：有信息量的文本（时间戳、计数、空态副标题、输入提示、底部说明、错误详情）最低 `text-content-secondary`，禁止 `text-content-muted`。** 现状中 `Sidebar.tsx` 时间戳、`ChatView.tsx` 空态副标题、`Composer.tsx` 底部提示、`blocks.tsx` 参数/结果小标题、`Turn.tsx` TraceChip（`text-zinc-500`，≈4.8:1 过 WCAG AA 但低于内部标准）均需按此上调。
 
 ### 3.2 状态色语义
 
@@ -170,9 +171,11 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
 | 过程聚合块 | `bg-surface border-line` 8px 圆角；**类型区分 = 左 3px 色条 + 专属图标**（思考 violet-400、工具 line-strong、子代理 accent）；头部为 chevron + 标签 + 计数 + 状态；展开区为**垂直时间线**（2px `line` 连接线 + 8px 节点圆点），工具卡/思考块作为时间线步骤存在，不再各自带边框 |
 | 内嵌 pre（参数/结果） | `bg-inset`，6px 圆角，12px mono，`max-h` + 滚动 |
 | 代码块 | 恒定 zinc-900 深底（浅色主题下即「深岛」，与 github-dark 高亮统一；深色主题下加 `border-line`）；右上角语言标签（11px，hover 区显现）+ 复制按钮；8px 圆角 |
-| 来源徽标 | 保留现有 chip 结构：`bg-surface border-line`，hover 转 accent |
+| 元信息 chip（来源徽标 / trace 芯片） | 同族规范：11px、`border-line` hairline、6px 圆角、文本 `content-secondary`、hover 转 accent。来源徽标保留现有 chip 结构；trace 芯片（`Turn.tsx` TraceChip，PR #2）展示 traceId 前 8 位、点击复制完整 32 位 hex——`h-8`（32px 触达）、`tabular-nums`、`focus-visible` 已达标，保留 |
 | Composer | 输入框 + 按钮同排 `gap-2`；输入 12px 圆角、`border-line`、focus 时 ring `accent`（2px，20% 透明度外扩）；底部 hint 12px `text-content-secondary`；发送钮 `bg-accent`，停止钮中性反色（`bg-content text-canvas`） |
 | 错误条 | `danger` 12% tint 底 + danger 30% 边框 + danger 文本；重试为描边式按钮 |
+
+**复制反馈（通用交互模式）**：点击复制类控件统一为——点击后文本切换「已复制」（配 SVG check 图标，见 §6），≤1.6s 自动回退原文，控件尺寸不变（无布局位移）。trace 芯片与代码块复制按钮（P2）共用此模式。
 
 ---
 
@@ -205,7 +208,7 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
 
 ## 10. 反模式（禁止）
 
-- ❌ emoji 作结构性图标；第二强调色；渐变 / glassmorphism / 重阴影
+- ❌ emoji / 字符 dingbat（如 ✓）作结构性图标；第二强调色；渐变 / glassmorphism / 重阴影
 - ❌ 组件层硬编码 `zinc-*` / `indigo-*`（只允许出现在 `index.css` token 定义处）
 - ❌ informative 文本使用 `content-muted`；裸状态点无标签
 - ❌ 深色模式直接复用浅色对比值（两主题分别校验）
@@ -217,9 +220,9 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
 
 | 阶段 | 内容 |
 |---|---|
-| P0 | 对比度修复（§3.1 硬规则）+ 全局 focus-visible + reduced-motion 适配（不依赖 token 层，可立即做） |
+| P0 | 对比度修复（§3.1 硬规则，含 TraceChip zinc-500）+ 全局 focus-visible + reduced-motion 适配（不依赖 token 层，可立即做） |
 | P1 | `@theme` token 层（§2）→ 全组件切换语义类 → 深色模式 + 字体自托管接入 |
-| P2 | 过程块时间线与类型色条（§7）+ 图标语义拆分/lucide 迁移（§6）+ 代码块语言标签与复制 + 微动效（§8） |
+| P2 | 过程块时间线与类型色条（§7）+ 图标语义拆分/lucide 迁移（§6，含 TraceChip「已复制 ✓」字符换 SVG）+ 代码块语言标签与复制（复用复制反馈模式，§7）+ 微动效（§8） |
 | P3 | 品牌 mark 替换「R」字母块 + 移动端抽屉侧栏 + 空态视觉增强 |
 
 每阶段验证门槛：`pnpm typecheck && pnpm test`；涉及检索/评测的变更另见仓库根 `AGENTS.md` 评测纪律。
