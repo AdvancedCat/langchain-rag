@@ -34,7 +34,8 @@ function CodeBlock({ lang, raw, children }: { lang: string | null; raw: string; 
     const { copied, copy } = useCopy();
     return (
         <div className="group/code relative">
-            {children}
+            {/* pre 覆写后必须补回：深岛背景/横向滚动/pre code 样式重置都挂在 .md-body pre 上 */}
+            <pre>{children}</pre>
             <div className="absolute right-2 top-2 flex items-center gap-1.5 opacity-0 transition-opacity duration-fast focus-within:opacity-100 group-hover/code:opacity-100">
                 {lang && (
                     <span className="rounded bg-code-chip px-1.5 py-1 font-mono text-[11px] leading-none text-code-muted">
