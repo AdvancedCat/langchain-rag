@@ -2,6 +2,7 @@ import type { ThreadListItem } from '../types';
 import type { ServiceStatus, ThemeChoice } from '../hooks';
 import { BrandMark } from './BrandMark';
 import { IconMoon, IconPlus, IconSun, IconTrash } from './icons';
+import { Tooltip } from './Tooltip';
 
 function relativeTime(iso: string): string {
     const deltaMs = Date.now() - new Date(iso).getTime();
@@ -104,18 +105,19 @@ export function Sidebar({
                                     运行中
                                 </span>
                             )}
-                            <button
-                                type="button"
-                                title="删除会话"
-                                aria-label="删除会话"
-                                className="-mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-content-muted opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-content/10 hover:text-danger"
-                                onClick={(event) => {
-                                    event.stopPropagation();
-                                    onDelete(thread.threadId);
-                                }}
-                            >
-                                <IconTrash />
-                            </button>
+                            <Tooltip label="删除会话">
+                                <button
+                                    type="button"
+                                    aria-label="删除会话"
+                                    className="-mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-content-muted opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-content/10 hover:text-danger"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onDelete(thread.threadId);
+                                    }}
+                                >
+                                    <IconTrash />
+                                </button>
+                            </Tooltip>
                         </div>
                     );
                 })}
@@ -124,15 +126,16 @@ export function Sidebar({
             <div className="flex items-center gap-2 border-t border-line px-4 py-3 text-xs text-content-secondary">
                 <span className={`h-2 w-2 rounded-full ${status.color}`} />
                 {status.text}
-                <button
-                    type="button"
-                    onClick={onToggleTheme}
-                    title={theme === 'dark' ? '切换为浅色主题' : '切换为深色主题'}
-                    aria-label={theme === 'dark' ? '切换为浅色主题' : '切换为深色主题'}
-                    className="ml-auto flex h-8 w-8 items-center justify-center rounded-md text-content-secondary transition hover:bg-content/10 hover:text-content"
-                >
-                    {theme === 'dark' ? <IconSun /> : <IconMoon />}
-                </button>
+                <Tooltip label={theme === 'dark' ? '切换为浅色主题' : '切换为深色主题'}>
+                    <button
+                        type="button"
+                        onClick={onToggleTheme}
+                        aria-label={theme === 'dark' ? '切换为浅色主题' : '切换为深色主题'}
+                        className="ml-auto flex h-8 w-8 items-center justify-center rounded-md text-content-secondary transition hover:bg-content/10 hover:text-content"
+                    >
+                        {theme === 'dark' ? <IconSun /> : <IconMoon />}
+                    </button>
+                </Tooltip>
             </div>
         </aside>
     );

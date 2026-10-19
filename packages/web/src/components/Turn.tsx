@@ -3,6 +3,7 @@ import { partitionTurnBlocks } from '../lib/turnView';
 import { useCopy } from '../hooks';
 import { ActivitySection, BlockList } from './blocks';
 import { IconCheck, IconCopy, IconSpinner } from './icons';
+import { Tooltip } from './Tooltip';
 
 /** RUN_ERROR code → 中文提示（cancelled 已在 reducer 归为非错误状态） */
 const RUN_ERROR_TEXT: Record<string, string> = {
@@ -31,16 +32,17 @@ function formatTurnTime(timestamp: number): string {
 function CopyAnswerButton({ text }: { text: string }) {
     const { copied, copy } = useCopy();
     return (
-        <button
-            type="button"
-            onClick={() => copy(text)}
-            title={copied ? '已复制' : '复制回答'}
-            aria-label={copied ? '已复制' : '复制回答'}
-            className="-ml-2 flex h-8 w-8 items-center justify-center rounded-md text-content-secondary transition-colors hover:bg-content/10 hover:text-content"
-        >
-            {copied ? <IconCheck className="h-3.5 w-3.5 text-accent" /> : <IconCopy />}
-            <span className="sr-only">{copied ? '已复制' : '复制回答'}</span>
-        </button>
+        <Tooltip label={copied ? '已复制' : '复制回答'}>
+            <button
+                type="button"
+                onClick={() => copy(text)}
+                aria-label={copied ? '已复制' : '复制回答'}
+                className="-ml-2 flex h-8 w-8 items-center justify-center rounded-md text-content-secondary transition-colors hover:bg-content/10 hover:text-content"
+            >
+                {copied ? <IconCheck className="h-3.5 w-3.5 text-accent" /> : <IconCopy />}
+                <span className="sr-only">{copied ? '已复制' : '复制回答'}</span>
+            </button>
+        </Tooltip>
     );
 }
 

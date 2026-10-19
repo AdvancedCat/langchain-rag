@@ -7,6 +7,7 @@ import 'highlight.js/styles/github-dark.css';
 import { parseSourceLink } from '../lib/sourceLink';
 import { useCopy } from '../hooks';
 import { IconCheck, IconCopy } from './icons';
+import { Tooltip } from './Tooltip';
 
 /** hast 节点最小结构（@types/hast 为传递依赖不直接引用） */
 interface HastNodeLike {
@@ -40,16 +41,17 @@ function CodeBlock({ lang, raw, children }: { lang: string | null; raw: string; 
                         {lang}
                     </span>
                 )}
-                <button
-                    type="button"
-                    onClick={() => copy(raw)}
-                    title={copied ? '已复制' : '复制代码'}
-                    aria-label={copied ? '已复制' : '复制代码'}
-                    className="flex h-6 w-6 items-center justify-center rounded bg-code-chip text-code-muted transition-colors hover:bg-code-chip-hover hover:text-code-bright"
-                >
-                    {copied ? <IconCheck className="h-3.5 w-3.5 text-code-bright" /> : <IconCopy />}
-                    {copied && <span className="sr-only">已复制</span>}
-                </button>
+                <Tooltip label={copied ? '已复制' : '复制代码'}>
+                    <button
+                        type="button"
+                        onClick={() => copy(raw)}
+                        aria-label={copied ? '已复制' : '复制代码'}
+                        className="flex h-6 w-6 items-center justify-center rounded bg-code-chip text-code-muted transition-colors hover:bg-code-chip-hover hover:text-code-bright"
+                    >
+                        {copied ? <IconCheck className="h-3.5 w-3.5 text-code-bright" /> : <IconCopy />}
+                        {copied && <span className="sr-only">已复制</span>}
+                    </button>
+                </Tooltip>
             </div>
         </div>
     );
