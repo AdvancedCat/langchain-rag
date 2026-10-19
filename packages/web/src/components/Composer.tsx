@@ -20,12 +20,16 @@ export function Composer({
 }) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    // 自动增高（上限约 8 行）
+    // 自动增高（上限约 8 行）：border-box 高度需补上边框宽度；未到上限时隐藏纵向溢出，
+    // 否则 min-h 低于单行内容高会让输入框常态挂着滚动条
     useEffect(() => {
         const el = textareaRef.current;
         if (!el) return;
         el.style.height = 'auto';
-        el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+        const borders = el.offsetHeight - el.clientHeight;
+        const full = el.scrollHeight + borders;
+        el.style.height = `${Math.min(full, 200)}px`;
+        el.style.overflowY = full > 200 ? 'auto' : 'hidden';
     }, [draft]);
 
     const submit = () => {
