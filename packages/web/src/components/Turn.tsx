@@ -36,7 +36,7 @@ function CopyAnswerButton({ text }: { text: string }) {
             onClick={() => copy(text)}
             title={copied ? '已复制' : '复制回答'}
             aria-label={copied ? '已复制' : '复制回答'}
-            className="-ml-2 flex h-8 w-8 items-center justify-center rounded-md text-content-secondary transition-colors hover:bg-inset hover:text-content"
+            className="-ml-2 flex h-8 w-8 items-center justify-center rounded-md text-content-secondary transition-colors hover:bg-content/10 hover:text-content"
         >
             {copied ? <IconCheck className="h-3.5 w-3.5 text-accent" /> : <IconCopy />}
             <span className="sr-only">{copied ? '已复制' : '复制回答'}</span>

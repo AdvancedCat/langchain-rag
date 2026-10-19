@@ -108,7 +108,7 @@ export function Sidebar({
                                 type="button"
                                 title="删除会话"
                                 aria-label="删除会话"
-                                className="-mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-content-muted opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-inset hover:text-danger"
+                                className="-mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-content-muted opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-content/10 hover:text-danger"
                                 onClick={(event) => {
                                     event.stopPropagation();
                                     onDelete(thread.threadId);
@@ -129,7 +129,7 @@ export function Sidebar({
                     onClick={onToggleTheme}
                     title={theme === 'dark' ? '切换为浅色主题' : '切换为深色主题'}
                     aria-label={theme === 'dark' ? '切换为浅色主题' : '切换为深色主题'}
-                    className="ml-auto flex h-8 w-8 items-center justify-center rounded-md text-content-secondary transition hover:bg-inset hover:text-content"
+                    className="ml-auto flex h-8 w-8 items-center justify-center rounded-md text-content-secondary transition hover:bg-content/10 hover:text-content"
                 >
                     {theme === 'dark' ? <IconSun /> : <IconMoon />}
                 </button>
