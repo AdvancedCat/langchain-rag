@@ -133,17 +133,19 @@ export function TurnView({ turn, canRetry, onRetry }: { turn: Turn; canRetry: bo
                 </div>
             )}
 
-            {turn.status === 'done' && (
-                <div className="flex items-center gap-2 pt-1 text-xs text-content-secondary">
+            {turn.status === 'done' ? (
+                <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-content-secondary">
                     {answerText && <CopyAnswerButton text={answerText} />}
                     {turn.usage && turn.usage.totalTokens > 0 && (
                         <span className="tabular-nums">用量 {formatTokenCount(turn.usage.totalTokens)} tok</span>
                     )}
                     {turn.createdAt > 0 && <span className="tabular-nums">{formatTurnTime(turn.createdAt)}</span>}
+                    {turn.traceId && <TraceChip traceId={turn.traceId} />}
                 </div>
+            ) : (
+                // 流式/异常/取消轮：trace 芯片单独成行，运行中即可复制去罗盘检索
+                turn.traceId && <TraceChip traceId={turn.traceId} />
             )}
-
-            {turn.traceId && <TraceChip traceId={turn.traceId} />}
         </div>
     );
 }
