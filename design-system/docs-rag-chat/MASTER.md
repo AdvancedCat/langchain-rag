@@ -5,7 +5,7 @@
 >
 > **Project:** Docs RAG Chat（`packages/web`，React 19 + Tailwind CSS v4）
 > **Generated:** 2026-10-11（ui-ux-pro-max 检索 + 现状审查，方向经确认）
-> **Updated:** 2026-10-19（纳入 PR #2 TraceChip 规范修订；P1 实施：§2 增补 `--accent-hover` 与状态色 `-fg`/`-soft` 衍生 token，duration 经 `@theme static` 发射；P2 实施：§2 增补过程块类型色与深岛前景 token，§6 完成 lucide 迁移与图标语义拆分）
+> **Updated:** 2026-10-19（纳入 PR #2 TraceChip 规范修订；P1 实施：§2 增补 `--accent-hover` 与状态色 `-fg`/`-soft` 衍生 token，duration 经 `@theme static` 发射；P2 实施：§2 增补过程块类型色与深岛前景 token，§6 完成 lucide 迁移与图标语义拆分；P3 实施：品牌 mark（文档+检索字形）替换 R 字母块、§7 抽屉侧栏落地（§2 增补 `--scrim`）、空态视觉增强与 §5 页边距/§9 触达达标）
 > **Style:** Minimalism & Swiss（极简瑞士风）· 开发者工具 · 双主题（浅色默认 + 深色）
 
 ---
@@ -70,6 +70,8 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
     --code-muted: var(--color-zinc-400);
     --code-chip: var(--color-zinc-800);
     --code-chip-hover: var(--color-zinc-700);
+    /* 抽屉遮罩（P3 增补，两主题同值） */
+    --scrim: color-mix(in oklab, var(--color-zinc-950) 40%, transparent);
 }
 .dark {
     --canvas: var(--color-zinc-950);
@@ -127,6 +129,7 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
     --color-code-muted: var(--code-muted);
     --color-code-chip: var(--code-chip);
     --color-code-chip-hover: var(--code-chip-hover);
+    --color-scrim: var(--scrim);
 }
 
 /* 字体与动效时长不随主题切换；static 强制发射（Tailwind v4 默认 tree-shake 未引用变量） */
@@ -141,6 +144,8 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
 ```
 
 深色模式机制：`html.dark` 类切换（`@custom-variant dark`）；默认跟随 `prefers-color-scheme`，手动选择存 localStorage（`theme` 键），index.html 内联脚本在首帧前落类防闪白，切换按钮在侧栏底部。
+
+品牌 mark（P3）：「文档 + 检索」几何字形（`components/BrandMark.tsx`，currentColor 着色），置于 bg-accent 圆角块内——侧栏头部 h-7 块/h-4 字形、空态 h-14 块/h-8 字形，替换原「R」字母块。
 
 ---
 

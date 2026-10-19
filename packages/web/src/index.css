@@ -44,6 +44,8 @@
     --code-muted: var(--color-zinc-400);
     --code-chip: var(--color-zinc-800);
     --code-chip-hover: var(--color-zinc-700);
+    /* 抽屉遮罩（P3，两主题同值） */
+    --scrim: color-mix(in oklab, var(--color-zinc-950) 40%, transparent);
 }
 .dark {
     color-scheme: dark;
@@ -101,6 +103,7 @@
     --color-code-muted: var(--code-muted);
     --color-code-chip: var(--code-chip);
     --color-code-chip-hover: var(--code-chip-hover);
+    --color-scrim: var(--scrim);
 }
 
 /* 字体与动效时长不随主题切换；static 强制发射（duration 暂无工具类消费，P2 微动效直接引用） */

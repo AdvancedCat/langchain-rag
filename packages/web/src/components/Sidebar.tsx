@@ -1,5 +1,6 @@
 import type { ThreadListItem } from '../types';
 import type { ServiceStatus, ThemeChoice } from '../hooks';
+import { BrandMark } from './BrandMark';
 import { IconMoon, IconPlus, IconSun, IconTrash } from './icons';
 
 function relativeTime(iso: string): string {
@@ -46,7 +47,9 @@ export function Sidebar({
     return (
         <aside className="flex h-full w-[264px] shrink-0 flex-col border-r border-line bg-surface">
             <div className="flex items-center gap-2 px-4 pt-4 pb-3">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-sm font-bold text-accent-fg">R</span>
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-fg">
+                    <BrandMark className="h-4 w-4" />
+                </span>
                 <div className="min-w-0">
                     <div className="text-sm font-semibold text-content">文档问答</div>
                     <div className="text-[11px] text-content-muted">RAG Agent</div>
@@ -105,7 +108,7 @@ export function Sidebar({
                                 type="button"
                                 title="删除会话"
                                 aria-label="删除会话"
-                                className="shrink-0 rounded p-1 text-content-muted opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-inset hover:text-danger"
+                                className="-mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-content-muted opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-inset hover:text-danger"
                                 onClick={(event) => {
                                     event.stopPropagation();
                                     onDelete(thread.threadId);

@@ -9,6 +9,7 @@ import {
     ChevronRight,
     Copy,
     LoaderCircle,
+    Menu,
     Moon,
     Plus,
     Send,
@@ -85,4 +86,9 @@ export function IconMoon() {
 
 export function IconCopy() {
     return <Copy {...withDefaults({ className: 'h-3.5 w-3.5' })} />;
+}
+
+/** 顶栏汉堡按钮（<768px 打开抽屉侧栏） */
+export function IconMenu() {
+    return <Menu {...withDefaults({ className: 'h-4 w-4' })} />;
 }

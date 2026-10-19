@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChatState } from '../lib/chatStore';
 import type { ThreadController } from '../lib/threadController';
+import { BrandMark } from './BrandMark';
+import { IconMenu } from './icons';
 import { TurnView } from './Turn';
 import { Composer } from './Composer';
 
@@ -15,11 +17,13 @@ export function ChatView({
     controller,
     title,
     threadId,
+    onOpenSidebar,
 }: {
     state: ChatState;
     controller: ThreadController;
     title: string;
     threadId: string | null;
+    onOpenSidebar: () => void;
 }) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const stickRef = useRef(true);
@@ -50,7 +54,16 @@ export function ChatView({
 
     return (
         <main className="flex h-full min-w-0 flex-1 flex-col bg-canvas">
-            <header className="flex h-13 items-center border-b border-line px-5 py-3">
+            <header className="flex h-13 items-center gap-2 border-b border-line px-4 py-3 md:px-5">
+                <button
+                    type="button"
+                    onClick={onOpenSidebar}
+                    aria-label="打开侧栏"
+                    title="打开侧栏"
+                    className="-ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-content-secondary transition-colors hover:bg-inset hover:text-content md:hidden"
+                >
+                    <IconMenu />
+                </button>
                 <h1 className="truncate text-sm font-semibold text-content">{title}</h1>
                 {state.activeRunId !== null && (
                     <span className="ml-3 flex items-center gap-1.5 rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-medium text-success-fg">
@@ -81,7 +94,9 @@ export function ChatView({
                 <div className="flex flex-1 items-center justify-center text-sm text-content-secondary">正在恢复会话…</div>
             ) : state.turns.length === 0 ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-5 px-6">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-lg font-bold text-accent-fg">R</div>
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent text-accent-fg">
+                        <BrandMark className="h-8 w-8" />
+                    </div>
                     <div className="text-center">
                         <h2 className="text-lg font-semibold text-content">知识库问答</h2>
                         <p className="mt-1 text-sm text-content-secondary">基于已接入的知识库检索与多代理分析生成，回答附完整过程</p>
@@ -100,7 +115,7 @@ export function ChatView({
                     </div>
                 </div>
             ) : (
-                <div ref={scrollRef} onScroll={onScroll} className="thin-scrollbar flex-1 overflow-y-auto px-4 py-5">
+                <div ref={scrollRef} onScroll={onScroll} className="thin-scrollbar flex-1 overflow-y-auto px-4 py-5 md:px-6">
                     <div className="mx-auto max-w-3xl space-y-8">
                         {state.turns.map((turn, index) => (
                             <TurnView

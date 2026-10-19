@@ -35,7 +35,7 @@ export function Composer({
     };
 
     return (
-        <div className="border-t border-line bg-canvas px-4 py-3">
+        <div className="border-t border-line bg-canvas px-4 py-3 md:px-6">
             <div className="mx-auto flex max-w-3xl items-end gap-2">
                 <textarea
                     ref={textareaRef}
