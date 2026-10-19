@@ -25,4 +25,5 @@ export {
     getCozeLoopCallbackHandler,
     getLangChainTracingCallbacks,
 } from './langchain-handler.js';
+export { createUsageCollector, readTokenUsage, type TokenUsageTotal } from './token-usage.js';
 export { createSubagentSpanMiddleware } from './subagent-span.js';

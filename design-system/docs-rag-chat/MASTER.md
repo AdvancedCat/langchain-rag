@@ -5,7 +5,7 @@
 >
 > **Project:** Docs RAG Chat（`packages/web`，React 19 + Tailwind CSS v4）
 > **Generated:** 2026-10-11（ui-ux-pro-max 检索 + 现状审查，方向经确认）
-> **Updated:** 2026-10-19（纳入 PR #2 TraceChip 规范修订；P1 实施：§2 增补 `--accent-hover` 与状态色 `-fg`/`-soft` 衍生 token，duration 经 `@theme static` 发射；P2 实施：§2 增补过程块类型色与深岛前景 token，§6 完成 lucide 迁移与图标语义拆分；P3 实施：品牌 mark（文档+检索字形）替换 R 字母块、§7 抽屉侧栏落地（§2 增补 `--scrim`）、空态视觉增强与 §5 页边距/§9 触达达标）
+> **Updated:** 2026-10-19（纳入 PR #2 TraceChip 规范修订；P1 实施：§2 增补 `--accent-hover` 与状态色 `-fg`/`-soft` 衍生 token，duration 经 `@theme static` 发射；P2 实施：§2 增补过程块类型色与深岛前景 token，§6 完成 lucide 迁移与图标语义拆分；P3 实施：品牌 mark（文档+检索字形）替换 R 字母块、§7 抽屉侧栏落地（§2 增补 `--scrim`）、空态视觉增强与 §5 页边距/§9 触达达标；P3 追加：§7 新增答案元信息行（复制回答 / 用量 / 时间，用量经 api CUSTOM `run.usage` 事件透出））
 > **Style:** Minimalism & Swiss（极简瑞士风）· 开发者工具 · 双主题（浅色默认 + 深色）
 
 ---
@@ -219,6 +219,7 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
 | 内嵌 pre（参数/结果） | `bg-inset`，6px 圆角，12px mono，`max-h` + 滚动 |
 | 代码块 | 恒定 zinc-900 深底（浅色主题下即「深岛」，与 github-dark 高亮统一；深色主题下加 `border-line`）；右上角语言标签（11px，hover 区显现）+ 复制按钮；8px 圆角 |
 | 元信息 chip（来源徽标 / trace 芯片） | 同族规范：11px、`border-line` hairline、6px 圆角、文本 `content-secondary`、hover 转 accent。来源徽标保留现有 chip 结构；trace 芯片（`Turn.tsx` TraceChip，PR #2）展示 traceId 前 8 位、点击复制完整 32 位 hex——`h-8`（32px 触达）、`tabular-nums`、`focus-visible` 已达标，保留 |
+| 答案元信息行 | 正文底部（完成轮才展示）：复制回答（§7 复制反馈模式，`h-8 w-8` 触达）· `用量 N tok`（CUSTOM `run.usage`，≥1 万取整 K、千位一位小数）· 时间（当日 `HH:mm`，跨日 `M月D日 HH:mm`，取 RUN_STARTED 事件时间戳）；12px `content-secondary`、`tabular-nums`，纯文本不带图标 |
 | Composer | 输入框 + 按钮同排 `gap-2`；输入 12px 圆角、`border-line`、focus 时 ring `accent`（2px，20% 透明度外扩）；底部 hint 12px `text-content-secondary`；发送钮 `bg-accent`，停止钮中性反色（`bg-content text-canvas`） |
 | 错误条 | `danger` 12% tint 底 + danger 30% 边框 + danger 文本；重试为描边式按钮 |
 

@@ -2,7 +2,7 @@ import type { Turn } from '../lib/chatStore';
 import { partitionTurnBlocks } from '../lib/turnView';
 import { useCopy } from '../hooks';
 import { ActivitySection, BlockList } from './blocks';
-import { IconCheck, IconSpinner } from './icons';
+import { IconCheck, IconCopy, IconSpinner } from './icons';
 
 /** RUN_ERROR code → 中文提示（cancelled 已在 reducer 归为非错误状态） */
 const RUN_ERROR_TEXT: Record<string, string> = {
@@ -13,6 +13,36 @@ const RUN_ERROR_TEXT: Record<string, string> = {
 
 export function errorText(error: { code?: string; message: string }): string {
     return RUN_ERROR_TEXT[error.code ?? ''] ?? error.message;
+}
+
+function formatTokenCount(count: number): string {
+    if (count >= 10_000) return `${Math.round(count / 1000)}K`;
+    if (count >= 1_000) return `${(count / 1000).toFixed(1)}K`;
+    return String(count);
+}
+
+function formatTurnTime(timestamp: number): string {
+    const date = new Date(timestamp);
+    const hm = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    const now = new Date();
+    return date.toDateString() === now.toDateString() ? hm : `${date.getMonth() + 1}月${date.getDate()}日 ${hm}`;
+}
+
+/** 复制回答按钮（MASTER §7 复制反馈模式：check 图标 + ≤1.6s 回退，尺寸不变） */
+function CopyAnswerButton({ text }: { text: string }) {
+    const { copied, copy } = useCopy();
+    return (
+        <button
+            type="button"
+            onClick={() => copy(text)}
+            title={copied ? '已复制' : '复制回答'}
+            aria-label={copied ? '已复制' : '复制回答'}
+            className="-ml-2 flex h-8 w-8 items-center justify-center rounded-md text-content-secondary transition-colors hover:bg-inset hover:text-content"
+        >
+            {copied ? <IconCheck className="h-3.5 w-3.5 text-accent" /> : <IconCopy />}
+            <span className="sr-only">{copied ? '已复制' : '复制回答'}</span>
+        </button>
+    );
 }
 
 /** CozeLoop traceId 复制芯片：点击复制完整 32 位 hex，悬停 title 看全量；复制反馈见 §7 通用模式 */
@@ -44,6 +74,10 @@ function TraceChip({ traceId }: { traceId: string }) {
 export function TurnView({ turn, canRetry, onRetry }: { turn: Turn; canRetry: boolean; onRetry: (text: string) => void }) {
     const streaming = turn.status === 'streaming';
     const { process, answer } = partitionTurnBlocks(turn.blocks);
+    const answerText = answer
+        .filter((block) => block.kind === 'text')
+        .map((block) => block.content)
+        .join('\n\n');
     return (
         <div className="enter-in space-y-3">
             {turn.userText !== null ? (
@@ -95,6 +129,16 @@ export function TurnView({ turn, canRetry, onRetry }: { turn: Turn; canRetry: bo
                             重试
                         </button>
                     )}
+                </div>
+            )}
+
+            {turn.status === 'done' && (
+                <div className="flex items-center gap-2 pt-1 text-xs text-content-secondary">
+                    {answerText && <CopyAnswerButton text={answerText} />}
+                    {turn.usage && turn.usage.totalTokens > 0 && (
+                        <span className="tabular-nums">用量 {formatTokenCount(turn.usage.totalTokens)} tok</span>
+                    )}
+                    {turn.createdAt > 0 && <span className="tabular-nums">{formatTurnTime(turn.createdAt)}</span>}
                 </div>
             )}
 

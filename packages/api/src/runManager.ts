@@ -22,6 +22,7 @@ import {
     setSpanOutput,
     truncateForSpan,
     getLangChainTracingCallbacks,
+    createUsageCollector,
     type Span,
 } from '@langchain-rag/rag';
 
@@ -268,6 +269,8 @@ export class RunManager {
         // CozeLoop 根 span 的 traceId：随 CUSTOM cozeloop.trace 事件透出给前端，
         // 用户可复制到罗盘后台按 trace 检索；禁用时 span 为 null，不发射
         const cozeloopTraceId = span?.spanContext().traceId;
+        // 本轮 token 用量：config 级回调跨 LLM 调用累计，流结束后随 CUSTOM run.usage 透出
+        const usageCollector = createUsageCollector();
         let traceEventSent = false;
         const timeout = setTimeout(() => {
             run.cancelReason = 'timeout';
@@ -291,7 +294,8 @@ export class RunManager {
                     // thread_id 让 checkpointer 按 thread 恢复多轮上下文（方案 §7.3）
                     configurable: { thread_id: run.threadId },
                     // CozeLoop：config 级回调兜底（与 LLM 实例级回调同一 handler，run_id 幂等去重）
-                    callbacks: getLangChainTracingCallbacks(),
+                    // 用量收集：独立 handler，避免与观测 handler 的语义耦合
+                    callbacks: [...getLangChainTracingCallbacks(), usageCollector],
                 },
             );
             for await (const event of translateRun(stream as unknown as TranslatableRunStream, {
@@ -304,6 +308,23 @@ export class RunManager {
                     answerText = '';
                 } else if (event.type === EventType.TEXT_MESSAGE_CONTENT && isMainAgentText(event)) {
                     answerText += (event as unknown as { delta?: string }).delta ?? '';
+                }
+                // 用量在 RUN_FINISHED 之前落盘：末次 LLM 的 handleLLMEnd 先于根 run 结束触发，
+                // 此时 POST 直发通道仍开启，前端归约按 activeRunId 落位；仅成功轮发射
+                if (event.type === EventType.RUN_FINISHED) {
+                    const usageTotal = usageCollector.total();
+                    if (usageTotal) {
+                        await this.persistAndFanout(run, {
+                            type: EventType.CUSTOM,
+                            name: 'run.usage',
+                            value: {
+                                inputTokens: usageTotal.input,
+                                outputTokens: usageTotal.output,
+                                totalTokens: usageTotal.total,
+                            },
+                            timestamp: Date.now(),
+                        } as AguiEvent);
+                    }
                 }
                 await this.persistAndFanout(run, event);
                 // 紧跟 RUN_STARTED 发 traceId：必须在该事件之后，前端归约按当前 turn 落位
