@@ -6,6 +6,12 @@ body,
     height: 100%;
 }
 
+/* 键盘焦点全局可见（MASTER §9）：2px accent 外扩 outline，P1 后改语义 --ring */
+:focus-visible {
+    outline: 2px solid var(--color-indigo-600);
+    outline-offset: 2px;
+}
+
 body {
     font-family:
         ui-sans-serif,
@@ -122,7 +128,7 @@ body {
     color: var(--color-zinc-600);
 }
 .md-body a.source-chip .source-path {
-    color: var(--color-zinc-500);
+    color: var(--color-zinc-600);
     overflow: hidden;
     text-overflow: ellipsis;
 }
@@ -155,7 +161,7 @@ body {
     border-left: 3px solid var(--color-zinc-300);
     padding-left: 0.75rem;
     margin: 0.75rem 0;
-    color: var(--color-zinc-500);
+    color: var(--color-zinc-600);
 }
 .md-body table {
     border-collapse: collapse;
@@ -180,12 +186,16 @@ body {
     margin: 1rem 0;
 }
 
-/* 流式光标 */
+/* 流式光标：常驻动画仅在允许动画时启用，reduced-motion 降级为静态（MASTER §8） */
 .stream-cursor::after {
     content: "▍";
     margin-left: 1px;
     color: var(--color-indigo-500);
-    animation: cursor-blink 1s steps(1) infinite;
+}
+@media (prefers-reduced-motion: no-preference) {
+    .stream-cursor::after {
+        animation: cursor-blink 1s steps(1) infinite;
+    }
 }
 @keyframes cursor-blink {
     50% {

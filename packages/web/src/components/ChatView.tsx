@@ -54,7 +54,7 @@ export function ChatView({
                 <h1 className="truncate text-sm font-semibold text-zinc-700">{title}</h1>
                 {state.activeRunId !== null && (
                     <span className="ml-3 flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                        <span className="h-1.5 w-1.5 motion-safe:animate-pulse rounded-full bg-emerald-500" />
                         回答生成中
                     </span>
                 )}
@@ -68,7 +68,7 @@ export function ChatView({
 
             {state.phase === 'error' ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-                    <p className="text-sm text-red-600">{state.loadError?.message ?? '会话加载失败'}</p>
+                    <p className="text-sm text-red-700">{state.loadError?.message ?? '会话加载失败'}</p>
                     <button
                         type="button"
                         onClick={() => void controller.open(threadId)}
@@ -78,13 +78,13 @@ export function ChatView({
                     </button>
                 </div>
             ) : state.phase === 'loading' ? (
-                <div className="flex flex-1 items-center justify-center text-sm text-zinc-400">正在恢复会话…</div>
+                <div className="flex flex-1 items-center justify-center text-sm text-zinc-600">正在恢复会话…</div>
             ) : state.turns.length === 0 ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-5 px-6">
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 text-lg font-bold text-white">R</div>
                     <div className="text-center">
                         <h2 className="text-lg font-semibold text-zinc-800">知识库问答</h2>
-                        <p className="mt-1 text-sm text-zinc-400">基于已接入的知识库检索与多代理分析生成，回答附完整过程</p>
+                        <p className="mt-1 text-sm text-zinc-600">基于已接入的知识库检索与多代理分析生成，回答附完整过程</p>
                     </div>
                     <div className="flex max-w-lg flex-wrap justify-center gap-2">
                         {EXAMPLE_QUESTIONS.map((question) => (

@@ -14,7 +14,7 @@ interface HastNodeLike {
 /** 来源徽标内的小链接图标 */
 function LinkIcon() {
     return (
-        <svg className="h-3 w-3 shrink-0 opacity-60" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <svg aria-hidden="true" className="h-3 w-3 shrink-0 opacity-60" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
             <path d="M6.5 9.5l3-3M5 7.5L3.7 8.8a2.4 2.4 0 0 0 3.4 3.4L8.4 11M11 8.5l1.3-1.3a2.4 2.4 0 0 0-3.4-3.4L7.6 5" strokeLinecap="round" />
         </svg>
     );

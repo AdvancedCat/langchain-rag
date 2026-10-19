@@ -30,6 +30,7 @@ export function ToolCallCard({ block }: { block: ToolCallBlock }) {
         <div className="rounded-lg border border-zinc-200 bg-white text-sm">
             <button
                 type="button"
+                aria-expanded={open}
                 onClick={() => setOpen((value) => !value)}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-zinc-600 hover:bg-zinc-50"
             >
@@ -44,7 +45,7 @@ export function ToolCallCard({ block }: { block: ToolCallBlock }) {
                 <div className="space-y-2 border-t border-zinc-100 px-3 py-2">
                     {block.args && (
                         <div>
-                            <div className="mb-1 text-xs font-medium text-zinc-400">参数</div>
+                            <div className="mb-1 text-xs font-medium text-zinc-600">参数</div>
                           <pre className="thin-scrollbar max-h-40 overflow-auto rounded bg-zinc-50 p-2 text-xs text-zinc-700">
                                 {prettyJson(block.args)}
                             </pre>
@@ -52,7 +53,7 @@ export function ToolCallCard({ block }: { block: ToolCallBlock }) {
                     )}
                     {block.result !== null && (
                         <div>
-                            <div className="mb-1 text-xs font-medium text-zinc-400">结果</div>
+                            <div className="mb-1 text-xs font-medium text-zinc-600">结果</div>
                             <pre className="thin-scrollbar max-h-60 overflow-auto whitespace-pre-wrap rounded bg-zinc-50 p-2 text-xs text-zinc-700">
                                 {block.result || '（空）'}
                             </pre>
@@ -71,8 +72,9 @@ export function ReasoningBlockView({ block }: { block: Extract<ChatBlock, { kind
         <div className="rounded-lg border border-zinc-200 bg-zinc-50/60 text-sm">
             <button
                 type="button"
+                aria-expanded={open}
                 onClick={() => setOpen((value) => !value)}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-zinc-500 hover:bg-zinc-100/60"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-zinc-600 hover:bg-zinc-100/60"
             >
                 <IconChevron open={open} />
                 <span className="text-zinc-400">
@@ -82,7 +84,7 @@ export function ReasoningBlockView({ block }: { block: Extract<ChatBlock, { kind
                 {!block.done && <IconSpinner />}
             </button>
             {open && (
-                <pre className="thin-scrollbar max-h-72 overflow-auto whitespace-pre-wrap border-t border-zinc-200/70 px-3 py-2 text-xs leading-relaxed text-zinc-500">
+                <pre className="thin-scrollbar max-h-72 overflow-auto whitespace-pre-wrap border-t border-zinc-200/70 px-3 py-2 text-xs leading-relaxed text-zinc-600">
                     {block.content}
                 </pre>
             )}
@@ -97,6 +99,7 @@ export function SubagentGroup({ block }: { block: SubagentBlock }) {
         <div className="rounded-lg border border-indigo-200 bg-indigo-50/40 text-sm">
             <button
                 type="button"
+                aria-expanded={open}
                 onClick={() => setOpen((value) => !value)}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-indigo-700 hover:bg-indigo-50"
             >
@@ -156,15 +159,16 @@ export function ActivitySection({ blocks }: { blocks: ChatBlock[] }) {
         <div className="rounded-lg border border-zinc-200 bg-zinc-50/60">
             <button
                 type="button"
+                aria-expanded={open}
                 onClick={() => setOpen((value) => !value)}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-500 hover:bg-zinc-100/60"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-600 hover:bg-zinc-100/60"
             >
                 <IconChevron open={open} />
                 <span className="text-zinc-400">
                     <IconBrain />
                 </span>
                 <span className="font-medium">思考与工具调用</span>
-                <span className="text-xs text-zinc-400">{parts.join(' · ')}</span>
+                <span className="text-xs text-zinc-600">{parts.join(' · ')}</span>
                 <span className="ml-auto">
                     {summary.allDone ? <IconCheck /> : <IconSpinner />}
                 </span>

@@ -32,7 +32,7 @@ function TraceChip({ traceId }: { traceId: string }) {
             type="button"
             onClick={copy}
             title={traceId}
-            className="inline-flex h-8 items-center rounded-md border border-zinc-200 px-2.5 font-mono text-[11px] tabular-nums text-zinc-500 transition-colors hover:border-indigo-300 hover:text-indigo-600 focus-visible:outline-2 focus-visible:outline-indigo-400"
+            className="inline-flex h-8 items-center rounded-md border border-zinc-200 px-2.5 font-mono text-[11px] tabular-nums text-zinc-600 transition-colors hover:border-indigo-300 hover:text-indigo-600"
         >
             {copied ? '已复制 ✓' : `trace ${traceId.slice(0, 8)}…`}
         </button>
@@ -64,7 +64,7 @@ export function TurnView({ turn, canRetry, onRetry }: { turn: Turn; canRetry: bo
 
             <div className="space-y-2">
                 {turn.blocks.length === 0 && streaming ? (
-                    <div className="flex items-center gap-2 text-sm text-zinc-400">
+                    <div className="flex items-center gap-2 text-sm text-zinc-600">
                         <IconSpinner />
                         思考中…
                     </div>
@@ -77,13 +77,13 @@ export function TurnView({ turn, canRetry, onRetry }: { turn: Turn; canRetry: bo
             </div>
 
             {streaming && answer.length === 0 && turn.blocks.length > 0 && (
-                <div className="flex items-center gap-2 text-xs text-zinc-400">
+                <div className="flex items-center gap-2 text-xs text-zinc-600">
                     <IconSpinner />
                     生成中…
                 </div>
             )}
 
-            {turn.status === 'cancelled' && <div className="text-xs text-zinc-400">已停止</div>}
+            {turn.status === 'cancelled' && <div className="text-xs text-zinc-600">已停止</div>}
 
             {turn.status === 'error' && turn.error && (
                 <div className="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

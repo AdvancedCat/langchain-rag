@@ -42,7 +42,7 @@ export function Composer({
                     rows={1}
                     value={draft}
                     placeholder="向知识库提问…"
-                    className="thin-scrollbar max-h-[200px] min-h-[44px] flex-1 resize-none rounded-xl border border-zinc-300 px-3.5 py-2.5 text-[0.9375rem] leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    className="thin-scrollbar max-h-[200px] min-h-[44px] flex-1 resize-none rounded-xl border border-zinc-300 px-3.5 py-2.5 text-[0.9375rem] leading-relaxed text-zinc-800 placeholder:text-zinc-600 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                     onChange={(event) => onDraftChange(event.target.value)}
                     onKeyDown={(event) => {
                         if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -72,7 +72,7 @@ export function Composer({
                     </button>
                 )}
             </div>
-            <p className="mx-auto mt-2 max-w-3xl text-xs text-zinc-400">
+            <p className="mx-auto mt-2 max-w-3xl text-xs text-zinc-600">
                 Enter 发送 · Shift+Enter 换行 · 回答基于已接入的知识库生成
             </p>
         </div>
