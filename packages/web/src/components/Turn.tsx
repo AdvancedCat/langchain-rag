@@ -24,8 +24,7 @@ function formatTokenCount(count: number): string {
 function formatTurnTime(timestamp: number): string {
     const date = new Date(timestamp);
     const hm = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-    const now = new Date();
-    return date.toDateString() === now.toDateString() ? hm : `${date.getMonth() + 1}月${date.getDate()}日 ${hm}`;
+    return `${date.getMonth() + 1}月${date.getDate()}日 ${hm}`;
 }
 
 /** 复制回答按钮（MASTER §7 复制反馈模式：check 图标 + ≤1.6s 回退，尺寸不变） */
