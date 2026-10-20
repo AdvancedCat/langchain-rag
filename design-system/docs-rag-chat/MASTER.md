@@ -247,7 +247,7 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
 | 元信息 chip（来源徽标 / trace 芯片） | 同族规范：11px、`border-line` hairline、6px 圆角、文本 `content-secondary`、hover 转 accent。来源徽标保留现有 chip 结构；trace 芯片（`Turn.tsx` TraceChip，PR #2）展示 traceId 前 8 位、点击复制完整 32 位 hex——`h-8`（32px 触达）、`tabular-nums`、`focus-visible` 已达标，保留。位置：完成轮并入答案元信息行尾（可 `flex-wrap` 换行），流式/异常/取消轮单独成行（运行中即可复制去罗盘检索） |
 | Tooltip | 图标按钮的即时悬停提示（`components/Tooltip.tsx`）：反色 chip（`bg-content text-canvas`）11px、6px 圆角，hover / 键盘聚焦即现（`duration-fast` 淡入），`pointer-events-none` 不拦截指针；`placement` 默认 `bottom`，贴近视口/容器底部的控件（如侧栏底部主题切换）用 `"top"`；替代原生 title 的延迟与系统样式，SR 语义仍由控件 `aria-label` 承担 |
 | 答案元信息行 | 正文底部（完成轮才展示）：复制回答（§7 复制反馈模式，`h-8 w-8` 触达，hover 高亮 `bg-content/10` + Tooltip）· `用量 N tok`（CUSTOM `run.usage`，≥1 万取整 K、千位一位小数）· 时间（恒为 `M月D日 HH:mm`，取 RUN_STARTED 事件时间戳）· 行尾可挂 trace 芯片（见上行）；12px `content-secondary`、`tabular-nums`，纯文本不带图标，`flex-wrap` 窄屏换行。图标按钮 hover 高亮统一 `bg-content/10`（主题无关；禁用 `bg-inset`——深色下与画布同色不可见） |
-| Composer | **悬浮输入卡**（2026-10-20 起，借鉴 DSH 面板式 Composer）：无通栏分隔，`rounded-panel bg-composer-card shadow-card` 悬浮于内容列底部（`max-w-3xl`，左右留 16px/底 4px）；无边框，投影即描边；**单行布局，文本区即主角**——透明无边框文本区居左（自动增高 ≤200px），**44px 圆形按钮贴右下**（`items-end`，随文本区长高锚定），不设底部提示文案（基于知识库的说明由空态副标题承担）；发送钮 `bg-accent` 白/近黑箭头（随 `accent-fg`，不照搬 DSH 强制白——深色白箭头不达图形 3:1）+ disabled `opacity-40`（DSH 同款）；停止钮 `bg-content text-canvas` 反色圆钮；卡聚焦 `focus-within:ring-2 ring-accent/20`；消息滚动区底部 sticky 渐隐条（`from-canvas`，DSH「遮罩归滚动器」） |
+| Composer | **悬浮输入卡**（2026-10-20 起，借鉴 DSH 面板式 Composer）：无通栏分隔，`rounded-panel bg-composer-card shadow-card` 悬浮于内容列底部（`max-w-3xl`，左右留 16px/**底 16px**）；无边框，投影即描边；**单行布局，文本区即主角**——透明无边框文本区居左（自动增高 ≤200px），**44px 圆形按钮贴右下**（`items-end`，随文本区长高锚定），不设底部提示文案（基于知识库的说明由空态副标题承担）；发送钮 `bg-accent` 白/近黑箭头（随 `accent-fg`，不照搬 DSH 强制白——深色白箭头不达图形 3:1）+ disabled `opacity-40`（DSH 同款）；停止钮 `bg-content text-canvas` 反色圆钮；聚焦指示在卡级 `focus-within:ring-2 ring-accent/20`，textarea 自身 `focus-visible:outline-none`（键盘焦点标识由卡 ring 承担，不画内嵌矩形）；消息滚动区底部 sticky 渐隐条（`from-canvas`，DSH「遮罩归滚动器」） |
 | 错误条 | `danger` 12% tint 底 + danger 30% 边框 + danger 文本；重试为描边式按钮 |
 
 **复制反馈（通用交互模式）**：点击复制类控件统一为——点击后文本切换「已复制」（配 SVG check 图标，见 §6），≤1.6s 自动回退原文，控件尺寸不变（无布局位移）。trace 芯片与代码块复制按钮（P2）共用此模式。
@@ -273,7 +273,7 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
 ## 9. 可访问性底线（每项 UI 变更必须过）
 
 - [ ] 双主题正文对比 ≥4.5:1；informative 文本 ≥ `content-secondary`；`content-muted` 仅装饰
-- [ ] 全局 `:focus-visible` 可见（`ring` 2px accent + offset）；键盘可达
+- [ ] 全局 `:focus-visible` 可见（`ring` 2px accent + offset，定义在 `@layer base`——非分层规则会压过 utilities 层导致组件无法覆盖）；键盘可达；组件用 `focus-visible:outline-none` 接管时必须提供等价可见指示（如 Composer 卡级 ring）
 - [ ] 触达目标 ≥32px（桌面 web），Composer 按钮保持 44px
 - [ ] 折叠控件带 `aria-expanded`；状态点有文字或 `aria-label`；装饰图标 `aria-hidden`
 - [ ] 错误提示可被读屏感知；`prefers-reduced-motion` 生效

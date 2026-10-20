@@ -155,10 +155,13 @@ html {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* 键盘焦点全局可见（MASTER §9） */
-:focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
+/* 键盘焦点全局可见（MASTER §9）；置于 base 层——非分层样式会压过 utilities，
+   组件将无法用 focus-visible:outline-none 接管（如 Composer 把焦点指示上移到卡级 ring） */
+@layer base {
+    :focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 2px;
+    }
 }
 
 /* ------------------------------------------------------------------ */

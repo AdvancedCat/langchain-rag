@@ -42,14 +42,14 @@ export function Composer({
     };
 
     return (
-        <div className="px-4 pb-1 pt-1 md:px-6">
+        <div className="px-4 pb-4 pt-1 md:px-6">
             <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-panel bg-composer-card py-2 pl-4 pr-2 shadow-card transition focus-within:ring-2 focus-within:ring-accent/20">
                 <textarea
                     ref={textareaRef}
                     rows={1}
                     value={draft}
                     placeholder="向知识库提问…"
-                    className="thin-scrollbar max-h-[200px] min-h-[40px] flex-1 resize-none bg-transparent py-2.5 text-[0.9375rem] leading-relaxed text-content placeholder:text-content-secondary focus:outline-none"
+                    className="thin-scrollbar max-h-[200px] min-h-[40px] flex-1 resize-none bg-transparent py-2.5 text-[0.9375rem] leading-relaxed text-content placeholder:text-content-secondary focus:outline-none focus-visible:outline-none"
                     onChange={(event) => onDraftChange(event.target.value)}
                     onKeyDown={(event) => {
                         if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
