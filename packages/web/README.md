@@ -3,7 +3,7 @@
 文档问答前端的 React + Vite 聊天界面：消费 API 服务的 AG-UI 事件流，支持**双通道断线续传**与多会话管理。界面遵循极简瑞士风 + 双主题设计规范。
 
 - 前端方案见 [docs/frontend-plan.md](../rag/docs/frontend-plan.md)（M10）
-- 视觉规范见 [design-system/docs-rag-chat/MASTER.md](../../design-system/docs-rag-chat/MASTER.md)
+- 视觉规范见 [docs/design-system.md](docs/design-system.md)（web 子项目约束）
 
 ## 功能特性
 

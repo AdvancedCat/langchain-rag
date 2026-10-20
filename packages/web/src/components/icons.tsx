@@ -1,96 +1,95 @@
-// 内联 SVG 图标（避免图标库依赖）
+// 图标统一走 lucide-react（设计规范 §6）：16px 网格线性、strokeWidth 1.5、currentColor；
+// 尺寸约定：行内 14px（h-3.5）、按钮内 16px（h-4）。
+// 语义规则：每类过程块一个专属图标——思考 Brain、工具 Wrench、子代理 Bot、聚合 Workflow。
+import type { LucideProps } from 'lucide-react';
+import {
+    ArrowUp,
+    Bot,
+    Brain,
+    Check,
+    ChevronRight,
+    Copy,
+    LoaderCircle,
+    Menu,
+    Moon,
+    Plus,
+    Square,
+    Sun,
+    Trash2,
+    Workflow,
+    Wrench,
+} from 'lucide-react';
+
+function withDefaults(props: LucideProps): LucideProps {
+    return { 'aria-hidden': true, strokeWidth: 1.5, ...props };
+}
+
 export function IconChevron({ open }: { open: boolean }) {
+    // 旋转与折叠过渡同步（--duration-base，设计规范 §8）
     return (
-        <svg
-            className={`h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform ${open ? 'rotate-90' : ''}`}
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-        >
-            <path d="M6 4l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <ChevronRight
+            {...withDefaults({
+                className: `h-3.5 w-3.5 shrink-0 text-content-muted motion-safe:transition-transform motion-safe:duration-base ${open ? 'rotate-90' : ''}`,
+            })}
+        />
     );
 }
 
 export function IconWrench() {
-    return (
-        <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path
-                d="M9.5 2.5a3.5 3.5 0 0 0-3.3 4.6L2 11.3 4.7 14l4.2-4.2a3.5 3.5 0 0 0 4.6-3.3l-2.3 1.2-1.9-1.9L10.5 3.5 9.5 2.5z"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-        </svg>
-    );
+    return <Wrench {...withDefaults({ className: 'h-3.5 w-3.5 shrink-0' })} />;
 }
 
 export function IconBrain() {
-    return (
-        <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3">
-            <path
-                d="M6.5 2.5c-1.5 0-2.5 1-2.5 2.3-1 .3-1.7 1.2-1.7 2.2 0 .8.4 1.5 1 1.9-.3.4-.5.9-.5 1.4 0 1.3 1.1 2.2 2.5 2.2.4.9 1.3 1.5 2.4 1.5V2.5h-1.2zM9.5 2.5c1.5 0 2.5 1 2.5 2.3 1 .3 1.7 1.2 1.7 2.2 0 .8-.4 1.5-1 1.9.3.4.5.9.5 1.4 0 1.3-1.1 2.2-2.5 2.2-.4.9-1.3 1.5-2.4 1.5V2.5h1.2z"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-        </svg>
-    );
+    return <Brain {...withDefaults({ className: 'h-3.5 w-3.5 shrink-0' })} />;
+}
+
+/** 聚合块专属图标（与思考块 Brain 拆分，禁止一图两义） */
+export function IconWorkflow() {
+    return <Workflow {...withDefaults({ className: 'h-3.5 w-3.5 shrink-0' })} />;
 }
 
 export function IconSpinner() {
-    return (
-        <svg className="h-3.5 w-3.5 shrink-0 animate-spin text-indigo-500" viewBox="0 0 16 16" fill="none">
-            <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" opacity="0.2" />
-            <path d="M8 2a6 6 0 0 1 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-    );
+    return <LoaderCircle {...withDefaults({ className: 'h-3.5 w-3.5 shrink-0 motion-safe:animate-spin text-accent' })} />;
 }
 
-export function IconCheck() {
-    return (
-        <svg className="h-3.5 w-3.5 shrink-0 text-zinc-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M3 8.5l3.5 3.5L13 4.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-    );
+export function IconCheck({ className = 'h-3.5 w-3.5 shrink-0 text-content-muted' }: { className?: string }) {
+    return <Check {...withDefaults({ className })} />;
 }
 
-export function IconSend() {
-    return (
-        <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
-            <path d="M2 8l12-5.5L9.5 14 8 9l-6-1z" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-    );
+/** 发送钮上箭头（悬浮卡圆钮 20px） */
+export function IconArrowUp() {
+    return <ArrowUp {...withDefaults({ className: 'h-5 w-5' })} />;
 }
 
 export function IconStop() {
-    return (
-        <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
-            <rect x="4" y="4" width="8" height="8" rx="1.5" />
-        </svg>
-    );
+    return <Square {...withDefaults({ className: 'h-3.5 w-3.5', fill: 'currentColor' })} />;
 }
 
 export function IconTrash() {
-    return (
-        <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
-            <path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.7 8.5h5.6l.7-8.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-    );
+    return <Trash2 {...withDefaults({ className: 'h-3.5 w-3.5 shrink-0' })} />;
 }
 
 export function IconPlus() {
-    return (
-        <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path d="M8 3v10M3 8h10" strokeLinecap="round" />
-        </svg>
-    );
+    return <Plus {...withDefaults({ className: 'h-4 w-4' })} />;
 }
 
 export function IconBot() {
-    return (
-        <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
-            <rect x="3" y="5" width="10" height="8" rx="2" />
-            <path d="M8 2.5V5M6 9h.01M10 9h.01" strokeLinecap="round" />
-        </svg>
-    );
+    return <Bot {...withDefaults({ className: 'h-3.5 w-3.5 shrink-0' })} />;
+}
+
+export function IconSun() {
+    return <Sun {...withDefaults({ className: 'h-4 w-4' })} />;
+}
+
+export function IconMoon() {
+    return <Moon {...withDefaults({ className: 'h-4 w-4' })} />;
+}
+
+export function IconCopy() {
+    return <Copy {...withDefaults({ className: 'h-3.5 w-3.5' })} />;
+}
+
+/** 顶栏汉堡按钮（<768px 打开抽屉侧栏） */
+export function IconMenu() {
+    return <Menu {...withDefaults({ className: 'h-4 w-4' })} />;
 }

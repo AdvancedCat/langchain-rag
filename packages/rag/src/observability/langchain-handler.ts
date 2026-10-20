@@ -13,7 +13,6 @@
 // ============================================================================
 
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
-import type { Callbacks } from '@langchain/core/callbacks/manager';
 import type { Serialized } from '@langchain/core/load/serializable';
 import type { LLMResult } from '@langchain/core/outputs';
 import {
@@ -21,6 +20,7 @@ import {
     context,
 } from '@cozeloop/ai';
 import { isCozeLoopEnabled } from './cozeloop.js';
+import { readTokenUsage } from './token-usage.js';
 import {
     COZELOOP_PARENT_CONTEXT_METADATA,
     startCozeLoopSpan,
@@ -150,60 +150,13 @@ export function getCozeLoopCallbackHandler(): CozeLoopLangChainCallbackHandler {
     return handlerSingleton;
 }
 
-/** 禁用时返回空数组（LangChain 接受空 callbacks，调用方无需分支） */
-export function getLangChainTracingCallbacks(): Callbacks {
+/** 恒返回数组（CozeLoop 禁用时为空），便于调用方与其余 config 级回调拼接 */
+export function getLangChainTracingCallbacks(): BaseCallbackHandler[] {
     if (!isCozeLoopEnabled()) return [];
     return [getCozeLoopCallbackHandler()];
-}
-
-function readFiniteNumber(value: unknown): number | undefined {
-    const num = Number(value);
-    return Number.isFinite(num) ? num : undefined;
 }
 
 function readStringProp(source: Record<string, unknown> | undefined, key: string): string | undefined {
     const value = source?.[key];
     return typeof value === 'string' && value.length > 0 ? value : undefined;
-}
-
-interface NormalizedTokenUsage {
-    input: number | undefined;
-    output: number | undefined;
-    total: number | undefined;
-}
-
-/**
- * token 用量按版本/路径形态各异，逐级回退：
- * - `message.usage_metadata`：@langchain/openai 1.x 流式聚合 chunk 与非流式 AIMessage 均携带（标准 snake_case）；
- * - `llmOutput.tokenUsage`：1.x 非流式/流式 llmOutput（camelCase，core _streamIterator 组装）；
- * - `llmOutput.token_usage`：0.x 旧字段（snake_case），保留兼容。
- */
-function readTokenUsage(
-    generation: unknown,
-    llmOutput: Record<string, unknown> | undefined,
-): NormalizedTokenUsage | undefined {
-    const usageMetadata = (generation as { message?: { usage_metadata?: Record<string, unknown> } } | undefined)
-        ?.message?.usage_metadata;
-    const fromMetadata = pickUsage(usageMetadata, 'input_tokens', 'output_tokens', 'total_tokens');
-    if (fromMetadata) return fromMetadata;
-    const fromCamel = pickUsage(llmOutput?.tokenUsage as Record<string, unknown> | undefined, 'promptTokens', 'completionTokens', 'totalTokens');
-    if (fromCamel) return fromCamel;
-    return pickUsage(llmOutput?.token_usage as Record<string, unknown> | undefined, 'prompt_tokens', 'completion_tokens', 'total_tokens');
-}
-
-function pickUsage(
-    source: Record<string, unknown> | undefined,
-    inputKey: string,
-    outputKey: string,
-    totalKey: string,
-): NormalizedTokenUsage | undefined {
-    if (!source) return undefined;
-    const usage: NormalizedTokenUsage = {
-        input: readFiniteNumber(source[inputKey]),
-        output: readFiniteNumber(source[outputKey]),
-        total: readFiniteNumber(source[totalKey]),
-    };
-    return usage.input !== undefined || usage.output !== undefined || usage.total !== undefined
-        ? usage
-        : undefined;
 }

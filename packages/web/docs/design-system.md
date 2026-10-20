@@ -1,0 +1,305 @@
+# Docs RAG Chat — 设计系统规范
+
+> **检索规则：** 为某个页面/组件做 UI 时，先查 `packages/web/docs/pages/[page-name].md`；
+> 存在则其规则**覆盖**本文件，不存在则严格遵循本文件。
+>
+> **Handoff：** 本规范的可复刻导出版为同目录 `design-handoff.md`（自包含，用于在其他对话类项目中复用本体系）；**本文件与 `src/index.css` 变更时必须同步回填该文件**。
+>
+> **Project:** Docs RAG Chat（`packages/web` 子项目的界面约束，React 19 + Tailwind CSS v4；本文件随 web 包维护，原 `design-system/docs-rag-chat/` 已于 2026-10-20 并入）
+> **Generated:** 2026-10-11（ui-ux-pro-max 检索 + 现状审查，方向经确认）
+> **Updated:** 2026-10-20 Composer 收敛为单行（文本区主角 + 右下圆钮，取消卡内提示文案，说明由空态承担）。悬浮输入卡（面板式输入区）：§2 增补 `--composer-card`/`--elevation-card`/`--radius-panel`，§5 圆角增第五档面板 28px 与 `shadow-card` 阴影，§7 Composer 改悬浮卡（无边框投影 + 44px 圆形发送钮 + 滚动区底部渐隐）。2026-10-20 次级操作按钮 token（`--btn-secondary-bg/-bg-hover/-fg-hover`）：浅色 rest `#f9fafb`（neutral-bluish-50）→ hover `#353638`（neutral-bluish-800）反色 + 文本翻白，深色 rest 同画布、hover 提亮；应用于「新对话」与「重新加载」按钮。色系改造：主题色焕新——accent 由 indigo 换为品牌蓝（浅 500 `rgb(65 118 230)` / 深 400 `rgb(122 170 255)`）、中性 zinc 换 neutral-bluish 蓝灰阶、状态色改用 green/amber/red 语义、新增 `--bubble` 软底气泡 token（§7 用户气泡改软底，浅色淡蓝底 / 深色 neutral-bluish-850 灰底）；同日追加 §4 全局灰度抗锯齿（修正深底白字次像素渲染过亮）。2026-10-19（纳入 PR #2 TraceChip 规范修订；P1 实施：§2 增补 `--accent-hover` 与状态色 `-fg`/`-soft` 衍生 token，duration 经 `@theme static` 发射；P2 实施：§2 增补过程块类型色与深岛前景 token，§6 完成 lucide 迁移与图标语义拆分；P3 实施：品牌 mark（文档+检索字形）替换 R 字母块、§7 抽屉侧栏落地（§2 增补 `--scrim`）、空态视觉增强与 §5 页边距/§9 触达达标；P3 追加：§7 新增答案元信息行（复制回答 / 用量 / 时间，用量经 api CUSTOM `run.usage` 事件透出））
+> **Style:** Minimalism & Swiss（极简瑞士风）· 开发者工具 · 双主题（浅色默认 + 深色）
+
+---
+
+## 1. 风格定位与设计原则
+
+单色中性基底 + 单一强调色，hairline 边框代替阴影，内容优先、装饰最小。
+检索依据：Minimalism & Swiss Style 官方标注 best for 文档站 / SaaS / 专业工具，性能成本最低；
+开发者工具类产品的深色模式倾向（编码平台首选）以**第二主题**形式满足，不作为默认。
+
+1. **内容优先**：答案正文是唯一主角，过程与装饰一律退后（折叠、弱化、hairline）。
+2. **单强调色纪律**：品牌蓝（浅色 500 / 深色 400）是全站唯一强调色，只用于交互意图与激活态；状态语义色（绿/黄/红）仅表状态。
+3. **克制即质感**：1px 边框代替阴影，微动效代替大动画，留白代替分隔线堆叠。
+
+---
+
+## 2. Token 架构（三层）
+
+**唯一定义处：`packages/web/src/index.css`。**
+
+```
+primitive 层   Tailwind 默认调色板 + 色阶字面值（品牌蓝阶/neutral-bluish-*，rgb() 直写），
+               只允许出现在本文件 token 定义处
+semantic 层    :root / .dark 下的 CSS 变量（--canvas、--content-secondary ...）
+component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secondary、border-line ...）
+```
+
+色系定义（2026-10-20 起）：品牌蓝阶 + `neutral-bluish` 蓝灰中性阶 + green/amber/red 状态色。悬停方向：浅色 accent 500→hover 400（变亮），深色 400→hover 500（变深）。
+
+```css
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+    --canvas: #ffffff;                    /* 页面底 */
+    --surface: rgb(249 250 251);          /* 侧栏/卡片/聚合块底（neutral-bluish-50） */
+    --inset: rgb(241 243 245);            /* 内嵌代码/参数/结果区底（neutral-bluish-75） */
+    --line: rgb(233 236 242);             /* 常规 hairline（neutral-bluish-150） */
+    --line-strong: rgb(225 229 238);      /* 强分隔/悬停边框（neutral-bluish-200） */
+    --content: rgb(15 17 21);             /* 正文（neutral-bluish-1000） */
+    --content-secondary: rgb(97 102 107); /* 次级/有信息量的弱文本（neutral-bluish-700） */
+    --content-muted: rgb(173 178 184);    /* 仅装饰性文本（neutral-bluish-400） */
+    --accent: rgb(65 118 230);            /* 品牌蓝 500 */
+    --accent-hover: rgb(122 170 255);     /* 品牌蓝 400（悬停态，P1 增补） */
+    --accent-fg: #ffffff;
+    --accent-soft: rgb(237 243 254);      /* 品牌蓝 50 */
+    --bubble: var(--accent-soft);         /* 用户气泡软底（2026-10-20 增补） */
+    --composer-card: #ffffff;             /* 悬浮输入卡底（2026-10-20 增补，浅色 = 白） */
+    --elevation-card: 0 0 0 0.5px var(--line), 0 4px 16px rgb(0 0 0 / 3%),
+        0 0 24px rgb(0 0 0 / 3%);         /* 悬浮卡投影（两主题同值） */
+    --success: rgb(34 197 94);            /* green-500 */
+    --success-fg: rgb(21 128 61);         /* green-700，§3.2 状态文本（P1 增补） */
+    --success-soft: rgb(230 250 237);     /* 淡绿底，§3.2 状态底色（P1 增补） */
+    --warning: rgb(245 158 11);           /* amber-500 */
+    --warning-fg: var(--color-amber-700);
+    --warning-soft: rgb(254 245 231);     /* 淡琥珀底 */
+    --danger: rgb(236 19 19);             /* red-600 */
+    --danger-fg: var(--color-red-700);
+    --danger-soft: rgb(254 242 242);      /* red-50 */
+    --ring: var(--accent);
+    /* 过程块类型色（§7，P2 增补）：思考 violet / 工具 line-strong / 子代理 accent；
+       -tool/-subagent 引用已主题化变量，html 上 :root/.dark 同元素级联即随主题切换 */
+    --process-reasoning: var(--color-violet-400);
+    --process-tool: var(--line-strong);
+    --process-subagent: var(--accent);
+    /* 代码块「深岛」前景/胶囊底（恒定 neutral-bluish-900 底，两主题共用，P2 增补） */
+    --code-bright: rgb(235 238 242);      /* neutral-bluish-100 */
+    --code-muted: rgb(173 178 184);       /* neutral-bluish-400 */
+    --code-chip: rgb(53 54 56);           /* neutral-bluish-800 */
+    --code-chip-hover: rgb(67 69 74);     /* neutral-bluish-750 */
+    /* 抽屉遮罩（P3 增补，两主题同值） */
+    --scrim: color-mix(in oklab, rgb(15 17 21) 40%, transparent);
+    /* 次级操作按钮（新对话/重新加载）：浅色 rest neutral-bluish-50 → hover 800 反色，文本翻白 */
+    --btn-secondary-bg: #f9fafb;
+    --btn-secondary-bg-hover: #353638;
+    --btn-secondary-fg-hover: #ffffff;
+}
+.dark {
+    --canvas: rgb(21 21 23);              /* neutral-bluish-950 */
+    --surface: rgb(27 27 28);             /* neutral-bluish-900 */
+    --inset: rgb(21 21 23);
+    --line: rgb(53 54 56);                /* neutral-bluish-800 */
+    --line-strong: rgb(67 69 74);         /* neutral-bluish-750 */
+    --content: rgb(249 250 251);          /* neutral-bluish-50 */
+    --content-secondary: rgb(207 211 214); /* neutral-bluish-300 */
+    --content-muted: rgb(129 133 140);    /* 仅装饰性文本（neutral-bluish-600） */
+    --accent: rgb(122 170 255);           /* 品牌蓝 400 */
+    --accent-hover: rgb(65 118 230);      /* 品牌蓝 500 */
+    --accent-fg: rgb(15 17 21);           /* 深色主按钮前景近黑（白字在品牌蓝 400 上仅 2.3:1） */
+    --accent-soft: color-mix(in oklab, rgb(122 170 255) 12%, transparent);
+    --bubble: rgb(44 44 46);              /* neutral-bluish-850（深色气泡中性灰底） */
+    --composer-card: rgb(44 44 46);       /* 深色 = neutral-bluish-850（2026-10-20 增补） */
+    --success: rgb(34 197 94);            /* green-500 */
+    --success-fg: rgb(78 209 126);        /* 亮绿 */
+    --success-soft: color-mix(in oklab, rgb(34 197 94) 12%, transparent);
+    --warning: rgb(245 158 11);           /* amber-500 */
+    --warning-fg: var(--color-amber-400);
+    --warning-soft: color-mix(in oklab, rgb(245 158 11) 12%, transparent);
+    --danger: rgb(242 90 90);             /* 亮红 */
+    --danger-fg: rgb(254 226 226);        /* 淡红 */
+    --danger-soft: color-mix(in oklab, rgb(242 90 90) 12%, transparent);
+    --ring: var(--accent);
+    /* 次级操作按钮：深色 rest 同画布（仅边框成形），hover 提亮至 800、文本保持近白 */
+    --btn-secondary-bg: var(--canvas);
+    --btn-secondary-bg-hover: #353638;
+    --btn-secondary-fg-hover: var(--content);
+}
+
+/* 颜色走 inline：工具类直接引用语义变量，.dark 切换即时生效 */
+@theme inline {
+    --color-canvas: var(--canvas);
+    --color-surface: var(--surface);
+    --color-inset: var(--inset);
+    --color-line: var(--line);
+    --color-line-strong: var(--line-strong);
+    --color-content: var(--content);
+    --color-content-secondary: var(--content-secondary);
+    --color-content-muted: var(--content-muted);
+    --color-accent: var(--accent);
+    --color-accent-hover: var(--accent-hover);
+    --color-accent-fg: var(--accent-fg);
+    --color-accent-soft: var(--accent-soft);
+    --color-bubble: var(--bubble);
+    --color-composer-card: var(--composer-card);
+    --shadow-card: var(--elevation-card);
+    --color-success: var(--success);
+    --color-success-fg: var(--success-fg);
+    --color-success-soft: var(--success-soft);
+    --color-warning: var(--warning);
+    --color-warning-fg: var(--warning-fg);
+    --color-warning-soft: var(--warning-soft);
+    --color-danger: var(--danger);
+    --color-danger-fg: var(--danger-fg);
+    --color-danger-soft: var(--danger-soft);
+    --color-ring: var(--ring);
+    --color-process-reasoning: var(--process-reasoning);
+    --color-process-tool: var(--process-tool);
+    --color-process-subagent: var(--process-subagent);
+    --color-code-bright: var(--code-bright);
+    --color-code-muted: var(--code-muted);
+    --color-code-chip: var(--code-chip);
+    --color-code-chip-hover: var(--code-chip-hover);
+    --color-scrim: var(--scrim);
+    --color-btn-secondary-bg: var(--btn-secondary-bg);
+    --color-btn-secondary-bg-hover: var(--btn-secondary-bg-hover);
+    --color-btn-secondary-fg-hover: var(--btn-secondary-fg-hover);
+}
+
+/* 字体与动效时长不随主题切换；static 强制发射（Tailwind v4 默认 tree-shake 未引用变量） */
+@theme static {
+    --radius-panel: 28px; /* 悬浮输入卡面板圆角（2026-10-20 增补） */
+    --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system,
+        "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --duration-fast: 150ms;
+    --duration-base: 200ms;
+    --duration-enter: 250ms;
+}
+```
+
+深色模式机制：`html.dark` 类切换（`@custom-variant dark`）；默认跟随 `prefers-color-scheme`，手动选择存 localStorage（`theme` 键），index.html 内联脚本在首帧前落类防闪白，切换按钮在侧栏底部。
+
+品牌 mark（P3）：「文档 + 检索」几何字形（`components/BrandMark.tsx`，currentColor 着色），置于 bg-accent 圆角块内——侧栏头部 h-7 块/h-4 字形、空态 h-14 块/h-8 字形，替换原「R」字母块。
+
+---
+
+## 3. 色彩规范
+
+### 3.1 对比度校验表（已验算，近似值）
+
+| 组合 | 浅色 | 深色 | 判定 |
+|---|---|---|---|
+| `content` on `canvas` | ~18.9:1 | ~17.3:1 | ✓ 正文 |
+| `content-secondary` on `canvas` | ~5.8:1 | ~12.1:1 | ✓ 次级正文/元信息 |
+| `content-muted` on `canvas` | ~2.1:1 | ~4.9:1 | ✗ **仅装饰性**（分隔符、禁用态） |
+| `accent-fg` on `accent` | ~4.2:1 | ~8.1:1 | ✓ 按钮文本（浅色 4.2 为既定取舍，≥3:1 UI 标准） |
+| `accent` on `accent-soft` | ~3.8:1 | — | ✓ 激活态文本（13px 中字重，随既定取舍） |
+| `content` on `bubble`（用户气泡） | ~17:1 | ~13.3:1 | ✓ 气泡正文 |
+
+**硬规则：有信息量的文本（时间戳、计数、空态副标题、底部说明、错误详情）最低 `text-content-secondary`，禁止 `text-content-muted`。** 豁免：输入框 placeholder 属装饰性文本（聚焦即消失，2026-10-20 起），用 `placeholder:text-content-muted`（nb-600 `rgb(129,133,140)`），与输入正文拉开层级。现状中 `Sidebar.tsx` 时间戳、`ChatView.tsx` 空态副标题、`blocks.tsx` 参数/结果小标题、`Turn.tsx` TraceChip（`text-zinc-500`，≈4.8:1 过 WCAG AA 但低于内部标准）均需按此上调。
+
+### 3.2 状态色语义
+
+| 语义 | 用法 | 文本/图标 | 底色 |
+|---|---|---|---|
+| success（绿） | 运行中、服务正常、完成 | 浅色 green-700 / 深色亮绿 | 淡绿底 / 深色 12% tint |
+| warning（黄） | 服务降级、重连中 | amber-700 / amber-400 | 淡琥珀底 / 深色 12% tint |
+| danger（红） | 错误、删除悬停、不可达 | 浅色 red-700 / 深色淡红 | red-50 / 深色 12% tint |
+
+状态点**必须**伴随文字标签，不允许裸色点传达状态。
+
+---
+
+## 4. 字体
+
+- **界面**：Inter Variable（自托管 `@fontsource-variable/inter`）+ 系统中文栈回退；**代码**：JetBrains Mono（自托管 `@fontsource/jetbrains-mono` 400/500）。不引 Google Fonts 运行时依赖。
+- **字体渲染**：全局灰度抗锯齿（`html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale }`，2026-10-20 起）——macOS 默认次像素渲染会让深底白字显得过粗过亮，灰度渲染两主题统一、观感更细腻。
+- 数字场景（时间戳、消息计数）加 `tabular-nums`；中文一律不加 `letter-spacing`；拉丁大标题可 `-0.01em`。
+
+| 用途 | 字号/行高 |
+|---|---|
+| 正文（`md-body`） | 15px / 1.75 |
+| 控件次级文本 | 14px / 1.5 |
+| 元信息、hint、计数 | 12px / 1.5 |
+| 来源徽标 | 11px |
+| md 标题 h1 / h2 / h3 | 20 / 18 / 16 px，行高 1.4，semibold |
+| 行内代码、代码块 | 13px / 1.6，mono |
+
+---
+
+## 5. 空间 · 圆角 · 边框 · 阴影
+
+- **间距**：4px 基数。组件内 8/12，卡片内 12/16，区块间 16/24/32。消息流 `max-w-3xl`（768px）居中、`space-y-8`；页边距移动端 16px、≥768px 24px。
+- **圆角**（全站仅五档）：6px 内嵌 pre / 徽标 / source-chip；8px 卡片；12px 次级按钮；16px 用户气泡（右下角 6px 破折）；28px 面板（`rounded-panel`，2026-10-20 增补，悬浮输入卡专用）。
+- **边框**：全局 1px hairline；3px 仅用于过程块左色条与 blockquote；禁止 2px 边框。
+- **阴影**：`shadow-sm` 仅限悬浮元素（新对话按钮、弹出层）；悬浮输入卡用 `shadow-card`（0.5px 描边 + 双层 3% 黑投影，2026-10-20 增补）；卡片层级靠 `border-line` 表达，禁止 md 及以上阴影。
+
+---
+
+## 6. 图标
+
+- 16px 网格线性图标，**strokeWidth 统一 1.5**，`currentColor` 着色；尺寸：行内 14px（`h-3.5`）、按钮内 16px（`h-4`）。
+- 来源策略：**已迁移 lucide-react**（tree-shakable，P2 落地；自绘图标仅存于规范附录）；语义拆分已落地：思考 Brain / 工具 Wrench / 子代理 Bot / 聚合 Workflow 各一义，**禁止同一图标表达两种语义**；正文旁装饰图标加 `aria-hidden="true"`。
+
+---
+
+## 7. 组件规范
+
+| 组件 | 规范 |
+|---|---|
+| 侧栏 | `bg-surface`，宽 264px，右 hairline；激活项 `bg-accent-soft text-accent`；<768px 收起为抽屉 |
+| 顶栏 | `bg-canvas`，下 hairline；「回答生成中」pill 用 success 语义（soft 底 + 呼吸点 + 文字） |
+| 用户气泡 | **软底**（2026-10-20 起）：`bg-bubble text-content`——浅色淡蓝底，深色 neutral-bluish-850 中性灰底；16px 圆角（右下 6px），max-w-[85%]，15px/1.625；流式占位气泡同底 `text-content-secondary` |
+| AI 回答 | **无容器**直接排版，`text-content`，内容优先；不加头像不加底色 |
+| 过程聚合块 | `bg-surface border-line` 8px 圆角；**类型区分 = 左 3px 色条 + 专属图标**（思考 violet-400、工具 line-strong、子代理 accent）；头部为 chevron + 标签 + 计数 + 状态；展开区为**垂直时间线**（2px `line` 连接线 + 8px 节点圆点），工具卡/思考块作为时间线步骤存在，不再各自带边框 |
+| 内嵌 pre（参数/结果） | `bg-inset`，6px 圆角，12px mono，`max-h` + 滚动 |
+| 代码块 | 恒定 neutral-bluish-900 深底 `rgb(27 27 28)`（浅色主题下即「深岛」，与高亮主题统一；深色主题下加 `border-line`）；右上角语言标签（11px，hover 区显现）+ 复制按钮；8px 圆角 |
+| 元信息 chip（来源徽标 / trace 芯片） | 同族规范：11px、`border-line` hairline、6px 圆角、文本 `content-secondary`、hover 转 accent。来源徽标保留现有 chip 结构；trace 芯片（`Turn.tsx` TraceChip，PR #2）展示 traceId 前 8 位、点击复制完整 32 位 hex——`h-8`（32px 触达）、`tabular-nums`、`focus-visible` 已达标，保留。位置：完成轮并入答案元信息行尾（可 `flex-wrap` 换行），流式/异常/取消轮单独成行（运行中即可复制去罗盘检索） |
+| Tooltip | 图标按钮的即时悬停提示（`components/Tooltip.tsx`）：反色 chip（`bg-content text-canvas`）11px、6px 圆角，hover / 键盘聚焦即现（`duration-fast` 淡入），`pointer-events-none` 不拦截指针；`placement` 默认 `bottom`，贴近视口/容器底部的控件（如侧栏底部主题切换）用 `"top"`；替代原生 title 的延迟与系统样式，SR 语义仍由控件 `aria-label` 承担 |
+| 答案元信息行 | 正文底部（完成轮才展示）：复制回答（§7 复制反馈模式，`h-8 w-8` 触达，hover 高亮 `bg-content/10` + Tooltip）· `用量 N tok`（CUSTOM `run.usage`，≥1 万取整 K、千位一位小数）· 时间（恒为 `M月D日 HH:mm`，取 RUN_STARTED 事件时间戳）· 行尾可挂 trace 芯片（见上行）；12px `content-secondary`、`tabular-nums`，纯文本不带图标，`flex-wrap` 窄屏换行。图标按钮 hover 高亮统一 `bg-content/10`（主题无关；禁用 `bg-inset`——深色下与画布同色不可见） |
+| Composer | **悬浮输入卡**（2026-10-20 起，面板式 Composer）：无通栏分隔，`rounded-panel bg-composer-card shadow-card` 悬浮于内容列底部；**卡宽 = 正文列 + 2×圆角半径**（`max-w-[calc(48rem+56px)]`，肩宽恰为 28px 半径，正文边缘与弧线终点精确相接、正文宽度即「圆角之间的直段」；肩宽小于半径（如 +32 方案）时弧线与正文边线间会留出楔形画布缺口，2026-10-20 实测后取 +56），左右留 16px/底 16px；无边框，投影即描边；**单行布局，文本区即主角**——透明无边框文本区居左（自动增高 ≤200px），placeholder `text-content-muted`（装饰性豁免，见 §3.1；与正文 `#f9fafb` 拉开层级），**44px 圆形按钮贴右下**（`items-end`，随文本区长高锚定），不设底部提示文案（基于知识库的说明由空态副标题承担）；发送钮 `bg-accent` 白/近黑箭头（随 `accent-fg`，不用强制白——深色白箭头不达图形 3:1）+ disabled `opacity-40`；停止钮 `bg-content text-canvas` 反色圆钮；聚焦指示在卡级 `focus-within:ring-2 ring-accent/20`，textarea 自身 `focus-visible:outline-none`（键盘焦点标识由卡 ring 承担，不画内嵌矩形）。不做滚动区底部渐隐遮罩：本布局输入卡与滚动区不重叠，遮罩会压住正在阅读的行（2026-10-20 实测移除）。消息滚动区必须带 `[scrollbar-gutter:stable_both-edges]`：经典滚动条占位会把内容列居中基准挤偏（实测双肩 11/21 不对称），对称预留 gutter 后双肩恢复 16/16 |
+| 错误条 | `danger` 12% tint 底 + danger 30% 边框 + danger 文本；重试为描边式按钮 |
+
+**复制反馈（通用交互模式）**：点击复制类控件统一为——点击后文本切换「已复制」（配 SVG check 图标，见 §6），≤1.6s 自动回退原文，控件尺寸不变（无布局位移）。trace 芯片与代码块复制按钮（P2）共用此模式。
+
+---
+
+## 8. 动效
+
+| Token | 值 | 用途 |
+|---|---|---|
+| `--duration-fast` | 150ms | hover、色彩/边框状态 |
+| `--duration-base` | 200ms | 折叠展开、抽屉 |
+| `--duration-enter` | 250ms | 内容入场 |
+
+- 折叠展开用 `grid-template-rows: 0fr → 1fr` 过渡（禁止瞬时跳变与布局抖动）；chevron 旋转同步。
+- 新消息/新块入场：`opacity 0→1` + `translateY(4px→0)`，`--duration-enter`，包裹 `motion-safe:`。
+- 常驻动画（`animate-spin`/`animate-pulse`/流式光标）必须适配 `prefers-reduced-motion`（关停或降级为静态）。
+- easing：进入 ease-out，退出 ease-in（出场比入场快）。
+- 禁止：布局位移式 hover、弹跳、视差、>300ms 装饰动画。
+
+---
+
+## 9. 可访问性底线（每项 UI 变更必须过）
+
+- [ ] 双主题正文对比 ≥4.5:1；informative 文本 ≥ `content-secondary`；`content-muted` 仅装饰
+- [ ] 全局 `:focus-visible` 可见（`ring` 2px accent + offset，定义在 `@layer base`——非分层规则会压过 utilities 层导致组件无法覆盖）；键盘可达；组件用 `focus-visible:outline-none` 接管时必须提供等价可见指示（如 Composer 卡级 ring）
+- [ ] 触达目标 ≥32px（桌面 web），Composer 按钮保持 44px
+- [ ] 折叠控件带 `aria-expanded`；状态点有文字或 `aria-label`；装饰图标 `aria-hidden`
+- [ ] 错误提示可被读屏感知；`prefers-reduced-motion` 生效
+- [ ] 双主题分别人工验证；375 / 768 / 1440px 三档验证
+
+---
+
+## 10. 反模式（禁止）
+
+- ❌ emoji / 字符 dingbat（如 ✓）作结构性图标；第二强调色；渐变 / glassmorphism / 重阴影
+- ❌ 组件层硬编码 `zinc-*` / `indigo-*` / 色阶字面值（rgb() 直写），以上只允许出现在 `index.css` token 定义处
+- ❌ informative 文本使用 `content-muted`；裸状态点无标签
+- ❌ 深色模式直接复用浅色对比值（两主题分别校验）
+- ❌ 瞬时跳变的展开/收起；布局位移式交互反馈
+
+---
+
+## 11. 落地路线（现状 → 规范的差距）
+
+| 阶段 | 内容 |
+|---|---|
+| P0 | 对比度修复（§3.1 硬规则，含 TraceChip zinc-500）+ 全局 focus-visible + reduced-motion 适配（不依赖 token 层，可立即做） |
+| P1 | `@theme` token 层（§2）→ 全组件切换语义类 → 深色模式 + 字体自托管接入 |
+| P2 | 过程块时间线与类型色条（§7）+ 图标语义拆分/lucide 迁移（§6，含 TraceChip「已复制 ✓」字符换 SVG）+ 代码块语言标签与复制（复用复制反馈模式，§7）+ 微动效（§8） |
+| P3 | 品牌 mark 替换「R」字母块 + 移动端抽屉侧栏 + 空态视觉增强 |
+
+每阶段验证门槛：`pnpm typecheck && pnpm test`；涉及检索/评测的变更另见仓库根 `AGENTS.md` 评测纪律。

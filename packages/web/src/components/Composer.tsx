@@ -1,8 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { IconSend, IconStop } from './icons';
+import { IconArrowUp, IconStop } from './icons';
 
 /**
- * 输入区：Enter 发送 / Shift+Enter 换行 / 输入法合成中不发送；
+ * 输入区：悬浮输入卡（面板式 Composer）——28px 面板圆角、无边框、
+ * 0.5px 描边 + 淡投影悬浮在内容列底部；单行布局，文本区为主角，
+ * 圆形发送钮贴右下（随文本区长高保持锚定）。
+ * Enter 发送 / Shift+Enter 换行 / 输入法合成中不发送；
  * 运行中发送钮变「停止」（断开 ≠ 取消，停止走 cancel 端点）。
  */
 export function Composer({
@@ -20,12 +23,16 @@ export function Composer({
 }) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    // 自动增高（上限约 8 行）
+    // 自动增高（上限约 8 行）：border-box 高度需补上边框宽度；未到上限时隐藏纵向溢出，
+    // 否则 min-h 低于单行内容高会让输入框常态挂着滚动条
     useEffect(() => {
         const el = textareaRef.current;
         if (!el) return;
         el.style.height = 'auto';
-        el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+        const borders = el.offsetHeight - el.clientHeight;
+        const full = el.scrollHeight + borders;
+        el.style.height = `${Math.min(full, 200)}px`;
+        el.style.overflowY = full > 200 ? 'auto' : 'hidden';
     }, [draft]);
 
     const submit = () => {
@@ -35,14 +42,17 @@ export function Composer({
     };
 
     return (
-        <div className="border-t border-zinc-200 bg-white px-4 py-3">
-            <div className="mx-auto flex max-w-3xl items-end gap-2">
+        <div className="px-4 pb-4 md:px-6">
+            {/* 卡宽 = 正文列(48rem) + 2×28px 圆角半径：正文边缘与圆角弧线终点精确相接，
+                正文宽度恰为「圆角之间的直段」。肩宽若小于半径（如 +32px 方案），
+                弧线与正文边线之间会留出楔形画布缺口 */}
+            <div className="mx-auto flex max-w-[calc(48rem+56px)] items-end gap-2 rounded-panel bg-composer-card py-2 pl-4 pr-2 shadow-card transition focus-within:ring-2 focus-within:ring-accent/20">
                 <textarea
                     ref={textareaRef}
                     rows={1}
                     value={draft}
                     placeholder="向知识库提问…"
-                    className="thin-scrollbar max-h-[200px] min-h-[44px] flex-1 resize-none rounded-xl border border-zinc-300 px-3.5 py-2.5 text-[0.9375rem] leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    className="thin-scrollbar max-h-[200px] min-h-[40px] flex-1 resize-none bg-transparent py-2.5 text-[0.9375rem] leading-relaxed text-content placeholder:text-content-muted focus:outline-none focus-visible:outline-none"
                     onChange={(event) => onDraftChange(event.target.value)}
                     onKeyDown={(event) => {
                         if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -55,26 +65,23 @@ export function Composer({
                     <button
                         type="button"
                         onClick={onStop}
-                        className="flex h-[44px] shrink-0 items-center gap-1.5 rounded-xl bg-zinc-800 px-4 text-sm font-medium text-white hover:bg-zinc-700"
+                        aria-label="停止"
+                        className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-content text-canvas transition hover:bg-content/85"
                     >
                         <IconStop />
-                        停止
                     </button>
                 ) : (
                     <button
                         type="button"
                         onClick={submit}
                         disabled={!draft.trim()}
-                        className="flex h-[44px] shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-4 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-zinc-300"
+                        aria-label="发送"
+                        className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent text-accent-fg transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                        <IconSend />
-                        发送
+                        <IconArrowUp />
                     </button>
                 )}
             </div>
-            <p className="mx-auto mt-2 max-w-3xl text-xs text-zinc-400">
-                Enter 发送 · Shift+Enter 换行 · 回答基于已接入的知识库生成
-            </p>
         </div>
     );
 }

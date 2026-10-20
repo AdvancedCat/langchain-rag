@@ -35,5 +35,6 @@ export {
     getLangChainTracingCallbacks,
     getCozeLoopCallbackHandler,
     CozeLoopLangChainCallbackHandler,
+    createUsageCollector,
 } from './observability/index.js';
-export type { CozeLoopSpanOptions, ChunkSpanSummary, Span } from './observability/index.js';
+export type { CozeLoopSpanOptions, ChunkSpanSummary, Span, TokenUsageTotal } from './observability/index.js';

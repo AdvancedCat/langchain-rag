@@ -257,6 +257,26 @@ describe('applyEvents 流式归约', () => {
         ]);
         expect(state.turns[0]!.traceId).toBeUndefined();
     });
+
+    it('CUSTOM run.usage 记录用量到当前 Turn（RUN_FINISHED 之后仍落位）；零用量忽略', () => {
+        let state = applyEvents(initialChatState('ready'), [
+            RUN_STARTED('r1'),
+            RUN_FINISHED('r1'),
+            ev({ type: 'CUSTOM', name: 'run.usage', value: { inputTokens: 100, outputTokens: 20, totalTokens: 120 } }),
+            ev({ type: 'CUSTOM', name: 'run.usage', value: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } }),
+        ]);
+        expect(state.turns[0]!.usage).toEqual({ inputTokens: 100, outputTokens: 20, totalTokens: 120 });
+    });
+
+    it('Turn.createdAt 取 RUN_STARTED 事件时间戳（回放不漂移）；乐观发送取当前时间', () => {
+        const state = applyEvents(initialChatState('ready'), [
+            { eventId: '1000-900', event: { type: 'RUN_STARTED', threadId: 't1', runId: 'r1', timestamp: 1729261800000 } as AguiEvent },
+        ]);
+        expect(state.turns[0]!.createdAt).toBe(1729261800000);
+
+        const sent = chatReducer(initialChatState('ready'), { type: 'optimisticSend', runId: 'r9', text: '问题' });
+        expect(sent.turns[0]!.createdAt).toBeGreaterThan(0);
+    });
 });
 
 describe('createChatStore', () => {

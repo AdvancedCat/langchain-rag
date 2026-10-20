@@ -20,6 +20,7 @@ import type {
     MessagesSnapshotEvent,
     RetrievalTrace,
     RunErrorEvent,
+    RunStartedEvent,
     TextMessageStartEvent,
     ReasoningMessageStartEvent,
     SubagentFinishedEvent,
@@ -73,6 +74,10 @@ export interface Turn {
     blocks: ChatBlock[];
     status: TurnStatus;
     error?: { code?: string; message: string };
+    /** 本轮起始时间（RUN_STARTED 事件时间戳，回放不漂移；元信息行展示） */
+    createdAt: number;
+    /** CUSTOM run.usage：本轮 LLM token 用量（元信息行展示） */
+    usage?: { inputTokens: number; outputTokens: number; totalTokens: number };
     /** CUSTOM retrieval.trace（M9-P3 项，当前通常为空） */
     trace?: RetrievalTrace;
     /** CUSTOM cozeloop.trace：本轮 CozeLoop traceId（点击复制到罗盘后台检索） */
@@ -238,7 +243,7 @@ function currentTurnIndex(state: ChatState): number {
     return state.turns.length - 1;
 }
 
-function onRunStarted(state: ChatState, event: { runId: string }): ChatState {
+function onRunStarted(state: ChatState, event: RunStartedEvent): ChatState {
     const existing = state.turns.findIndex((turn) => turn.runId === event.runId);
     if (existing !== -1) {
         // optimisticSend 已建 Turn（本端发送）——保留 userText，仅确保 streaming
@@ -248,7 +253,7 @@ function onRunStarted(state: ChatState, event: { runId: string }): ChatState {
         ...state,
         phase: 'ready',
         activeRunId: event.runId,
-        turns: [...state.turns, { runId: event.runId, userText: null, blocks: [], status: 'streaming' }],
+        turns: [...state.turns, { runId: event.runId, userText: null, blocks: [], status: 'streaming', createdAt: event.timestamp }],
     };
 }
 
@@ -410,6 +415,16 @@ function onCustom(state: ChatState, event: CustomEvent): ChatState {
         const traceId = event.value.traceId;
         return touchTurn(state, turnIndex, (turn) => ({ ...turn, traceId }));
     }
+    if (event.name === 'run.usage' && event.value) {
+        const raw = event.value as { inputTokens?: unknown; outputTokens?: unknown; totalTokens?: unknown };
+        const usage = {
+            inputTokens: Number(raw.inputTokens ?? 0),
+            outputTokens: Number(raw.outputTokens ?? 0),
+            totalTokens: Number(raw.totalTokens ?? 0),
+        };
+        if (!Number.isFinite(usage.totalTokens) || usage.totalTokens <= 0) return state;
+        return touchTurn(state, turnIndex, (turn) => ({ ...turn, usage }));
+    }
     if (event.name !== 'retrieval.trace' || !event.value) return state;
     return touchTurn(state, turnIndex, (turn) => ({ ...turn, trace: event.value as RetrievalTrace }));
 }
@@ -462,7 +477,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
                 ...state,
                 phase: 'ready',
                 activeRunId: action.runId,
-                turns: [...state.turns, { runId: action.runId, userText: action.text, blocks: [], status: 'streaming' }],
+                turns: [...state.turns, { runId: action.runId, userText: action.text, blocks: [], status: 'streaming', createdAt: Date.now() }],
             };
         }
         case 'sendFailed': {
