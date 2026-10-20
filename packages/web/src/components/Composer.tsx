@@ -43,9 +43,10 @@ export function Composer({
 
     return (
         <div className="px-4 pb-4 md:px-6">
-            {/* 卡宽 = 正文列(48rem) + 32px（DSH 同款关系）：正文边缘恰好对齐 28px 圆角弧线结束后
-                的卡身直段，避免正文顶进圆角区造成「双肩空缺」 */}
-            <div className="mx-auto flex max-w-[calc(48rem+32px)] items-end gap-2 rounded-panel bg-composer-card py-2 pl-4 pr-2 shadow-card transition focus-within:ring-2 focus-within:ring-accent/20">
+            {/* 卡宽 = 正文列(48rem) + 2×28px 圆角半径：正文边缘与圆角弧线终点精确相接，
+                正文宽度恰为「圆角之间的直段」。肩宽若小于半径（如 DSH 的 +32px），
+                弧线与正文边线之间会留出楔形画布缺口 */}
+            <div className="mx-auto flex max-w-[calc(48rem+56px)] items-end gap-2 rounded-panel bg-composer-card py-2 pl-4 pr-2 shadow-card transition focus-within:ring-2 focus-within:ring-accent/20">
                 <textarea
                     ref={textareaRef}
                     rows={1}
