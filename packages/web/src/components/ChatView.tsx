@@ -85,7 +85,7 @@ export function ChatView({
                     <button
                         type="button"
                         onClick={() => void controller.open(threadId)}
-                        className="rounded-lg border border-line-strong px-3 py-1.5 text-sm text-content hover:bg-surface"
+                        className="rounded-lg border border-line-strong bg-btn-secondary-bg px-3 py-1.5 text-sm text-content transition-colors hover:border-accent hover:bg-btn-secondary-bg-hover hover:text-btn-secondary-fg-hover"
                     >
                         重新加载
                     </button>

@@ -51,6 +51,12 @@
     --code-chip-hover: rgb(67 69 74);     /* DSH neutral-bluish-750 */
     /* 抽屉遮罩（P3，两主题同值） */
     --scrim: color-mix(in oklab, rgb(15 17 21) 40%, transparent);
+    /* 次级操作按钮（新对话/重新加载）：浅色 rest #f9fafb（DSH neutral-bluish-50）→
+       hover #353638（DSH neutral-bluish-800）反色，hover 文本翻白保对比；
+       深色 rest 同画布（仅边框成形），hover 提亮至 800、文本保持近白 */
+    --btn-secondary-bg: #f9fafb;
+    --btn-secondary-bg-hover: #353638;
+    --btn-secondary-fg-hover: #ffffff;
 }
 .dark {
     color-scheme: dark;
@@ -77,6 +83,9 @@
     --danger-fg: rgb(254 226 226);        /* DSH red-100 */
     --danger-soft: color-mix(in oklab, rgb(242 90 90) 12%, transparent);
     --ring: var(--accent);
+    --btn-secondary-bg: var(--canvas);
+    --btn-secondary-bg-hover: #353638;
+    --btn-secondary-fg-hover: var(--content);
 }
 
 @theme inline {
@@ -111,6 +120,9 @@
     --color-code-chip: var(--code-chip);
     --color-code-chip-hover: var(--code-chip-hover);
     --color-scrim: var(--scrim);
+    --color-btn-secondary-bg: var(--btn-secondary-bg);
+    --color-btn-secondary-bg-hover: var(--btn-secondary-bg-hover);
+    --color-btn-secondary-fg-hover: var(--btn-secondary-fg-hover);
 }
 
 /* 字体与动效时长不随主题切换；static 强制发射（duration 暂无工具类消费，P2 微动效直接引用） */

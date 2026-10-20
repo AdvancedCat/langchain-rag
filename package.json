@@ -9,6 +9,7 @@
     "rag:index": "pnpm --filter @langchain-rag/rag run index",
     "serve": "pnpm --filter @langchain-rag/api run serve",
     "dev": "pnpm --filter @langchain-rag/web run dev",
+    "dev:all": "concurrently -n api,web -c blue,green \"pnpm serve\" \"pnpm dev\"",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test"
   },
@@ -36,5 +37,8 @@
     "url": "https://github.com/advancedcat/langchain-rag/issues"
   },
   "homepage": "https://github.com/advancedcat/langchain-rag#readme",
-  "packageManager": "pnpm@10.7.0"
+  "packageManager": "pnpm@10.7.0",
+  "devDependencies": {
+    "concurrently": "^10.0.6"
+  }
 }

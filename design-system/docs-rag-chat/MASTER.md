@@ -5,7 +5,7 @@
 >
 > **Project:** Docs RAG Chat（`packages/web`，React 19 + Tailwind CSS v4）
 > **Generated:** 2026-10-11（ui-ux-pro-max 检索 + 现状审查，方向经确认）
-> **Updated:** 2026-10-20 色系改造：借鉴 DSH（DeepSeek Harness `design-platform.css`）主题色——accent 由 indigo 换为 deepseek 品牌蓝（浅 500 `rgb(65 118 230)` / 深 400 `rgb(122 170 255)`）、中性 zinc 换 neutral-bluish 蓝灰阶、状态色对齐 DSH green/amber/red、新增 `--bubble` 软底气泡 token（§7 用户气泡改软底，浅色 deepseek-50 淡蓝底 / 深色 neutral-bluish-850 灰底）；同日追加 §4 全局灰度抗锯齿（借鉴 DSH base.css，修正深底白字次像素渲染过亮）。2026-10-19（纳入 PR #2 TraceChip 规范修订；P1 实施：§2 增补 `--accent-hover` 与状态色 `-fg`/`-soft` 衍生 token，duration 经 `@theme static` 发射；P2 实施：§2 增补过程块类型色与深岛前景 token，§6 完成 lucide 迁移与图标语义拆分；P3 实施：品牌 mark（文档+检索字形）替换 R 字母块、§7 抽屉侧栏落地（§2 增补 `--scrim`）、空态视觉增强与 §5 页边距/§9 触达达标；P3 追加：§7 新增答案元信息行（复制回答 / 用量 / 时间，用量经 api CUSTOM `run.usage` 事件透出））
+> **Updated:** 2026-10-20 次级操作按钮 token（`--btn-secondary-bg/-bg-hover/-fg-hover`）：浅色 rest `#f9fafb`（neutral-bluish-50）→ hover `#353638`（neutral-bluish-800）反色 + 文本翻白，深色 rest 同画布、hover 提亮；应用于「新对话」与「重新加载」按钮。色系改造：借鉴 DSH（DeepSeek Harness `design-platform.css`）主题色——accent 由 indigo 换为 deepseek 品牌蓝（浅 500 `rgb(65 118 230)` / 深 400 `rgb(122 170 255)`）、中性 zinc 换 neutral-bluish 蓝灰阶、状态色对齐 DSH green/amber/red、新增 `--bubble` 软底气泡 token（§7 用户气泡改软底，浅色 deepseek-50 淡蓝底 / 深色 neutral-bluish-850 灰底）；同日追加 §4 全局灰度抗锯齿（借鉴 DSH base.css，修正深底白字次像素渲染过亮）。2026-10-19（纳入 PR #2 TraceChip 规范修订；P1 实施：§2 增补 `--accent-hover` 与状态色 `-fg`/`-soft` 衍生 token，duration 经 `@theme static` 发射；P2 实施：§2 增补过程块类型色与深岛前景 token，§6 完成 lucide 迁移与图标语义拆分；P3 实施：品牌 mark（文档+检索字形）替换 R 字母块、§7 抽屉侧栏落地（§2 增补 `--scrim`）、空态视觉增强与 §5 页边距/§9 触达达标；P3 追加：§7 新增答案元信息行（复制回答 / 用量 / 时间，用量经 api CUSTOM `run.usage` 事件透出））
 > **Style:** Minimalism & Swiss（极简瑞士风）· 开发者工具 · 双主题（浅色默认 + 深色）
 
 ---
@@ -76,6 +76,10 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
     --code-chip-hover: rgb(67 69 74);     /* DSH neutral-bluish-750 */
     /* 抽屉遮罩（P3 增补，两主题同值） */
     --scrim: color-mix(in oklab, rgb(15 17 21) 40%, transparent);
+    /* 次级操作按钮（新对话/重新加载）：浅色 rest neutral-bluish-50 → hover 800 反色，文本翻白 */
+    --btn-secondary-bg: #f9fafb;
+    --btn-secondary-bg-hover: #353638;
+    --btn-secondary-fg-hover: #ffffff;
 }
 .dark {
     --canvas: rgb(21 21 23);              /* DSH neutral-bluish-950 */
@@ -101,6 +105,10 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
     --danger-fg: rgb(254 226 226);        /* DSH red-100 */
     --danger-soft: color-mix(in oklab, rgb(242 90 90) 12%, transparent);
     --ring: var(--accent);
+    /* 次级操作按钮：深色 rest 同画布（仅边框成形），hover 提亮至 800、文本保持近白 */
+    --btn-secondary-bg: var(--canvas);
+    --btn-secondary-bg-hover: #353638;
+    --btn-secondary-fg-hover: var(--content);
 }
 
 /* 颜色走 inline：工具类直接引用语义变量，.dark 切换即时生效 */
@@ -136,6 +144,9 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
     --color-code-chip: var(--code-chip);
     --color-code-chip-hover: var(--code-chip-hover);
     --color-scrim: var(--scrim);
+    --color-btn-secondary-bg: var(--btn-secondary-bg);
+    --color-btn-secondary-bg-hover: var(--btn-secondary-bg-hover);
+    --color-btn-secondary-fg-hover: var(--btn-secondary-fg-hover);
 }
 
 /* 字体与动效时长不随主题切换；static 强制发射（Tailwind v4 默认 tree-shake 未引用变量） */

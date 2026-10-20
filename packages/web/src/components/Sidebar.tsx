@@ -61,7 +61,7 @@ export function Sidebar({
                 <button
                     type="button"
                     onClick={onNew}
-                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-line-strong bg-canvas px-3 py-2 text-sm font-medium text-content shadow-sm transition hover:border-accent hover:text-accent"
+                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-line-strong bg-btn-secondary-bg px-3 py-2 text-sm font-medium text-content shadow-sm transition hover:border-accent hover:bg-btn-secondary-bg-hover hover:text-btn-secondary-fg-hover"
                 >
                     <IconPlus />
                     新对话
