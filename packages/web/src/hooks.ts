@@ -86,7 +86,7 @@ export function useThreads(api: ThreadsApi) {
 
 export type ServiceStatus = 'checking' | 'ready' | 'degraded' | 'down';
 
-/** 主题选择：深色模式按 html.dark 类切换（MASTER §2），手动选择存 localStorage */
+/** 主题选择：深色模式按 html.dark 类切换（设计规范 §2），手动选择存 localStorage */
 export type ThemeChoice = 'light' | 'dark';
 
 const THEME_STORAGE_KEY = 'theme';
@@ -120,7 +120,7 @@ export function useTheme(): [ThemeChoice, (theme: ThemeChoice) => void] {
 }
 
 /**
- * 复制反馈（MASTER §7 通用交互模式）：点击复制后 copied 置 true，
+ * 复制反馈（设计规范 §7 通用交互模式）：点击复制后 copied 置 true，
  * ≤1.6s 自动回退；调用方负责控件尺寸不变（无布局位移）。
  */
 export function useCopy(): { copied: boolean; copy: (text: string) => void } {

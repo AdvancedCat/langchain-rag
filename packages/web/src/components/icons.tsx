@@ -1,4 +1,4 @@
-// 图标统一走 lucide-react（MASTER §6）：16px 网格线性、strokeWidth 1.5、currentColor；
+// 图标统一走 lucide-react（设计规范 §6）：16px 网格线性、strokeWidth 1.5、currentColor；
 // 尺寸约定：行内 14px（h-3.5）、按钮内 16px（h-4）。
 // 语义规则：每类过程块一个专属图标——思考 Brain、工具 Wrench、子代理 Bot、聚合 Workflow。
 import type { LucideProps } from 'lucide-react';
@@ -25,7 +25,7 @@ function withDefaults(props: LucideProps): LucideProps {
 }
 
 export function IconChevron({ open }: { open: boolean }) {
-    // 旋转与折叠过渡同步（--duration-base，MASTER §8）
+    // 旋转与折叠过渡同步（--duration-base，设计规范 §8）
     return (
         <ChevronRight
             {...withDefaults({

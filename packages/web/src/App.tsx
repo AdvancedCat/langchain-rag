@@ -9,7 +9,7 @@ export function App() {
     const { threads, refresh } = useThreads(api);
     const serviceStatus = useServiceStatus(api);
     const [theme, setTheme] = useTheme();
-    // 移动端抽屉侧栏（<768px，MASTER §7）
+    // 移动端抽屉侧栏（<768px，设计规范 §7）
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const closeSidebar = () => setSidebarOpen(false);
     const drawerRef = useRef<HTMLElement>(null);

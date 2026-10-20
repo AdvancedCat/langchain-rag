@@ -4,11 +4,11 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Token 架构（MASTER §2，唯一定义处）：
+ * Token 架构（设计规范 §2，唯一定义处）：
  *   primitive 层   Tailwind 默认调色板 + DSH 色阶字面值，只允许出现在本文件
  *   semantic 层    :root / .dark 下的 CSS 变量
  *   component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secondary ...）
- * 除 MASTER §2 清单外的衍生 token：--accent-hover（accent 悬停态）、
+ * 除 设计规范 §2 清单外的衍生 token：--accent-hover（accent 悬停态）、
  * 状态色 -fg/-soft（§3.2 的文本/底色语义）、--bubble（用户气泡软底）。
  *
  * 色系来源：借鉴 DSH（DeepSeek Harness）design-platform.css——
@@ -43,7 +43,7 @@
     --danger-fg: var(--color-red-700);
     --danger-soft: rgb(254 242 242);      /* DSH red-50 */
     --ring: var(--accent);
-    /* 过程块类型色（MASTER §7）：思考 violet / 工具 line-strong / 子代理 accent */
+    /* 过程块类型色（设计规范 §7）：思考 violet / 工具 line-strong / 子代理 accent */
     --process-reasoning: var(--color-violet-400);
     --process-tool: var(--line-strong);
     --process-subagent: var(--accent);
@@ -133,7 +133,7 @@
 
 /* 字体与动效时长不随主题切换；static 强制发射（duration 暂无工具类消费，P2 微动效直接引用） */
 @theme static {
-    --radius-panel: 28px; /* 悬浮输入卡面板圆角（DSH --dsw-radius-panel，MASTER §5 第五档） */
+    --radius-panel: 28px; /* 悬浮输入卡面板圆角（DSH --dsw-radius-panel，设计规范 §5 第五档） */
     --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system,
         "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
     --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -155,7 +155,7 @@ html {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* 键盘焦点全局可见（MASTER §9）；置于 base 层——非分层样式会压过 utilities，
+/* 键盘焦点全局可见（设计规范 §9）；置于 base 层——非分层样式会压过 utilities，
    组件将无法用 focus-visible:outline-none 接管（如 Composer 把焦点指示上移到卡级 ring） */
 @layer base {
     :focus-visible {
@@ -165,7 +165,7 @@ html {
 }
 
 /* ------------------------------------------------------------------ */
-/* 过程块时间线（MASTER §7）：8px 类型色节点 + 2px line 连接线；        */
+/* 过程块时间线（设计规范 §7）：8px 类型色节点 + 2px line 连接线；        */
 /* 步骤内容带左 3px 类型色条，工具卡/思考块不再各自带边框              */
 /* ------------------------------------------------------------------ */
 .tl-step {
@@ -195,7 +195,7 @@ html {
     border-radius: 9999px;
 }
 
-/* 新消息/新块入场（MASTER §8）：opacity 0→1 + translateY(4px→0)，reduced-motion 关停 */
+/* 新消息/新块入场（设计规范 §8）：opacity 0→1 + translateY(4px→0)，reduced-motion 关停 */
 @media (prefers-reduced-motion: no-preference) {
     .enter-in {
         animation: enter-in var(--duration-enter) ease-out both;
@@ -325,7 +325,7 @@ html {
     border-radius: 4px;
     padding: 0.1em 0.35em;
 }
-/* 代码块恒定深底（MASTER §7「深岛」，DSH neutral-bluish-900，与高亮主题统一）；深色主题下加 hairline */
+/* 代码块恒定深底（设计规范 §7「深岛」，DSH neutral-bluish-900，与高亮主题统一）；深色主题下加 hairline */
 .md-body pre {
     background: rgb(27 27 28);
     color: var(--code-bright);
@@ -376,7 +376,7 @@ html {
     margin: 1rem 0;
 }
 
-/* 流式光标：常驻动画仅在允许动画时启用，reduced-motion 降级为静态（MASTER §8） */
+/* 流式光标：常驻动画仅在允许动画时启用，reduced-motion 降级为静态（设计规范 §8） */
 .stream-cursor::after {
     content: "▍";
     margin-left: 1px;

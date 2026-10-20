@@ -30,7 +30,7 @@ function prettyJson(text: string): string {
 }
 
 /**
- * 折叠容器（MASTER §8）：grid-template-rows 0fr→1fr 过渡，禁止瞬时跳变；
+ * 折叠容器（设计规范 §8）：grid-template-rows 0fr→1fr 过渡，禁止瞬时跳变；
  * 进入 ease-out、退出 ease-in；reduced-motion 降级为直接展开。
  */
 function Collapsible({ open, children }: { open: boolean; children: ReactNode }) {
@@ -46,7 +46,7 @@ function Collapsible({ open, children }: { open: boolean; children: ReactNode })
 }
 
 /**
- * 时间线步骤外壳（MASTER §7）：8px 类型色节点 + 2px line 连接线（.tl-step），
+ * 时间线步骤外壳（设计规范 §7）：8px 类型色节点 + 2px line 连接线（.tl-step），
  * 内容区左 3px 类型色条，不再各自带边框。
  */
 function TimelineStep({
@@ -194,7 +194,7 @@ export function BlockList({ blocks }: { blocks: ChatBlock[] }) {
 
 /**
  * 执行过程聚合区块（默认收起）：一个 Turn 的思考/工具调用/子代理折叠为单个
- * 可展开区块，展开区为垂直时间线（MASTER §7）。头部：chevron + 聚合专属图标
+ * 可展开区块，展开区为垂直时间线（设计规范 §7）。头部：chevron + 聚合专属图标
  * （Workflow，与思考块 Brain 拆分）+ 标签 + 步骤计数 + 运行状态。
  */
 export function ActivitySection({ blocks }: { blocks: ChatBlock[] }) {

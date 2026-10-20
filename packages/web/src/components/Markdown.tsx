@@ -26,7 +26,7 @@ function hastTextDeep(node: HastNodeLike | undefined): string {
 }
 
 /**
- * 代码块工具条（MASTER §7）：右上角语言标签（11px）+ 复制按钮，hover/focus 显现；
+ * 代码块工具条（设计规范 §7）：右上角语言标签（11px）+ 复制按钮，hover/focus 显现；
  * 复制走 §7 通用反馈模式（check 图标，≤1.6s 回退，控件尺寸不变）。
  * 色彩用深岛 token：代码块恒定 zinc-900 深底，两主题一致。
  */

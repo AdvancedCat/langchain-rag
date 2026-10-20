@@ -28,7 +28,7 @@ function formatTurnTime(timestamp: number): string {
     return `${date.getMonth() + 1}月${date.getDate()}日 ${hm}`;
 }
 
-/** 复制回答按钮（MASTER §7 复制反馈模式：check 图标 + ≤1.6s 回退，尺寸不变） */
+/** 复制回答按钮（设计规范 §7 复制反馈模式：check 图标 + ≤1.6s 回退，尺寸不变） */
 function CopyAnswerButton({ text }: { text: string }) {
     const { copied, copy } = useCopy();
     return (

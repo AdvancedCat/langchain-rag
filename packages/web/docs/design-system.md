@@ -1,4 +1,4 @@
-# Docs RAG Chat — 设计系统规范（MASTER）
+# Docs RAG Chat — 设计系统规范
 
 > **检索规则：** 为某个页面/组件做 UI 时，先查 `packages/web/docs/pages/[page-name].md`；
 > 存在则其规则**覆盖**本文件，不存在则严格遵循本文件。

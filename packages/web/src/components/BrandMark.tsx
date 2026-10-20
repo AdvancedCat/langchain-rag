@@ -1,5 +1,5 @@
 /**
- * 品牌 mark（MASTER §11 P3）：「文档 + 检索」几何字形，替换 R 字母块。
+ * 品牌 mark（设计规范 §11 P3）：「文档 + 检索」几何字形，替换 R 字母块。
  * currentColor 着色——放在 bg-accent 容器内即呈 accent-fg 色。
  */
 export function BrandMark({ className }: { className?: string }) {
