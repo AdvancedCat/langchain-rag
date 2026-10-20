@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { IconArrowUp, IconStop } from './icons';
 
 /**
- * 输入区：悬浮输入卡（借鉴 DSH 面板式 Composer）——28px 面板圆角、无边框、
+ * 输入区：悬浮输入卡（面板式 Composer）——28px 面板圆角、无边框、
  * 0.5px 描边 + 淡投影悬浮在内容列底部；单行布局，文本区为主角，
  * 圆形发送钮贴右下（随文本区长高保持锚定）。
  * Enter 发送 / Shift+Enter 换行 / 输入法合成中不发送；
@@ -44,7 +44,7 @@ export function Composer({
     return (
         <div className="px-4 pb-4 md:px-6">
             {/* 卡宽 = 正文列(48rem) + 2×28px 圆角半径：正文边缘与圆角弧线终点精确相接，
-                正文宽度恰为「圆角之间的直段」。肩宽若小于半径（如 DSH 的 +32px），
+                正文宽度恰为「圆角之间的直段」。肩宽若小于半径（如 +32px 方案），
                 弧线与正文边线之间会留出楔形画布缺口 */}
             <div className="mx-auto flex max-w-[calc(48rem+56px)] items-end gap-2 rounded-panel bg-composer-card py-2 pl-4 pr-2 shadow-card transition focus-within:ring-2 focus-within:ring-accent/20">
                 <textarea

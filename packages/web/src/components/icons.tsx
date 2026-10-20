@@ -56,7 +56,7 @@ export function IconCheck({ className = 'h-3.5 w-3.5 shrink-0 text-content-muted
     return <Check {...withDefaults({ className })} />;
 }
 
-/** 发送钮上箭头（悬浮卡圆钮 20px，DSH 同款字形） */
+/** 发送钮上箭头（悬浮卡圆钮 20px） */
 export function IconArrowUp() {
     return <ArrowUp {...withDefaults({ className: 'h-5 w-5' })} />;
 }

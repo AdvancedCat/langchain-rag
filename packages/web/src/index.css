@@ -5,57 +5,56 @@
 
 /*
  * Token 架构（设计规范 §2，唯一定义处）：
- *   primitive 层   Tailwind 默认调色板 + DSH 色阶字面值，只允许出现在本文件
+ *   primitive 层   Tailwind 默认调色板 + 色阶字面值（rgb() 直写），只允许出现在本文件
  *   semantic 层    :root / .dark 下的 CSS 变量
  *   component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secondary ...）
  * 除 设计规范 §2 清单外的衍生 token：--accent-hover（accent 悬停态）、
  * 状态色 -fg/-soft（§3.2 的文本/底色语义）、--bubble（用户气泡软底）。
  *
- * 色系来源：借鉴 DSH（DeepSeek Harness）design-platform.css——
- *   deepseek 品牌蓝阶（500/450/400/100/50/800）+
- *   neutral-bluish 蓝灰中性阶（1000…950…50），状态色对齐其 green/amber/red。
+ * 色系构成：品牌蓝阶（500/450/400/100/50/800）+
+ *   neutral-bluish 蓝灰中性阶（1000…950…50），状态色用 green/amber/red 语义。
  */
 :root {
     color-scheme: light;
     --canvas: #ffffff;                    /* 页面底 */
-    --surface: rgb(249 250 251);          /* 侧栏/卡片/聚合块底（DSH neutral-bluish-50） */
-    --inset: rgb(241 243 245);            /* 内嵌代码/参数/结果区底（DSH neutral-bluish-75） */
-    --line: rgb(233 236 242);             /* 常规 hairline（DSH neutral-bluish-150） */
-    --line-strong: rgb(225 229 238);      /* 强分隔/悬停边框（DSH neutral-bluish-200） */
-    --content: rgb(15 17 21);             /* 正文（DSH neutral-bluish-1000） */
-    --content-secondary: rgb(97 102 107);  /* 次级/有信息量的弱文本（DSH neutral-bluish-700） */
-    --content-muted: rgb(173 178 184);    /* 仅装饰性文本（DSH neutral-bluish-400） */
-    --accent: rgb(65 118 230);            /* DSH deepseek-500 */
-    --accent-hover: rgb(122 170 255);     /* DSH deepseek-400（浅色 hover 变亮，同 DSH 方向） */
+    --surface: rgb(249 250 251);          /* 侧栏/卡片/聚合块底（neutral-bluish-50） */
+    --inset: rgb(241 243 245);            /* 内嵌代码/参数/结果区底（neutral-bluish-75） */
+    --line: rgb(233 236 242);             /* 常规 hairline（neutral-bluish-150） */
+    --line-strong: rgb(225 229 238);      /* 强分隔/悬停边框（neutral-bluish-200） */
+    --content: rgb(15 17 21);             /* 正文（neutral-bluish-1000） */
+    --content-secondary: rgb(97 102 107);  /* 次级/有信息量的弱文本（neutral-bluish-700） */
+    --content-muted: rgb(173 178 184);    /* 仅装饰性文本（neutral-bluish-400） */
+    --accent: rgb(65 118 230);            /* 品牌蓝 500 */
+    --accent-hover: rgb(122 170 255);     /* 品牌蓝 400（浅色 hover 变亮） */
     --accent-fg: #ffffff;
-    --accent-soft: rgb(237 243 254);      /* DSH deepseek-50 */
-    --bubble: var(--accent-soft);         /* 用户气泡软底 = 淡蓝（DSH 浅色 bubble） */
-    --composer-card: #ffffff;             /* 悬浮输入卡底（DSH input-major 浅色 = 白，靠投影成形） */
+    --accent-soft: rgb(237 243 254);      /* 品牌蓝 50 */
+    --bubble: var(--accent-soft);         /* 用户气泡软底 = 淡蓝 */
+    --composer-card: #ffffff;             /* 悬浮输入卡底（浅色 = 白，靠投影成形） */
     --elevation-card: 0 0 0 0.5px var(--line), 0 4px 16px rgb(0 0 0 / 3%),
-        0 0 24px rgb(0 0 0 / 3%);         /* 悬浮卡投影（DSH elevation-soft：0.5px 描边 + 双层淡投影，两主题同值） */
-    --success: rgb(34 197 94);            /* DSH green-500 */
+        0 0 24px rgb(0 0 0 / 3%);         /* 悬浮卡投影（0.5px 描边 + 双层淡投影，两主题同值） */
+    --success: rgb(34 197 94);            /* green-500 */
     --success-fg: rgb(21 128 61);         /* green-700（on soft 文本） */
-    --success-soft: rgb(230 250 237);     /* DSH green-100 */
-    --warning: rgb(245 158 11);           /* DSH amber-500（= amber-500 同值） */
+    --success-soft: rgb(230 250 237);     /* 淡绿底 */
+    --warning: rgb(245 158 11);           /* amber-500 */
     --warning-fg: var(--color-amber-700);
-    --warning-soft: rgb(254 245 231);     /* DSH amber-100 */
-    --danger: rgb(236 19 19);             /* DSH red-600 */
+    --warning-soft: rgb(254 245 231);     /* 淡琥珀底 */
+    --danger: rgb(236 19 19);             /* red-600 */
     --danger-fg: var(--color-red-700);
-    --danger-soft: rgb(254 242 242);      /* DSH red-50 */
+    --danger-soft: rgb(254 242 242);      /* red-50 */
     --ring: var(--accent);
     /* 过程块类型色（设计规范 §7）：思考 violet / 工具 line-strong / 子代理 accent */
     --process-reasoning: var(--color-violet-400);
     --process-tool: var(--line-strong);
     --process-subagent: var(--accent);
     /* 代码块「深岛」内容色（恒定 neutral-bluish-900 底，两主题共用） */
-    --code-bright: rgb(235 238 242);      /* DSH neutral-bluish-100 */
-    --code-muted: rgb(173 178 184);       /* DSH neutral-bluish-400 */
-    --code-chip: rgb(53 54 56);           /* DSH neutral-bluish-800 */
-    --code-chip-hover: rgb(67 69 74);     /* DSH neutral-bluish-750 */
+    --code-bright: rgb(235 238 242);      /* neutral-bluish-100 */
+    --code-muted: rgb(173 178 184);       /* neutral-bluish-400 */
+    --code-chip: rgb(53 54 56);           /* neutral-bluish-800 */
+    --code-chip-hover: rgb(67 69 74);     /* neutral-bluish-750 */
     /* 抽屉遮罩（P3，两主题同值） */
     --scrim: color-mix(in oklab, rgb(15 17 21) 40%, transparent);
-    /* 次级操作按钮（新对话/重新加载）：浅色 rest #f9fafb（DSH neutral-bluish-50）→
-       hover #353638（DSH neutral-bluish-800）反色，hover 文本翻白保对比；
+    /* 次级操作按钮（新对话/重新加载）：浅色 rest #f9fafb（neutral-bluish-50）→
+       hover #353638（neutral-bluish-800）反色，hover 文本翻白保对比；
        深色 rest 同画布（仅边框成形），hover 提亮至 800、文本保持近白 */
     --btn-secondary-bg: #f9fafb;
     --btn-secondary-bg-hover: #353638;
@@ -63,28 +62,28 @@
 }
 .dark {
     color-scheme: dark;
-    --canvas: rgb(21 21 23);              /* DSH neutral-bluish-950 */
-    --surface: rgb(27 27 28);             /* DSH neutral-bluish-900 */
+    --canvas: rgb(21 21 23);              /* neutral-bluish-950 */
+    --surface: rgb(27 27 28);             /* neutral-bluish-900 */
     --inset: rgb(21 21 23);
-    --line: rgb(53 54 56);                /* DSH neutral-bluish-800 */
-    --line-strong: rgb(67 69 74);         /* DSH neutral-bluish-750 */
-    --content: rgb(249 250 251);          /* DSH neutral-bluish-50 */
-    --content-secondary: rgb(207 211 214); /* DSH neutral-bluish-300 */
-    --content-muted: rgb(129 133 140);    /* 仅装饰性文本（DSH neutral-bluish-600） */
-    --accent: rgb(122 170 255);           /* DSH deepseek-400 */
-    --accent-hover: rgb(65 118 230);      /* DSH deepseek-500（深色 hover 变深，同 DSH 方向） */
-    --accent-fg: rgb(15 17 21);           /* DSH 深色主按钮前景：近黑（白字在 ds-400 上仅 2.3:1） */
+    --line: rgb(53 54 56);                /* neutral-bluish-800 */
+    --line-strong: rgb(67 69 74);         /* neutral-bluish-750 */
+    --content: rgb(249 250 251);          /* neutral-bluish-50 */
+    --content-secondary: rgb(207 211 214); /* neutral-bluish-300 */
+    --content-muted: rgb(129 133 140);    /* 仅装饰性文本（neutral-bluish-600） */
+    --accent: rgb(122 170 255);           /* 品牌蓝 400 */
+    --accent-hover: rgb(65 118 230);      /* 品牌蓝 500（深色 hover 变深） */
+    --accent-fg: rgb(15 17 21);           /* 深色主按钮前景：近黑（白字在品牌蓝 400 上仅 2.3:1） */
     --accent-soft: color-mix(in oklab, rgb(122 170 255) 12%, transparent);
-    --bubble: rgb(44 44 46);              /* DSH neutral-bluish-850（深色气泡为中性灰底） */
-    --composer-card: rgb(44 44 46);       /* DSH input-major 深色 = neutral-bluish-850 */
-    --success: rgb(34 197 94);            /* DSH green-500 */
-    --success-fg: rgb(78 209 126);        /* DSH green-400 */
+    --bubble: rgb(44 44 46);              /* neutral-bluish-850（深色气泡为中性灰底） */
+    --composer-card: rgb(44 44 46);       /* 深色 = neutral-bluish-850 */
+    --success: rgb(34 197 94);            /* green-500 */
+    --success-fg: rgb(78 209 126);        /* 亮绿 */
     --success-soft: color-mix(in oklab, rgb(34 197 94) 12%, transparent);
-    --warning: rgb(245 158 11);           /* DSH amber-500 */
+    --warning: rgb(245 158 11);           /* amber-500 */
     --warning-fg: var(--color-amber-400);
     --warning-soft: color-mix(in oklab, rgb(245 158 11) 12%, transparent);
-    --danger: rgb(242 90 90);             /* DSH red-400 */
-    --danger-fg: rgb(254 226 226);        /* DSH red-100 */
+    --danger: rgb(242 90 90);             /* 亮红 */
+    --danger-fg: rgb(254 226 226);        /* 淡红 */
     --danger-soft: color-mix(in oklab, rgb(242 90 90) 12%, transparent);
     --ring: var(--accent);
     --btn-secondary-bg: var(--canvas);
@@ -133,7 +132,7 @@
 
 /* 字体与动效时长不随主题切换；static 强制发射（duration 暂无工具类消费，P2 微动效直接引用） */
 @theme static {
-    --radius-panel: 28px; /* 悬浮输入卡面板圆角（DSH --dsw-radius-panel，设计规范 §5 第五档） */
+    --radius-panel: 28px; /* 悬浮输入卡面板圆角（设计规范 §5 第五档） */
     --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system,
         "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
     --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -148,8 +147,8 @@ body,
     height: 100%;
 }
 
-/* 字体灰度抗锯齿（借鉴 DSH base.css）：macOS 默认次像素渲染会让深底白字
-   显得过粗过亮；灰度渲染笔画更纤细、观感与 DSH 一致。两主题统一生效。 */
+/* 字体灰度抗锯齿：macOS 默认次像素渲染会让深底白字
+   显得过粗过亮；灰度渲染笔画更纤细。两主题统一生效。 */
 html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -325,7 +324,7 @@ html {
     border-radius: 4px;
     padding: 0.1em 0.35em;
 }
-/* 代码块恒定深底（设计规范 §7「深岛」，DSH neutral-bluish-900，与高亮主题统一）；深色主题下加 hairline */
+/* 代码块恒定深底（设计规范 §7「深岛」，neutral-bluish-900，与高亮主题统一）；深色主题下加 hairline */
 .md-body pre {
     background: rgb(27 27 28);
     color: var(--code-bright);

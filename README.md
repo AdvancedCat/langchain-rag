@@ -337,7 +337,7 @@ langchain-rag/
 │   │   │   │   └── sse.ts / api.ts      # SSE 流解析 / REST 客户端
 │   │   │   ├── hooks.ts            # useChat / useHashRoute 等 React 绑定
 │   │   │   └── env.ts              # VITE_API_BASE_URL 解析
-│   │   ├── docs/design-system.md          #   设计系统规范（极简瑞士风 + 双主题，DSH 色系）
+│   │   ├── docs/design-system.md          #   设计系统规范（极简瑞士风 + 双主题）
 │   │   ├── index.html
 │   │   └── vite.config.ts
 │   └── libs/                       # 📦 跨包共享工具
