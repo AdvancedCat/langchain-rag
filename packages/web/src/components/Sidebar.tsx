@@ -126,12 +126,12 @@ export function Sidebar({
             <div className="flex items-center gap-2 border-t border-line px-4 py-3 text-xs text-content-secondary">
                 <span className={`h-2 w-2 rounded-full ${status.color}`} />
                 {status.text}
-                <Tooltip label={theme === 'dark' ? '切换为浅色主题' : '切换为深色主题'}>
+                <Tooltip label={theme === 'dark' ? '切换为浅色主题' : '切换为深色主题'} placement="top">
                     <button
                         type="button"
                         onClick={onToggleTheme}
                         aria-label={theme === 'dark' ? '切换为浅色主题' : '切换为深色主题'}
-                        className="ml-auto flex h-8 w-8 items-center justify-center rounded-md text-content-secondary transition hover:bg-content/10 hover:text-content"
+                        className="flex h-8 w-8 items-center justify-center rounded-md text-content-secondary transition hover:bg-content/10 hover:text-content"
                     >
                         {theme === 'dark' ? <IconSun /> : <IconMoon />}
                     </button>

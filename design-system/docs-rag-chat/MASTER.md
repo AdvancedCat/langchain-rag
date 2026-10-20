@@ -219,7 +219,7 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
 | 内嵌 pre（参数/结果） | `bg-inset`，6px 圆角，12px mono，`max-h` + 滚动 |
 | 代码块 | 恒定 zinc-900 深底（浅色主题下即「深岛」，与 github-dark 高亮统一；深色主题下加 `border-line`）；右上角语言标签（11px，hover 区显现）+ 复制按钮；8px 圆角 |
 | 元信息 chip（来源徽标 / trace 芯片） | 同族规范：11px、`border-line` hairline、6px 圆角、文本 `content-secondary`、hover 转 accent。来源徽标保留现有 chip 结构；trace 芯片（`Turn.tsx` TraceChip，PR #2）展示 traceId 前 8 位、点击复制完整 32 位 hex——`h-8`（32px 触达）、`tabular-nums`、`focus-visible` 已达标，保留。位置：完成轮并入答案元信息行尾（可 `flex-wrap` 换行），流式/异常/取消轮单独成行（运行中即可复制去罗盘检索） |
-| Tooltip | 图标按钮的即时悬停提示（`components/Tooltip.tsx`）：反色 chip（`bg-content text-canvas`）11px、6px 圆角，hover / 键盘聚焦即现（`duration-fast` 淡入），`pointer-events-none` 不拦截指针；替代原生 title 的延迟与系统样式，SR 语义仍由控件 `aria-label` 承担 |
+| Tooltip | 图标按钮的即时悬停提示（`components/Tooltip.tsx`）：反色 chip（`bg-content text-canvas`）11px、6px 圆角，hover / 键盘聚焦即现（`duration-fast` 淡入），`pointer-events-none` 不拦截指针；`placement` 默认 `bottom`，贴近视口/容器底部的控件（如侧栏底部主题切换）用 `"top"`；替代原生 title 的延迟与系统样式，SR 语义仍由控件 `aria-label` 承担 |
 | 答案元信息行 | 正文底部（完成轮才展示）：复制回答（§7 复制反馈模式，`h-8 w-8` 触达，hover 高亮 `bg-content/10` + Tooltip）· `用量 N tok`（CUSTOM `run.usage`，≥1 万取整 K、千位一位小数）· 时间（恒为 `M月D日 HH:mm`，取 RUN_STARTED 事件时间戳）· 行尾可挂 trace 芯片（见上行）；12px `content-secondary`、`tabular-nums`，纯文本不带图标，`flex-wrap` 窄屏换行。图标按钮 hover 高亮统一 `bg-content/10`（主题无关；禁用 `bg-inset`——深色下与画布同色不可见） |
 | Composer | 输入框 + 按钮同排 `gap-2`；输入 12px 圆角、`border-line`、focus 时 ring `accent`（2px，20% 透明度外扩）；底部 hint 12px `text-content-secondary`；发送钮 `bg-accent`，停止钮中性反色（`bg-content text-canvas`） |
 | 错误条 | `danger` 12% tint 底 + danger 30% 边框 + danger 文本；重试为描边式按钮 |
