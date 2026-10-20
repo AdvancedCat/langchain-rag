@@ -131,7 +131,7 @@ export function Sidebar({
                         type="button"
                         onClick={onToggleTheme}
                         aria-label={theme === 'dark' ? '切换为浅色主题' : '切换为深色主题'}
-                        className="flex h-8 w-8 items-center justify-center rounded-md text-content-secondary transition hover:bg-content/10 hover:text-content"
+                        className="ml-auto flex h-8 w-8 items-center justify-center rounded-md text-content-secondary transition hover:bg-content/10 hover:text-content"
                     >
                         {theme === 'dark' ? <IconSun /> : <IconMoon />}
                     </button>
