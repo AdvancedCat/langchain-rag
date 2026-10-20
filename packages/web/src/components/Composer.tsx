@@ -49,7 +49,7 @@ export function Composer({
                     rows={1}
                     value={draft}
                     placeholder="向知识库提问…"
-                    className="thin-scrollbar max-h-[200px] min-h-[40px] flex-1 resize-none bg-transparent py-2.5 text-[0.9375rem] leading-relaxed text-content placeholder:text-content-secondary focus:outline-none focus-visible:outline-none"
+                    className="thin-scrollbar max-h-[200px] min-h-[40px] flex-1 resize-none bg-transparent py-2.5 text-[0.9375rem] leading-relaxed text-content placeholder:text-content-muted focus:outline-none focus-visible:outline-none"
                     onChange={(event) => onDraftChange(event.target.value)}
                     onKeyDown={(event) => {
                         if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
