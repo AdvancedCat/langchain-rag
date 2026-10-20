@@ -115,7 +115,11 @@ export function ChatView({
                     </div>
                 </div>
             ) : (
-                <div ref={scrollRef} onScroll={onScroll} className="thin-scrollbar flex-1 overflow-y-auto px-4 py-5 md:px-6">
+                <div
+                    ref={scrollRef}
+                    onScroll={onScroll}
+                    className="thin-scrollbar flex-1 overflow-y-auto px-4 py-5 [scrollbar-gutter:stable_both-edges] md:px-6"
+                >
                     <div className="mx-auto max-w-3xl space-y-8">
                         {state.turns.map((turn, index) => (
                             <TurnView
