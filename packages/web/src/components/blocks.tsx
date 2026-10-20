@@ -32,6 +32,7 @@ function prettyJson(text: string): string {
 /**
  * 折叠容器（设计规范 §8）：grid-template-rows 0fr→1fr 过渡，禁止瞬时跳变；
  * 进入 ease-out、退出 ease-in；reduced-motion 降级为直接展开。
+ * 内容保持挂载以承载动画，收起时置 inert——否则内部链接/复制按钮仍在 Tab 序列里。
  */
 function Collapsible({ open, children }: { open: boolean; children: ReactNode }) {
     return (
@@ -40,7 +41,9 @@ function Collapsible({ open, children }: { open: boolean; children: ReactNode })
                 open ? 'grid-rows-[1fr] motion-safe:ease-out' : 'grid-rows-[0fr] motion-safe:ease-in'
             }`}
         >
-            <div className="min-h-0 overflow-hidden">{children}</div>
+            <div className="min-h-0 overflow-hidden" inert={!open}>
+                {children}
+            </div>
         </div>
     );
 }

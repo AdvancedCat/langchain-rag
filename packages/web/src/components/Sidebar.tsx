@@ -86,6 +86,8 @@ export function Sidebar({
                             }`}
                             onClick={() => onSelect(thread.threadId)}
                             onKeyDown={(event) => {
+                                // 嵌套删除按钮的 Enter/Space 会冒泡到这里；不拦截，否则 preventDefault 会吞掉按钮的原生激活
+                                if (event.target !== event.currentTarget) return;
                                 if (event.key === 'Enter' || event.key === ' ') {
                                     event.preventDefault();
                                     onSelect(thread.threadId);
@@ -105,7 +107,7 @@ export function Sidebar({
                                     运行中
                                 </span>
                             )}
-                            <Tooltip label="删除会话">
+                            <Tooltip label="删除会话" placement="left">
                                 <button
                                     type="button"
                                     aria-label="删除会话"
@@ -131,7 +133,7 @@ export function Sidebar({
                         type="button"
                         onClick={onToggleTheme}
                         aria-label={theme === 'dark' ? '切换为浅色主题' : '切换为深色主题'}
-                        className="ml-auto flex h-8 w-8 items-center justify-center rounded-md text-content-secondary transition hover:bg-content/10 hover:text-content"
+                        className="flex h-8 w-8 items-center justify-center rounded-md text-content-secondary transition hover:bg-content/10 hover:text-content"
                     >
                         {theme === 'dark' ? <IconSun /> : <IconMoon />}
                     </button>

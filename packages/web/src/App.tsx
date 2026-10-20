@@ -26,15 +26,45 @@ export function App() {
         wasActiveRef.current = state.activeRunId !== null;
     }, [state.activeRunId, refresh]);
 
-    // 抽屉打开时：焦点移入面板 + Escape 关闭
+    // 抽屉打开时：焦点移入面板、Tab 困在面板内、锁 body 滚动、Escape 关闭；
+    // 关闭时焦点归还打开它的触发元素（否则 aside 变 invisible 后焦点掉回 body，键盘用户从头 Tab）
     useEffect(() => {
         if (!sidebarOpen) return;
-        drawerRef.current?.focus();
+        const drawer = drawerRef.current;
+        const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        drawer?.focus();
         const onKey = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') setSidebarOpen(false);
+            if (event.key === 'Escape') {
+                setSidebarOpen(false);
+                return;
+            }
+            if (event.key !== 'Tab' || !drawer) return;
+            const focusable = Array.from(
+                drawer.querySelectorAll<HTMLElement>('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'),
+            ).filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null);
+            if (focusable.length === 0) {
+                event.preventDefault();
+                return;
+            }
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            const active = document.activeElement;
+            if (event.shiftKey && (active === first || active === drawer)) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && active === last) {
+                event.preventDefault();
+                first.focus();
+            }
         };
         window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            window.removeEventListener('keydown', onKey);
+            document.body.style.overflow = previousOverflow;
+            if (trigger?.isConnected) trigger.focus();
+        };
     }, [sidebarOpen]);
 
     const title = threads.find((thread) => thread.threadId === threadId)?.title ?? (threadId ? '会话' : '新对话');
