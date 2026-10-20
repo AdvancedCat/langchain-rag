@@ -3,6 +3,7 @@
 // 语义规则：每类过程块一个专属图标——思考 Brain、工具 Wrench、子代理 Bot、聚合 Workflow。
 import type { LucideProps } from 'lucide-react';
 import {
+    ArrowUp,
     Bot,
     Brain,
     Check,
@@ -12,7 +13,6 @@ import {
     Menu,
     Moon,
     Plus,
-    Send,
     Square,
     Sun,
     Trash2,
@@ -56,8 +56,9 @@ export function IconCheck({ className = 'h-3.5 w-3.5 shrink-0 text-content-muted
     return <Check {...withDefaults({ className })} />;
 }
 
-export function IconSend() {
-    return <Send {...withDefaults({ className: 'h-4 w-4' })} />;
+/** 发送钮上箭头（悬浮卡圆钮 20px，DSH 同款字形） */
+export function IconArrowUp() {
+    return <ArrowUp {...withDefaults({ className: 'h-5 w-5' })} />;
 }
 
 export function IconStop() {

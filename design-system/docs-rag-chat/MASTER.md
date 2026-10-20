@@ -5,7 +5,7 @@
 >
 > **Project:** Docs RAG Chat（`packages/web`，React 19 + Tailwind CSS v4）
 > **Generated:** 2026-10-11（ui-ux-pro-max 检索 + 现状审查，方向经确认）
-> **Updated:** 2026-10-20 次级操作按钮 token（`--btn-secondary-bg/-bg-hover/-fg-hover`）：浅色 rest `#f9fafb`（neutral-bluish-50）→ hover `#353638`（neutral-bluish-800）反色 + 文本翻白，深色 rest 同画布、hover 提亮；应用于「新对话」与「重新加载」按钮。色系改造：借鉴 DSH（DeepSeek Harness `design-platform.css`）主题色——accent 由 indigo 换为 deepseek 品牌蓝（浅 500 `rgb(65 118 230)` / 深 400 `rgb(122 170 255)`）、中性 zinc 换 neutral-bluish 蓝灰阶、状态色对齐 DSH green/amber/red、新增 `--bubble` 软底气泡 token（§7 用户气泡改软底，浅色 deepseek-50 淡蓝底 / 深色 neutral-bluish-850 灰底）；同日追加 §4 全局灰度抗锯齿（借鉴 DSH base.css，修正深底白字次像素渲染过亮）。2026-10-19（纳入 PR #2 TraceChip 规范修订；P1 实施：§2 增补 `--accent-hover` 与状态色 `-fg`/`-soft` 衍生 token，duration 经 `@theme static` 发射；P2 实施：§2 增补过程块类型色与深岛前景 token，§6 完成 lucide 迁移与图标语义拆分；P3 实施：品牌 mark（文档+检索字形）替换 R 字母块、§7 抽屉侧栏落地（§2 增补 `--scrim`）、空态视觉增强与 §5 页边距/§9 触达达标；P3 追加：§7 新增答案元信息行（复制回答 / 用量 / 时间，用量经 api CUSTOM `run.usage` 事件透出））
+> **Updated:** 2026-10-20 悬浮输入卡（借鉴 DSH InputBar）：§2 增补 `--composer-card`/`--elevation-card`/`--radius-panel`，§5 圆角增第五档面板 28px 与 `shadow-card` 阴影，§7 Composer 改悬浮卡（无边框投影 + 44px 圆形发送钮 + 滚动区底部渐隐）。2026-10-20 次级操作按钮 token（`--btn-secondary-bg/-bg-hover/-fg-hover`）：浅色 rest `#f9fafb`（neutral-bluish-50）→ hover `#353638`（neutral-bluish-800）反色 + 文本翻白，深色 rest 同画布、hover 提亮；应用于「新对话」与「重新加载」按钮。色系改造：借鉴 DSH（DeepSeek Harness `design-platform.css`）主题色——accent 由 indigo 换为 deepseek 品牌蓝（浅 500 `rgb(65 118 230)` / 深 400 `rgb(122 170 255)`）、中性 zinc 换 neutral-bluish 蓝灰阶、状态色对齐 DSH green/amber/red、新增 `--bubble` 软底气泡 token（§7 用户气泡改软底，浅色 deepseek-50 淡蓝底 / 深色 neutral-bluish-850 灰底）；同日追加 §4 全局灰度抗锯齿（借鉴 DSH base.css，修正深底白字次像素渲染过亮）。2026-10-19（纳入 PR #2 TraceChip 规范修订；P1 实施：§2 增补 `--accent-hover` 与状态色 `-fg`/`-soft` 衍生 token，duration 经 `@theme static` 发射；P2 实施：§2 增补过程块类型色与深岛前景 token，§6 完成 lucide 迁移与图标语义拆分；P3 实施：品牌 mark（文档+检索字形）替换 R 字母块、§7 抽屉侧栏落地（§2 增补 `--scrim`）、空态视觉增强与 §5 页边距/§9 触达达标；P3 追加：§7 新增答案元信息行（复制回答 / 用量 / 时间，用量经 api CUSTOM `run.usage` 事件透出））
 > **Style:** Minimalism & Swiss（极简瑞士风）· 开发者工具 · 双主题（浅色默认 + 深色）
 
 ---
@@ -54,6 +54,9 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
     --accent-fg: #ffffff;
     --accent-soft: rgb(237 243 254);      /* DSH deepseek-50 */
     --bubble: var(--accent-soft);         /* 用户气泡软底（2026-10-20 增补） */
+    --composer-card: #ffffff;             /* 悬浮输入卡底（2026-10-20 增补，DSH input-major 浅色 = 白） */
+    --elevation-card: 0 0 0 0.5px var(--line), 0 4px 16px rgb(0 0 0 / 3%),
+        0 0 24px rgb(0 0 0 / 3%);         /* 悬浮卡投影（DSH elevation-soft，两主题同值） */
     --success: rgb(34 197 94);            /* DSH green-500 */
     --success-fg: rgb(21 128 61);         /* green-700，§3.2 状态文本（P1 增补） */
     --success-soft: rgb(230 250 237);     /* DSH green-100，§3.2 状态底色（P1 增补） */
@@ -95,6 +98,7 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
     --accent-fg: rgb(15 17 21);           /* DSH 深色主按钮前景近黑（白字在 ds-400 上仅 2.3:1） */
     --accent-soft: color-mix(in oklab, rgb(122 170 255) 12%, transparent);
     --bubble: rgb(44 44 46);              /* DSH neutral-bluish-850（深色气泡中性灰底） */
+    --composer-card: rgb(44 44 46);       /* DSH input-major 深色 = neutral-bluish-850（2026-10-20 增补） */
     --success: rgb(34 197 94);            /* DSH green-500 */
     --success-fg: rgb(78 209 126);        /* DSH green-400 */
     --success-soft: color-mix(in oklab, rgb(34 197 94) 12%, transparent);
@@ -126,6 +130,8 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
     --color-accent-fg: var(--accent-fg);
     --color-accent-soft: var(--accent-soft);
     --color-bubble: var(--bubble);
+    --color-composer-card: var(--composer-card);
+    --shadow-card: var(--elevation-card);
     --color-success: var(--success);
     --color-success-fg: var(--success-fg);
     --color-success-soft: var(--success-soft);
@@ -151,6 +157,7 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
 
 /* 字体与动效时长不随主题切换；static 强制发射（Tailwind v4 默认 tree-shake 未引用变量） */
 @theme static {
+    --radius-panel: 28px; /* 悬浮输入卡面板圆角（2026-10-20 增补，DSH --dsw-radius-panel） */
     --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system,
         "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
     --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -213,9 +220,9 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
 ## 5. 空间 · 圆角 · 边框 · 阴影
 
 - **间距**：4px 基数。组件内 8/12，卡片内 12/16，区块间 16/24/32。消息流 `max-w-3xl`（768px）居中、`space-y-8`；页边距移动端 16px、≥768px 24px。
-- **圆角**（全站仅四档）：6px 内嵌 pre / 徽标 / source-chip；8px 卡片；12px 输入框与主按钮；16px 用户气泡（右下角 6px 破折）。
+- **圆角**（全站仅五档）：6px 内嵌 pre / 徽标 / source-chip；8px 卡片；12px 次级按钮；16px 用户气泡（右下角 6px 破折）；28px 面板（`rounded-panel`，2026-10-20 增补，悬浮输入卡专用，DSH `--dsw-radius-panel` 同值）。
 - **边框**：全局 1px hairline；3px 仅用于过程块左色条与 blockquote；禁止 2px 边框。
-- **阴影**：`shadow-sm` 仅限悬浮元素（新对话按钮、弹出层）；卡片层级靠 `border-line` 表达，禁止 md 及以上阴影。
+- **阴影**：`shadow-sm` 仅限悬浮元素（新对话按钮、弹出层）；悬浮输入卡用 `shadow-card`（0.5px 描边 + 双层 3% 黑投影，同 DSH elevation-soft，2026-10-20 增补）；卡片层级靠 `border-line` 表达，禁止 md 及以上阴影。
 
 ---
 
@@ -240,7 +247,7 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
 | 元信息 chip（来源徽标 / trace 芯片） | 同族规范：11px、`border-line` hairline、6px 圆角、文本 `content-secondary`、hover 转 accent。来源徽标保留现有 chip 结构；trace 芯片（`Turn.tsx` TraceChip，PR #2）展示 traceId 前 8 位、点击复制完整 32 位 hex——`h-8`（32px 触达）、`tabular-nums`、`focus-visible` 已达标，保留。位置：完成轮并入答案元信息行尾（可 `flex-wrap` 换行），流式/异常/取消轮单独成行（运行中即可复制去罗盘检索） |
 | Tooltip | 图标按钮的即时悬停提示（`components/Tooltip.tsx`）：反色 chip（`bg-content text-canvas`）11px、6px 圆角，hover / 键盘聚焦即现（`duration-fast` 淡入），`pointer-events-none` 不拦截指针；`placement` 默认 `bottom`，贴近视口/容器底部的控件（如侧栏底部主题切换）用 `"top"`；替代原生 title 的延迟与系统样式，SR 语义仍由控件 `aria-label` 承担 |
 | 答案元信息行 | 正文底部（完成轮才展示）：复制回答（§7 复制反馈模式，`h-8 w-8` 触达，hover 高亮 `bg-content/10` + Tooltip）· `用量 N tok`（CUSTOM `run.usage`，≥1 万取整 K、千位一位小数）· 时间（恒为 `M月D日 HH:mm`，取 RUN_STARTED 事件时间戳）· 行尾可挂 trace 芯片（见上行）；12px `content-secondary`、`tabular-nums`，纯文本不带图标，`flex-wrap` 窄屏换行。图标按钮 hover 高亮统一 `bg-content/10`（主题无关；禁用 `bg-inset`——深色下与画布同色不可见） |
-| Composer | 输入框 + 按钮同排 `gap-2`；输入 12px 圆角、`border-line`、focus 时 ring `accent`（2px，20% 透明度外扩）；底部 hint 12px `text-content-secondary`；发送钮 `bg-accent`，停止钮中性反色（`bg-content text-canvas`） |
+| Composer | **悬浮输入卡**（2026-10-20 起，借鉴 DSH 面板式 Composer）：无通栏分隔，`rounded-panel bg-composer-card shadow-card` 悬浮于内容列底部（`max-w-3xl`，左右留 16px/底 4px）；无边框，投影即描边；文本区在上（透明无边框，`px-4 pt-1.5`），控制行在下（左 hint 12px `text-content-secondary`、右 **44px 圆形按钮**）；发送钮 `bg-accent` 白/近黑箭头（随 `accent-fg`，不照搬 DSH 强制白——深色白箭头不达图形 3:1）+ disabled `opacity-40`（DSH 同款）；停止钮 `bg-content text-canvas` 反色圆钮；卡聚焦 `focus-within:ring-2 ring-accent/20`；消息滚动区底部 sticky 渐隐条（`from-canvas`，DSH「遮罩归滚动器」） |
 | 错误条 | `danger` 12% tint 底 + danger 30% 边框 + danger 文本；重试为描边式按钮 |
 
 **复制反馈（通用交互模式）**：点击复制类控件统一为——点击后文本切换「已复制」（配 SVG check 图标，见 §6），≤1.6s 自动回退原文，控件尺寸不变（无布局位移）。trace 芯片与代码块复制按钮（P2）共用此模式。
