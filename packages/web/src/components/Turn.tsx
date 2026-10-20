@@ -83,13 +83,13 @@ export function TurnView({ turn, canRetry, onRetry }: { turn: Turn; canRetry: bo
         <div className="enter-in space-y-3">
             {turn.userText !== null ? (
                 <div className="flex justify-end">
-                    <div className="max-w-[85%] rounded-2xl rounded-br-md bg-accent px-4 py-2.5 text-[0.9375rem] leading-relaxed whitespace-pre-wrap text-accent-fg">
+                    <div className="max-w-[85%] rounded-2xl rounded-br-md bg-bubble px-4 py-2.5 text-[0.9375rem] leading-relaxed whitespace-pre-wrap text-content">
                         {turn.userText}
                     </div>
                 </div>
             ) : streaming ? (
                 <div className="flex justify-end">
-                    <div className="max-w-[85%] rounded-2xl rounded-br-md bg-accent/25 px-4 py-2.5 text-[0.9375rem] text-accent-fg">
+                    <div className="max-w-[85%] rounded-2xl rounded-br-md bg-bubble px-4 py-2.5 text-[0.9375rem] text-content-secondary">
                         （本轮提问）
                     </div>
                 </div>

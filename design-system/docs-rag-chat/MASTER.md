@@ -5,7 +5,7 @@
 >
 > **Project:** Docs RAG Chat（`packages/web`，React 19 + Tailwind CSS v4）
 > **Generated:** 2026-10-11（ui-ux-pro-max 检索 + 现状审查，方向经确认）
-> **Updated:** 2026-10-19（纳入 PR #2 TraceChip 规范修订；P1 实施：§2 增补 `--accent-hover` 与状态色 `-fg`/`-soft` 衍生 token，duration 经 `@theme static` 发射；P2 实施：§2 增补过程块类型色与深岛前景 token，§6 完成 lucide 迁移与图标语义拆分；P3 实施：品牌 mark（文档+检索字形）替换 R 字母块、§7 抽屉侧栏落地（§2 增补 `--scrim`）、空态视觉增强与 §5 页边距/§9 触达达标；P3 追加：§7 新增答案元信息行（复制回答 / 用量 / 时间，用量经 api CUSTOM `run.usage` 事件透出））
+> **Updated:** 2026-10-20 色系改造：借鉴 DSH（DeepSeek Harness `design-platform.css`）主题色——accent 由 indigo 换为 deepseek 品牌蓝（浅 500 `rgb(65 118 230)` / 深 400 `rgb(122 170 255)`）、中性 zinc 换 neutral-bluish 蓝灰阶、状态色对齐 DSH green/amber/red、新增 `--bubble` 软底气泡 token（§7 用户气泡改软底，浅色 deepseek-50 淡蓝底 / 深色 neutral-bluish-850 灰底）。2026-10-19（纳入 PR #2 TraceChip 规范修订；P1 实施：§2 增补 `--accent-hover` 与状态色 `-fg`/`-soft` 衍生 token，duration 经 `@theme static` 发射；P2 实施：§2 增补过程块类型色与深岛前景 token，§6 完成 lucide 迁移与图标语义拆分；P3 实施：品牌 mark（文档+检索字形）替换 R 字母块、§7 抽屉侧栏落地（§2 增补 `--scrim`）、空态视觉增强与 §5 页边距/§9 触达达标；P3 追加：§7 新增答案元信息行（复制回答 / 用量 / 时间，用量经 api CUSTOM `run.usage` 事件透出））
 > **Style:** Minimalism & Swiss（极简瑞士风）· 开发者工具 · 双主题（浅色默认 + 深色）
 
 ---
@@ -17,7 +17,7 @@
 开发者工具类产品的深色模式倾向（编码平台首选）以**第二主题**形式满足，不作为默认。
 
 1. **内容优先**：答案正文是唯一主角，过程与装饰一律退后（折叠、弱化、hairline）。
-2. **单强调色纪律**：indigo 是全站唯一强调色，只用于交互意图与激活态；状态语义色（绿/黄/红）仅表状态。
+2. **单强调色纪律**：deepseek 蓝（DSH 品牌蓝，浅色 500 / 深色 400）是全站唯一强调色，只用于交互意图与激活态；状态语义色（绿/黄/红）仅表状态。
 3. **克制即质感**：1px 边框代替阴影，微动效代替大动画，留白代替分隔线堆叠。
 
 ---
@@ -27,10 +27,13 @@
 **唯一定义处：`packages/web/src/index.css`。**
 
 ```
-primitive 层   Tailwind 默认调色板（zinc-*/indigo-*/emerald-*/...），只允许出现在本文件 token 定义处
+primitive 层   Tailwind 默认调色板 + DSH 色阶字面值（deepseek-*/neutral-bluish-*，rgb() 直写），
+               只允许出现在本文件 token 定义处
 semantic 层    :root / .dark 下的 CSS 变量（--canvas、--content-secondary ...）
 component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secondary、border-line ...）
 ```
+
+色系出处（2026-10-20 起）：借鉴 DSH（DeepSeek Harness）`packages/client/ui-theme/src/styles/design-platform.css`——`deepseek` 品牌蓝阶 + `neutral-bluish` 蓝灰中性阶 + Tailwind green/amber/red 状态色。悬停方向同 DSH：浅色 accent 500→hover 400（变亮），深色 400→hover 500（变深）。
 
 ```css
 @import "tailwindcss";
@@ -39,63 +42,65 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
 
 :root {
     --canvas: #ffffff;                    /* 页面底 */
-    --surface: var(--color-zinc-50);      /* 侧栏/卡片/聚合块底 */
-    --inset: var(--color-zinc-100);       /* 内嵌代码/参数/结果区底 */
-    --line: var(--color-zinc-200);        /* 常规 hairline */
-    --line-strong: var(--color-zinc-300); /* 强分隔/悬停边框 */
-    --content: var(--color-zinc-800);     /* 正文 */
-    --content-secondary: var(--color-zinc-600);  /* 次级/有信息量的弱文本 */
-    --content-muted: var(--color-zinc-400);      /* 仅装饰性文本 */
-    --accent: var(--color-indigo-600);
-    --accent-hover: var(--color-indigo-500);     /* accent 悬停态（P1 增补） */
+    --surface: rgb(249 250 251);          /* 侧栏/卡片/聚合块底（DSH neutral-bluish-50） */
+    --inset: rgb(241 243 245);            /* 内嵌代码/参数/结果区底（DSH neutral-bluish-75） */
+    --line: rgb(233 236 242);             /* 常规 hairline（DSH neutral-bluish-150） */
+    --line-strong: rgb(225 229 238);      /* 强分隔/悬停边框（DSH neutral-bluish-200） */
+    --content: rgb(15 17 21);             /* 正文（DSH neutral-bluish-1000） */
+    --content-secondary: rgb(97 102 107); /* 次级/有信息量的弱文本（DSH neutral-bluish-700） */
+    --content-muted: rgb(173 178 184);    /* 仅装饰性文本（DSH neutral-bluish-400） */
+    --accent: rgb(65 118 230);            /* DSH deepseek-500 */
+    --accent-hover: rgb(122 170 255);     /* DSH deepseek-400（悬停态，P1 增补） */
     --accent-fg: #ffffff;
-    --accent-soft: var(--color-indigo-50);
-    --success: var(--color-emerald-600);
-    --success-fg: var(--color-emerald-700);      /* §3.2 状态文本（P1 增补） */
-    --success-soft: var(--color-emerald-50);     /* §3.2 状态底色（P1 增补） */
-    --warning: var(--color-amber-500);
+    --accent-soft: rgb(237 243 254);      /* DSH deepseek-50 */
+    --bubble: var(--accent-soft);         /* 用户气泡软底（2026-10-20 增补） */
+    --success: rgb(34 197 94);            /* DSH green-500 */
+    --success-fg: rgb(21 128 61);         /* green-700，§3.2 状态文本（P1 增补） */
+    --success-soft: rgb(230 250 237);     /* DSH green-100，§3.2 状态底色（P1 增补） */
+    --warning: rgb(245 158 11);           /* DSH amber-500 */
     --warning-fg: var(--color-amber-700);
-    --warning-soft: var(--color-amber-50);
-    --danger: var(--color-red-600);
+    --warning-soft: rgb(254 245 231);     /* DSH amber-100 */
+    --danger: rgb(236 19 19);             /* DSH red-600 */
     --danger-fg: var(--color-red-700);
-    --danger-soft: var(--color-red-50);
-    --ring: var(--color-indigo-600);
+    --danger-soft: rgb(254 242 242);      /* DSH red-50 */
+    --ring: var(--accent);
     /* 过程块类型色（§7，P2 增补）：思考 violet / 工具 line-strong / 子代理 accent；
        -tool/-subagent 引用已主题化变量，html 上 :root/.dark 同元素级联即随主题切换 */
     --process-reasoning: var(--color-violet-400);
     --process-tool: var(--line-strong);
     --process-subagent: var(--accent);
-    /* 代码块「深岛」前景/胶囊底（恒定 zinc-900 底，两主题共用，P2 增补） */
-    --code-bright: var(--color-zinc-100);
-    --code-muted: var(--color-zinc-400);
-    --code-chip: var(--color-zinc-800);
-    --code-chip-hover: var(--color-zinc-700);
+    /* 代码块「深岛」前景/胶囊底（恒定 neutral-bluish-900 底，两主题共用，P2 增补） */
+    --code-bright: rgb(235 238 242);      /* DSH neutral-bluish-100 */
+    --code-muted: rgb(173 178 184);       /* DSH neutral-bluish-400 */
+    --code-chip: rgb(53 54 56);           /* DSH neutral-bluish-800 */
+    --code-chip-hover: rgb(67 69 74);     /* DSH neutral-bluish-750 */
     /* 抽屉遮罩（P3 增补，两主题同值） */
-    --scrim: color-mix(in oklab, var(--color-zinc-950) 40%, transparent);
+    --scrim: color-mix(in oklab, rgb(15 17 21) 40%, transparent);
 }
 .dark {
-    --canvas: var(--color-zinc-950);
-    --surface: var(--color-zinc-900);
-    --inset: var(--color-zinc-950);
-    --line: var(--color-zinc-800);
-    --line-strong: var(--color-zinc-700);
-    --content: var(--color-zinc-100);
-    --content-secondary: var(--color-zinc-400);
-    --content-muted: var(--color-zinc-500);      /* 仅装饰性文本 */
-    --accent: var(--color-indigo-500);
-    --accent-hover: var(--color-indigo-400);
-    --accent-fg: #ffffff;
-    --accent-soft: color-mix(in oklab, var(--color-indigo-500) 12%, transparent);
-    --success: var(--color-emerald-500);
-    --success-fg: var(--color-emerald-400);
-    --success-soft: color-mix(in oklab, var(--color-emerald-500) 12%, transparent);
-    --warning: var(--color-amber-500);
+    --canvas: rgb(21 21 23);              /* DSH neutral-bluish-950 */
+    --surface: rgb(27 27 28);             /* DSH neutral-bluish-900 */
+    --inset: rgb(21 21 23);
+    --line: rgb(53 54 56);                /* DSH neutral-bluish-800 */
+    --line-strong: rgb(67 69 74);         /* DSH neutral-bluish-750 */
+    --content: rgb(249 250 251);          /* DSH neutral-bluish-50 */
+    --content-secondary: rgb(207 211 214); /* DSH neutral-bluish-300 */
+    --content-muted: rgb(129 133 140);    /* 仅装饰性文本（DSH neutral-bluish-600） */
+    --accent: rgb(122 170 255);           /* DSH deepseek-400 */
+    --accent-hover: rgb(65 118 230);      /* DSH deepseek-500 */
+    --accent-fg: rgb(15 17 21);           /* DSH 深色主按钮前景近黑（白字在 ds-400 上仅 2.3:1） */
+    --accent-soft: color-mix(in oklab, rgb(122 170 255) 12%, transparent);
+    --bubble: rgb(44 44 46);              /* DSH neutral-bluish-850（深色气泡中性灰底） */
+    --success: rgb(34 197 94);            /* DSH green-500 */
+    --success-fg: rgb(78 209 126);        /* DSH green-400 */
+    --success-soft: color-mix(in oklab, rgb(34 197 94) 12%, transparent);
+    --warning: rgb(245 158 11);           /* DSH amber-500 */
     --warning-fg: var(--color-amber-400);
-    --warning-soft: color-mix(in oklab, var(--color-amber-500) 12%, transparent);
-    --danger: var(--color-red-500);
-    --danger-fg: var(--color-red-400);
-    --danger-soft: color-mix(in oklab, var(--color-red-500) 12%, transparent);
-    --ring: var(--color-indigo-500);
+    --warning-soft: color-mix(in oklab, rgb(245 158 11) 12%, transparent);
+    --danger: rgb(242 90 90);             /* DSH red-400 */
+    --danger-fg: rgb(254 226 226);        /* DSH red-100 */
+    --danger-soft: color-mix(in oklab, rgb(242 90 90) 12%, transparent);
+    --ring: var(--accent);
 }
 
 /* 颜色走 inline：工具类直接引用语义变量，.dark 切换即时生效 */
@@ -112,6 +117,7 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
     --color-accent-hover: var(--accent-hover);
     --color-accent-fg: var(--accent-fg);
     --color-accent-soft: var(--accent-soft);
+    --color-bubble: var(--bubble);
     --color-success: var(--success);
     --color-success-fg: var(--success-fg);
     --color-success-soft: var(--success-soft);
@@ -155,11 +161,12 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
 
 | 组合 | 浅色 | 深色 | 判定 |
 |---|---|---|---|
-| `content` on `canvas` | ~14.8:1 | ~18:1 | ✓ 正文 |
-| `content-secondary` on `canvas` | ~7.7:1 | ~7.7:1 | ✓ 次级正文/元信息 |
-| `content-muted` on `canvas` | ~2.6:1 | ~4.1:1 | ✗ **仅装饰性**（分隔符、禁用态） |
-| `accent-fg` on `accent` | ~6.3:1 | ~4.5:1 | ✓ 按钮文本 |
-| `accent` on `accent-soft` | ~5.6:1 | — | ✓ 激活态文本 |
+| `content` on `canvas` | ~18.9:1 | ~17.3:1 | ✓ 正文 |
+| `content-secondary` on `canvas` | ~5.8:1 | ~12.1:1 | ✓ 次级正文/元信息 |
+| `content-muted` on `canvas` | ~2.1:1 | ~4.9:1 | ✗ **仅装饰性**（分隔符、禁用态） |
+| `accent-fg` on `accent` | ~4.2:1 | ~8.1:1 | ✓ 按钮文本（浅色 4.2 为 DSH 原值取舍，≥3:1 UI 标准） |
+| `accent` on `accent-soft` | ~3.8:1 | — | ✓ 激活态文本（13px 中字重，随 DSH 原值取舍） |
+| `content` on `bubble`（用户气泡） | ~17:1 | ~13.3:1 | ✓ 气泡正文 |
 
 **硬规则：有信息量的文本（时间戳、计数、空态副标题、输入提示、底部说明、错误详情）最低 `text-content-secondary`，禁止 `text-content-muted`。** 现状中 `Sidebar.tsx` 时间戳、`ChatView.tsx` 空态副标题、`Composer.tsx` 底部提示、`blocks.tsx` 参数/结果小标题、`Turn.tsx` TraceChip（`text-zinc-500`，≈4.8:1 过 WCAG AA 但低于内部标准）均需按此上调。
 
@@ -167,9 +174,9 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
 
 | 语义 | 用法 | 文本/图标 | 底色 |
 |---|---|---|---|
-| success（绿） | 运行中、服务正常、完成 | 浅色 emerald-700 / 深色 emerald-400 | emerald-50 / 深色 12% tint |
-| warning（黄） | 服务降级、重连中 | amber-700 / amber-400 | amber-50 / 深色 12% tint |
-| danger（红） | 错误、删除悬停、不可达 | red-700 / red-400 | red-50 / 深色 12% tint |
+| success（绿） | 运行中、服务正常、完成 | 浅色 green-700 / 深色 green-400（DSH） | DSH green-100 / 深色 12% tint |
+| warning（黄） | 服务降级、重连中 | amber-700 / amber-400 | DSH amber-100 / 深色 12% tint |
+| danger（红） | 错误、删除悬停、不可达 | 浅色 red-700 / 深色 DSH red-100 | DSH red-50 / 深色 12% tint |
 
 状态点**必须**伴随文字标签，不允许裸色点传达状态。
 
@@ -213,11 +220,11 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
 |---|---|
 | 侧栏 | `bg-surface`，宽 264px，右 hairline；激活项 `bg-accent-soft text-accent`；<768px 收起为抽屉 |
 | 顶栏 | `bg-canvas`，下 hairline；「回答生成中」pill 用 success 语义（soft 底 + 呼吸点 + 文字） |
-| 用户气泡 | `bg-accent text-accent-fg`，16px 圆角（右下 6px），max-w-[85%]，15px/1.625 |
+| 用户气泡 | **软底**（2026-10-20 起，同 DSH 原生样式）：`bg-bubble text-content`——浅色 deepseek-50 淡蓝底，深色 neutral-bluish-850 中性灰底；16px 圆角（右下 6px），max-w-[85%]，15px/1.625；流式占位气泡同底 `text-content-secondary` |
 | AI 回答 | **无容器**直接排版，`text-content`，内容优先；不加头像不加底色 |
 | 过程聚合块 | `bg-surface border-line` 8px 圆角；**类型区分 = 左 3px 色条 + 专属图标**（思考 violet-400、工具 line-strong、子代理 accent）；头部为 chevron + 标签 + 计数 + 状态；展开区为**垂直时间线**（2px `line` 连接线 + 8px 节点圆点），工具卡/思考块作为时间线步骤存在，不再各自带边框 |
 | 内嵌 pre（参数/结果） | `bg-inset`，6px 圆角，12px mono，`max-h` + 滚动 |
-| 代码块 | 恒定 zinc-900 深底（浅色主题下即「深岛」，与 github-dark 高亮统一；深色主题下加 `border-line`）；右上角语言标签（11px，hover 区显现）+ 复制按钮；8px 圆角 |
+| 代码块 | 恒定 DSH neutral-bluish-900 深底 `rgb(27 27 28)`（浅色主题下即「深岛」，与高亮主题统一；深色主题下加 `border-line`）；右上角语言标签（11px，hover 区显现）+ 复制按钮；8px 圆角 |
 | 元信息 chip（来源徽标 / trace 芯片） | 同族规范：11px、`border-line` hairline、6px 圆角、文本 `content-secondary`、hover 转 accent。来源徽标保留现有 chip 结构；trace 芯片（`Turn.tsx` TraceChip，PR #2）展示 traceId 前 8 位、点击复制完整 32 位 hex——`h-8`（32px 触达）、`tabular-nums`、`focus-visible` 已达标，保留。位置：完成轮并入答案元信息行尾（可 `flex-wrap` 换行），流式/异常/取消轮单独成行（运行中即可复制去罗盘检索） |
 | Tooltip | 图标按钮的即时悬停提示（`components/Tooltip.tsx`）：反色 chip（`bg-content text-canvas`）11px、6px 圆角，hover / 键盘聚焦即现（`duration-fast` 淡入），`pointer-events-none` 不拦截指针；`placement` 默认 `bottom`，贴近视口/容器底部的控件（如侧栏底部主题切换）用 `"top"`；替代原生 title 的延迟与系统样式，SR 语义仍由控件 `aria-label` 承担 |
 | 答案元信息行 | 正文底部（完成轮才展示）：复制回答（§7 复制反馈模式，`h-8 w-8` 触达，hover 高亮 `bg-content/10` + Tooltip）· `用量 N tok`（CUSTOM `run.usage`，≥1 万取整 K、千位一位小数）· 时间（恒为 `M月D日 HH:mm`，取 RUN_STARTED 事件时间戳）· 行尾可挂 trace 芯片（见上行）；12px `content-secondary`、`tabular-nums`，纯文本不带图标，`flex-wrap` 窄屏换行。图标按钮 hover 高亮统一 `bg-content/10`（主题无关；禁用 `bg-inset`——深色下与画布同色不可见） |
@@ -258,7 +265,7 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
 ## 10. 反模式（禁止）
 
 - ❌ emoji / 字符 dingbat（如 ✓）作结构性图标；第二强调色；渐变 / glassmorphism / 重阴影
-- ❌ 组件层硬编码 `zinc-*` / `indigo-*`（只允许出现在 `index.css` token 定义处）
+- ❌ 组件层硬编码 `zinc-*` / `indigo-*` / DSH 色阶字面值（rgb() 直写），以上只允许出现在 `index.css` token 定义处
 - ❌ informative 文本使用 `content-muted`；裸状态点无标签
 - ❌ 深色模式直接复用浅色对比值（两主题分别校验）
 - ❌ 瞬时跳变的展开/收起；布局位移式交互反馈
