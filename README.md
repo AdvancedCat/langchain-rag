@@ -337,11 +337,11 @@ langchain-rag/
 │   │   │   │   └── sse.ts / api.ts      # SSE 流解析 / REST 客户端
 │   │   │   ├── hooks.ts            # useChat / useHashRoute 等 React 绑定
 │   │   │   └── env.ts              # VITE_API_BASE_URL 解析
+│   │   ├── docs/MASTER.md          #   设计系统规范（极简瑞士风 + 双主题，DSH 色系）
 │   │   ├── index.html
 │   │   └── vite.config.ts
 │   └── libs/                       # 📦 跨包共享工具
 │       └── llm-provider.ts         #   统一 LLM 工厂
-├── design-system/                  # 前端设计系统规范（docs-rag-chat/MASTER.md，极简瑞士风 + 双主题）
 ├── AGENTS.md                       # AI 编码代理指南
 ├── LICENSE
 ├── package.json
@@ -421,7 +421,7 @@ langchain-rag/
 ## Roadmap
 
 - [ ] **API 服务加固（M9-P3）** — `retrieval.trace` CUSTOM 事件、长会话事件日志压缩、鉴权挂载、子代理异常 run 级收口（当前已有 unhandledRejection 进程兜底）
-- [ ] **前端体验深化** — 按 [design-system](design-system/docs-rag-chat/MASTER.md) 规范推进组件化与双主题打磨
+- [ ] **前端体验深化** — 按 [设计系统规范](packages/web/docs/MASTER.md) 推进组件化与双主题打磨
 - [ ] **Metadata 路由** — 基于 `language` / `module` 元数据预过滤，解决跨语言与跨包混淆问题
 - [ ] **Reranker 模型升级** — 接入 bge-reranker-v2-m3 或中文微调 reranker，替换当前效果未达预期的 qwen3-rerank
 - [ ] **BM25 索引优化** — 流式增量构建 / 紧凑数据结构，支持 100k+ chunks 无 OOM；长期迁移至 Qdrant native sparse vectors
