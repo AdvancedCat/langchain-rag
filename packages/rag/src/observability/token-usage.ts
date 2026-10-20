@@ -64,7 +64,9 @@ function pickUsage(
 
 /**
  * 跨 LLM 调用累计本轮用量：handleLLMEnd 每次 LLM 调用恰好触发一次
- * （流式聚合 usage 在末 chunk 汇齐），主代理 + 子代理逐一累加即为整轮。
+ * （流式聚合 usage 在末 chunk 汇齐），主代理 + 子代理逐一累加。
+ * 作为 config 级回调注册时只覆盖 graph 传播链上的调用——检索工具内直调的
+ * query rewrite / multiQuery 不在链上，不计入（见 langchain-handler.ts 头注）。
  * 每次调用先取 generation 级 usage_metadata，整级缺失才回退 llmOutput 一次，
  * 避免多代生成时按代数重复累加。
  */

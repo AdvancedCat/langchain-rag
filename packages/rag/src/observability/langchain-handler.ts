@@ -150,7 +150,6 @@ export function getCozeLoopCallbackHandler(): CozeLoopLangChainCallbackHandler {
     return handlerSingleton;
 }
 
-/** 禁用时返回空数组（LangChain 接受空 callbacks，调用方无需分支） */
 /** 恒返回数组（CozeLoop 禁用时为空），便于调用方与其余 config 级回调拼接 */
 export function getLangChainTracingCallbacks(): BaseCallbackHandler[] {
     if (!isCozeLoopEnabled()) return [];

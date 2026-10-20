@@ -294,7 +294,11 @@ export class RunManager {
                     // thread_id 让 checkpointer 按 thread 恢复多轮上下文（方案 §7.3）
                     configurable: { thread_id: run.threadId },
                     // CozeLoop：config 级回调兜底（与 LLM 实例级回调同一 handler，run_id 幂等去重）
-                    // 用量收集：独立 handler，避免与观测 handler 的语义耦合
+                    // 用量收集：独立 handler，避免与观测 handler 的语义耦合。只覆盖 graph 传播链上的
+                    // LLM 调用（主代理 + 子代理）；search_documentation 工具内直调的 query rewrite /
+                    // multiQuery 不在此链上（见 langchain-handler.ts 头注），其 token 未计入——
+                    // 开启 RETRIEVAL_QUERY_REWRITE（默认）时 run.usage 会略低于罗盘 span 合计。
+                    // 补齐需把工具收到的 config.callbacks 穿透进 transformers 的 llm.invoke。
                     callbacks: [...getLangChainTracingCallbacks(), usageCollector],
                 },
             );

@@ -37,6 +37,17 @@ describe('UsageCollectorHandler', () => {
         expect(collector.total()).toEqual({ input: 10, output: 5, total: 15 });
     });
 
+    it('generation 级 usage_metadata 与 llmOutput 同时存在时只取前者，不叠加', () => {
+        const collector = createUsageCollector();
+        collector.handleLLMEnd(
+            llmResult(
+                [{ message: { usage_metadata: { input_tokens: 10, output_tokens: 5, total_tokens: 15 } } }],
+                { tokenUsage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 } },
+            ),
+        );
+        expect(collector.total()).toEqual({ input: 10, output: 5, total: 15 });
+    });
+
     it('无任何用量数据 → total() 返回 null', () => {
         const collector = createUsageCollector();
         expect(collector.total()).toBeNull();
