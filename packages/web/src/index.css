@@ -129,6 +129,13 @@ body,
     height: 100%;
 }
 
+/* 字体灰度抗锯齿（借鉴 DSH base.css）：macOS 默认次像素渲染会让深底白字
+   显得过粗过亮；灰度渲染笔画更纤细、观感与 DSH 一致。两主题统一生效。 */
+html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
 /* 键盘焦点全局可见（MASTER §9） */
 :focus-visible {
     outline: 2px solid var(--ring);

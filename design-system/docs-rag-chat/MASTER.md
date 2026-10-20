@@ -5,7 +5,7 @@
 >
 > **Project:** Docs RAG Chat（`packages/web`，React 19 + Tailwind CSS v4）
 > **Generated:** 2026-10-11（ui-ux-pro-max 检索 + 现状审查，方向经确认）
-> **Updated:** 2026-10-20 色系改造：借鉴 DSH（DeepSeek Harness `design-platform.css`）主题色——accent 由 indigo 换为 deepseek 品牌蓝（浅 500 `rgb(65 118 230)` / 深 400 `rgb(122 170 255)`）、中性 zinc 换 neutral-bluish 蓝灰阶、状态色对齐 DSH green/amber/red、新增 `--bubble` 软底气泡 token（§7 用户气泡改软底，浅色 deepseek-50 淡蓝底 / 深色 neutral-bluish-850 灰底）。2026-10-19（纳入 PR #2 TraceChip 规范修订；P1 实施：§2 增补 `--accent-hover` 与状态色 `-fg`/`-soft` 衍生 token，duration 经 `@theme static` 发射；P2 实施：§2 增补过程块类型色与深岛前景 token，§6 完成 lucide 迁移与图标语义拆分；P3 实施：品牌 mark（文档+检索字形）替换 R 字母块、§7 抽屉侧栏落地（§2 增补 `--scrim`）、空态视觉增强与 §5 页边距/§9 触达达标；P3 追加：§7 新增答案元信息行（复制回答 / 用量 / 时间，用量经 api CUSTOM `run.usage` 事件透出））
+> **Updated:** 2026-10-20 色系改造：借鉴 DSH（DeepSeek Harness `design-platform.css`）主题色——accent 由 indigo 换为 deepseek 品牌蓝（浅 500 `rgb(65 118 230)` / 深 400 `rgb(122 170 255)`）、中性 zinc 换 neutral-bluish 蓝灰阶、状态色对齐 DSH green/amber/red、新增 `--bubble` 软底气泡 token（§7 用户气泡改软底，浅色 deepseek-50 淡蓝底 / 深色 neutral-bluish-850 灰底）；同日追加 §4 全局灰度抗锯齿（借鉴 DSH base.css，修正深底白字次像素渲染过亮）。2026-10-19（纳入 PR #2 TraceChip 规范修订；P1 实施：§2 增补 `--accent-hover` 与状态色 `-fg`/`-soft` 衍生 token，duration 经 `@theme static` 发射；P2 实施：§2 增补过程块类型色与深岛前景 token，§6 完成 lucide 迁移与图标语义拆分；P3 实施：品牌 mark（文档+检索字形）替换 R 字母块、§7 抽屉侧栏落地（§2 增补 `--scrim`）、空态视觉增强与 §5 页边距/§9 触达达标；P3 追加：§7 新增答案元信息行（复制回答 / 用量 / 时间，用量经 api CUSTOM `run.usage` 事件透出））
 > **Style:** Minimalism & Swiss（极简瑞士风）· 开发者工具 · 双主题（浅色默认 + 深色）
 
 ---
@@ -185,6 +185,7 @@ component 层   JSX 中只使用语义工具类（bg-canvas、text-content-secon
 ## 4. 字体
 
 - **界面**：Inter Variable（自托管 `@fontsource-variable/inter`）+ 系统中文栈回退；**代码**：JetBrains Mono（自托管 `@fontsource/jetbrains-mono` 400/500）。不引 Google Fonts 运行时依赖。
+- **字体渲染**：全局灰度抗锯齿（`html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale }`，2026-10-20 借鉴 DSH base.css）——macOS 默认次像素渲染会让深底白字显得过粗过亮，灰度渲染两主题统一、观感更细腻。
 - 数字场景（时间戳、消息计数）加 `tabular-nums`；中文一律不加 `letter-spacing`；拉丁大标题可 `-0.01em`。
 
 | 用途 | 字号/行高 |
