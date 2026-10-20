@@ -9,14 +9,17 @@ import type { ReactNode } from 'react';
 export function Tooltip({
     label,
     placement = 'bottom',
+    className,
     children,
 }: {
     label: string;
     placement?: 'top' | 'bottom';
+    /** 附加到外层包装 span（Tooltip 是 flex 容器的直接子元素，auto 边距等布局属性应加在这里） */
+    className?: string;
     children: ReactNode;
 }) {
     return (
-        <span className="group/tt relative inline-flex">
+        <span className={`group/tt relative inline-flex ${className ?? ''}`}>
             {children}
             <span
                 aria-hidden="true"
