@@ -127,8 +127,6 @@ export function ChatView({
                         ))}
                         {lastTurn === undefined && <span />}
                     </div>
-                    {/* 底部渐隐（DSH「遮罩归滚动器」）：内容贴底时在悬浮输入卡上方淡出 */}
-                    <div aria-hidden className="sticky bottom-0 h-6 bg-gradient-to-t from-canvas to-transparent" />
                 </div>
             )}
 
