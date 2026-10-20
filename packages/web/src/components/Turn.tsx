@@ -28,19 +28,19 @@ function formatTurnTime(timestamp: number): string {
     return `${date.getMonth() + 1}月${date.getDate()}日 ${hm}`;
 }
 
-/** 复制回答按钮（设计规范 §7 复制反馈模式：check 图标 + ≤1.6s 回退，尺寸不变） */
+/** 复制回答按钮（设计规范 §7 复制反馈模式：check 图标 + ≤1.6s 回退，尺寸不变；失败时 label 翻为「复制失败」） */
 function CopyAnswerButton({ text }: { text: string }) {
-    const { copied, copy } = useCopy();
+    const { copied, failed, copy } = useCopy();
+    const label = failed ? '复制失败' : copied ? '已复制' : '复制回答';
     return (
-        <Tooltip label={copied ? '已复制' : '复制回答'}>
+        <Tooltip label={label}>
             <button
                 type="button"
                 onClick={() => copy(text)}
-                aria-label={copied ? '已复制' : '复制回答'}
+                aria-label={label}
                 className="-ml-2 flex h-8 w-8 items-center justify-center rounded-md text-content-secondary transition-colors hover:bg-content/10 hover:text-content"
             >
                 {copied ? <IconCheck className="h-3.5 w-3.5 text-accent" /> : <IconCopy />}
-                <span className="sr-only">{copied ? '已复制' : '复制回答'}</span>
             </button>
         </Tooltip>
     );
@@ -48,7 +48,7 @@ function CopyAnswerButton({ text }: { text: string }) {
 
 /** CozeLoop traceId 复制芯片：点击复制完整 32 位 hex，悬停 title 看全量；复制反馈见 §7 通用模式 */
 function TraceChip({ traceId }: { traceId: string }) {
-    const { copied, copy } = useCopy();
+    const { copied, failed, copy } = useCopy();
     return (
         <button
             type="button"
@@ -61,6 +61,8 @@ function TraceChip({ traceId }: { traceId: string }) {
                     <IconCheck className="h-3 w-3 text-accent" />
                     已复制
                 </>
+            ) : failed ? (
+                '复制失败'
             ) : (
                 `trace ${traceId.slice(0, 8)}…`
             )}
@@ -75,10 +77,7 @@ function TraceChip({ traceId }: { traceId: string }) {
 export function TurnView({ turn, canRetry, onRetry }: { turn: Turn; canRetry: boolean; onRetry: (text: string) => void }) {
     const streaming = turn.status === 'streaming';
     const { process, answer } = partitionTurnBlocks(turn.blocks);
-    const answerText = answer
-        .filter((block) => block.kind === 'text')
-        .map((block) => block.content)
-        .join('\n\n');
+    const answerText = answer.map((block) => block.content).join('\n\n');
     return (
         <div className="enter-in space-y-3">
             {turn.userText !== null ? (

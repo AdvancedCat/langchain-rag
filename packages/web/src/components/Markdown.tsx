@@ -31,7 +31,8 @@ function hastTextDeep(node: HastNodeLike | undefined): string {
  * 色彩用深岛 token：代码块恒定 zinc-900 深底，两主题一致。
  */
 function CodeBlock({ lang, raw, children }: { lang: string | null; raw: string; children: ReactNode }) {
-    const { copied, copy } = useCopy();
+    const { copied, failed, copy } = useCopy();
+    const copyLabel = failed ? '复制失败' : copied ? '已复制' : '复制代码';
     return (
         <div className="group/code relative">
             {/* pre 覆写后必须补回：深岛背景/横向滚动/pre code 样式重置都挂在 .md-body pre 上 */}
@@ -42,15 +43,14 @@ function CodeBlock({ lang, raw, children }: { lang: string | null; raw: string; 
                         {lang}
                     </span>
                 )}
-                <Tooltip label={copied ? '已复制' : '复制代码'}>
+                <Tooltip label={copyLabel}>
                     <button
                         type="button"
                         onClick={() => copy(raw)}
-                        aria-label={copied ? '已复制' : '复制代码'}
+                        aria-label={copyLabel}
                         className="flex h-6 w-6 items-center justify-center rounded bg-code-chip text-code-muted transition-colors hover:bg-code-chip-hover hover:text-code-bright"
                     >
                         {copied ? <IconCheck className="h-3.5 w-3.5 text-code-bright" /> : <IconCopy />}
-                        {copied && <span className="sr-only">已复制</span>}
                     </button>
                 </Tooltip>
             </div>
