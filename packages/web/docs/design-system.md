@@ -3,6 +3,8 @@
 > **检索规则：** 为某个页面/组件做 UI 时，先查 `packages/web/docs/pages/[page-name].md`；
 > 存在则其规则**覆盖**本文件，不存在则严格遵循本文件。
 >
+> **Handoff：** 本规范的可复刻导出版为同目录 `design-handoff.md`（自包含，用于在其他对话类项目中复用本体系）；**本文件与 `src/index.css` 变更时必须同步回填该文件**。
+>
 > **Project:** Docs RAG Chat（`packages/web` 子项目的界面约束，React 19 + Tailwind CSS v4；本文件随 web 包维护，原 `design-system/docs-rag-chat/` 已于 2026-10-20 并入）
 > **Generated:** 2026-10-11（ui-ux-pro-max 检索 + 现状审查，方向经确认）
 > **Updated:** 2026-10-20 Composer 收敛为单行（文本区主角 + 右下圆钮，取消卡内提示文案，说明由空态承担）。悬浮输入卡（面板式输入区）：§2 增补 `--composer-card`/`--elevation-card`/`--radius-panel`，§5 圆角增第五档面板 28px 与 `shadow-card` 阴影，§7 Composer 改悬浮卡（无边框投影 + 44px 圆形发送钮 + 滚动区底部渐隐）。2026-10-20 次级操作按钮 token（`--btn-secondary-bg/-bg-hover/-fg-hover`）：浅色 rest `#f9fafb`（neutral-bluish-50）→ hover `#353638`（neutral-bluish-800）反色 + 文本翻白，深色 rest 同画布、hover 提亮；应用于「新对话」与「重新加载」按钮。色系改造：主题色焕新——accent 由 indigo 换为品牌蓝（浅 500 `rgb(65 118 230)` / 深 400 `rgb(122 170 255)`）、中性 zinc 换 neutral-bluish 蓝灰阶、状态色改用 green/amber/red 语义、新增 `--bubble` 软底气泡 token（§7 用户气泡改软底，浅色淡蓝底 / 深色 neutral-bluish-850 灰底）；同日追加 §4 全局灰度抗锯齿（修正深底白字次像素渲染过亮）。2026-10-19（纳入 PR #2 TraceChip 规范修订；P1 实施：§2 增补 `--accent-hover` 与状态色 `-fg`/`-soft` 衍生 token，duration 经 `@theme static` 发射；P2 实施：§2 增补过程块类型色与深岛前景 token，§6 完成 lucide 迁移与图标语义拆分；P3 实施：品牌 mark（文档+检索字形）替换 R 字母块、§7 抽屉侧栏落地（§2 增补 `--scrim`）、空态视觉增强与 §5 页边距/§9 触达达标；P3 追加：§7 新增答案元信息行（复制回答 / 用量 / 时间，用量经 api CUSTOM `run.usage` 事件透出））
